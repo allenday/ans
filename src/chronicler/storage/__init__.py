@@ -103,3 +103,17 @@ message_id: {msg.metadata['message_id']}
         topic_name = metadata['topics'][topic_id]['name']
         
         self._repo.index.commit(f"Added message to topic: {topic_name}")
+
+    def add_remote(self, name: str, url: str) -> None:
+        """Add a remote repository"""
+        if not self._repo:
+            self._repo = Repo(self.repo_path)
+        self._repo.create_remote(name, url)
+
+    def push(self, remote_name: str = 'origin', branch: str = 'main') -> None:
+        """Push changes to remote repository"""
+        if not self._repo:
+            self._repo = Repo(self.repo_path)
+        
+        # Force push to ensure all changes are sent
+        self._repo.git.push('-u', remote_name, branch)
