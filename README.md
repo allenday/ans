@@ -39,3 +39,42 @@ We follow a strict branching strategy:
 
 ## Setup
 [Setup instructions to be added]
+
+## Development Setup
+
+### Git Integration Testing
+
+For running live integration tests with GitHub:
+
+1. Create a test repository on GitHub
+2. Configure local environment:
+   ```bash
+   # Create .env file in project root
+   echo "GITHUB_TEST_REPO=https://github.com/yourusername/test-repo.git" >> .env
+   echo "GITHUB_TOKEN=your_personal_access_token" >> .env
+   ```
+3. Generate a Personal Access Token:
+   - Go to GitHub Settings → Developer Settings → Personal Access Tokens
+   - Create a token with `repo` scope
+   - Copy token to .env file
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run only unit tests
+pytest tests/unit
+
+# Run only mock integration tests
+pytest tests/integration-mock
+
+# Run live integration tests (requires GitHub setup)
+pytest tests/integration-live
+```
+
+## Documentation
+- Added `.env.example` for required configuration
+- Updated README.md with setup instructions
+- Updated .gitignore for environment files
