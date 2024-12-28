@@ -12,11 +12,17 @@ jobs:
     steps:
     - name: Check branch naming convention
       run: |
-        BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+          BRANCH_NAME=${GITHUB_HEAD_REF#refs/heads/}
+        else
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        fi
+        
         if [[ "$BRANCH_NAME" == "main" ]]; then
           echo "❌ Don't work directly on main branch!"
           exit 1
         fi
+        
         if [[ ! "$BRANCH_NAME" =~ ^(feature|fix|docs|refactor)/ ]]; then
           echo "❌ Branch name must start with feature/, fix/, docs/, or refactor/"
           echo "Current branch: $BRANCH_NAME"
