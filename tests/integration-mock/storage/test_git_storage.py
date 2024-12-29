@@ -4,7 +4,9 @@ import tempfile
 import shutil
 from git import Repo
 import yaml
-from chronicler.storage import GitStorage
+from chronicler.storage import GitStorageAdapter
+from chronicler.storage.interface import User, Topic, Message
+from datetime import datetime
 
 @pytest.fixture
 def temp_dir():
@@ -33,14 +35,15 @@ def bare_repo():
     shutil.rmtree(tmp_path)
 
 @pytest.fixture
-def storage_with_remote(temp_dir, bare_repo):
-    """Provides a GitStorage instance configured with a remote"""
+async def storage_with_remote(temp_dir, bare_repo):
+    """Provides a GitStorageAdapter instance configured with a remote"""
     # Initialize storage first (this creates the directory)
-    storage = GitStorage(base_path=temp_dir, user_id="test_user")
-    storage.init_user_repo()
+    adapter = GitStorageAdapter(base_path=temp_dir)
+    user = User(id="test_user", name="Test User")
+    await adapter.init_storage(user)
     
     # Set up git repo with remote
-    repo = Repo(storage.repo_path)
+    repo = Repo(adapter.repo_path)
     repo.create_remote('origin', bare_repo.working_dir)
     
     # Configure git to use rebase strategy
@@ -50,34 +53,37 @@ def storage_with_remote(temp_dir, bare_repo):
     # Pull from remote to sync histories
     repo.git.pull('origin', 'main')
     
-    return storage
+    return adapter
 
-def test_push_to_remote(storage_with_remote):
+@pytest.mark.asyncio
+async def test_push_to_remote(storage_with_remote):
     """Test that changes are pushed to remote"""
-    topic_id = "topic_123"
-    storage_with_remote.create_topic(topic_id, "Test Topic")
+    adapter = await storage_with_remote
+    topic = Topic(id="topic_123", name="Test Topic")
+    await adapter.create_topic(topic)
     
-    message = {
-        "text": "Test message",
-        "timestamp": "2024-03-20T12:00:00Z",
-        "sender": "user123"
-    }
-    storage_with_remote.record_message(topic_id, message)
+    message = Message(
+        content="Test message",
+        metadata={"sender": "user123"},
+        source="test",
+        timestamp=datetime.fromisoformat("2024-03-20T12:00:00+00:00")
+    )
+    await adapter.save_message(topic.id, message)
     
     # Push changes to remote
-    storage_with_remote.push()
+    await adapter.sync()
     
     # Clone the bare repo to verify contents
     clone_path = Path(tempfile.mkdtemp())
-    cloned_repo = Repo.clone_from(storage_with_remote._repo.remotes.origin.url, clone_path)
+    cloned_repo = Repo.clone_from(adapter._repo.remotes.origin.url, clone_path)
     
     try:
         # Check that files exist in clone
-        messages_file = clone_path / "topics" / topic_id / "messages.md"
-        assert messages_file.exists(), "Messages file not found in cloned repo"
+        cloned_messages = clone_path / "topics" / topic.id / GitStorageAdapter.MESSAGES_FILE
+        assert cloned_messages.exists(), "Messages file not found in cloned repo"
         
         # Verify content
-        content = messages_file.read_text()
+        content = cloned_messages.read_text()
         assert "Test message" in content, "Message content not found in cloned repo"
         
         # Check metadata
@@ -85,24 +91,27 @@ def test_push_to_remote(storage_with_remote):
         assert metadata_file.exists(), "Metadata file not found in cloned repo"
         with open(metadata_file) as f:
             metadata = yaml.safe_load(f)
-        assert topic_id in metadata['topics'], "Topic not found in metadata"
+        assert topic.id in metadata['topics'], "Topic not found in metadata"
     finally:
         # Cleanup
         shutil.rmtree(clone_path)
 
-def test_remote_operations(storage_with_remote):
+@pytest.mark.asyncio
+async def test_remote_operations(storage_with_remote):
     """Test various remote operations"""
+    adapter = await storage_with_remote
     # Test that remote is properly configured
-    assert 'origin' in [r.name for r in storage_with_remote._repo.remotes]
+    assert 'origin' in [r.name for r in adapter._repo.remotes]
     
     # Test basic push operation
-    storage_with_remote.create_topic("test_topic", "Test Topic")
-    storage_with_remote.push()
+    topic = Topic(id="test_topic", name="Test Topic")
+    await adapter.create_topic(topic)
+    await adapter.sync()
     
     # Verify remote has our changes
     clone_path = Path(tempfile.mkdtemp())
     try:
-        cloned_repo = Repo.clone_from(storage_with_remote._repo.remotes.origin.url, clone_path)
+        cloned_repo = Repo.clone_from(adapter._repo.remotes.origin.url, clone_path)
         assert (clone_path / "topics" / "test_topic").exists()
     finally:
         shutil.rmtree(clone_path) 
