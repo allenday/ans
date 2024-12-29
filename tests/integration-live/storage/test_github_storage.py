@@ -1,87 +1,91 @@
 import os
 import pytest
+import pytest_asyncio
 from pathlib import Path
 from dotenv import load_dotenv
-from chronicler.storage import GitStorage
+from chronicler.storage.interface import User, Topic, Message, Attachment
+from chronicler.storage.git import GitStorageAdapter
 from git import Repo
 import tempfile
 import shutil
 import yaml
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
+
+# Mark all tests in this file as live integration tests
+pytestmark = [pytest.mark.live, pytest.mark.integration]
 
 @pytest.fixture
 def github_repo():
     """Provides GitHub repository URL from environment"""
     repo_url = os.getenv("GITHUB_TEST_REPO")
     if not repo_url:
-        pytest.skip("GITHUB_TEST_REPO not configured")
+        pytest.skip("GITHUB_TEST_REPO environment variable not set. Source .env file to run live tests.")
     return repo_url
 
-@pytest.fixture
-def github_storage(tmp_path, github_repo):
-    """Provides GitStorage configured with GitHub remote"""
-    storage = GitStorage(base_path=tmp_path, user_id="test_user")
-    storage.init_user_repo()
+@pytest_asyncio.fixture
+async def github_storage(tmp_path, github_repo):
+    """Provides GitStorageAdapter configured with GitHub remote"""
+    adapter = GitStorageAdapter(base_path=tmp_path)
+    user = User(id="test_user", name="Test User")
+    await adapter.init_storage(user)
     
     # Configure git user for commits
-    repo = Repo(storage.repo_path)
+    repo = Repo(adapter.repo_path)
     with repo.config_writer() as cw:
         cw.set_value('user', 'name', 'Integration Test')
         cw.set_value('user', 'email', 'test@example.com')
     
     # Set up remote and sync
-    storage.add_remote('origin', github_repo)
+    adapter.add_remote('origin', github_repo)
     
     try:
         # Try to pull existing content
-        repo.git.pull('origin', 'main', '--allow-unrelated-histories')
+        await adapter.sync()
     except:
-        # If pull fails (e.g., empty repo), force push our initial structure
+        # Force push clean state
         repo.git.push('-u', 'origin', 'main', '--force')
     
-    return storage
+    return adapter
 
-def test_github_push(github_storage):
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_github_push(github_storage):
     """Test pushing changes to GitHub"""
-    # Create and push changes
-    topic_id = "live_test_topic"
-    github_storage.create_topic(topic_id, "Live Test Topic")
+    adapter = await github_storage  # Await the fixture
+    topic = Topic(id="live_test_topic", name="Live Test Topic")
+    await adapter.create_topic(topic, ignore_exists=True)
     
-    # Add a test message
-    message = {
-        "text": "Test message from live integration",
-        "timestamp": "2024-03-20T12:00:00Z",
-        "sender": "test_user"
-    }
-    github_storage.record_message(topic_id, message)
+    # Add test message
+    message = Message(
+        content="Test message from live integration",
+        metadata={},
+        source="test",
+        timestamp=datetime.utcnow()
+    )
+    await adapter.save_message(topic.id, message)
     
     # Push changes
-    github_storage.push()
+    await adapter.sync()
     
-    # Debug: Check local content
-    messages_file = github_storage.repo_path / "topics" / topic_id / "messages.md"
-    print(f"\nLocal messages content:\n{messages_file.read_text()}")
-    
-    # Clone and verify
+    # Verify through clone
     clone_path = Path(tempfile.mkdtemp())
     try:
-        cloned_repo = Repo.clone_from(github_storage._repo.remotes.origin.url, clone_path)
+        cloned_repo = Repo.clone_from(adapter._repo.remotes.origin.url, clone_path)
         
-        # Check cloned content
-        cloned_messages = clone_path / "topics" / topic_id / "messages.md"
-        print(f"\nCloned messages content:\n{cloned_messages.read_text()}")
-        
+        # Check content
+        cloned_messages = clone_path / "topics" / topic.id / GitStorageAdapter.MESSAGES_FILE
         assert cloned_messages.exists(), "Messages file not found in clone"
         content = cloned_messages.read_text()
-        assert "Test message from live integration" in content, "Message content not found"
+        assert "Test message from live integration" in content
         
         # Check metadata
         metadata_file = clone_path / "metadata.yaml"
-        assert metadata_file.exists(), "Metadata file not found"
+        assert metadata_file.exists()
         with open(metadata_file) as f:
             metadata = yaml.safe_load(f)
-        assert topic_id in metadata['topics'], "Topic not found in metadata"
+        assert topic.id in metadata['topics']
     finally:
         shutil.rmtree(clone_path)
