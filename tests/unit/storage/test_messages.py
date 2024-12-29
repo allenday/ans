@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 from datetime import datetime
 import json
+import logging
 
 from chronicler.storage.interface import Message, Attachment
 from chronicler.storage.messages import MessageStore
@@ -11,8 +12,10 @@ def temp_file(tmp_path):
     """Provides a temporary file for testing"""
     return tmp_path / "messages.jsonl"
 
-def test_serialize_basic_message(temp_file):
+@pytest.mark.unit
+def test_serialize_basic_message(temp_file, caplog, test_log_level):
     """Test serializing a basic message"""
+    caplog.set_level(test_log_level)
     message = Message(
         content="Test message",
         metadata={"type": "chat"},
@@ -30,8 +33,9 @@ def test_serialize_basic_message(temp_file):
     assert data["metadata"]["type"] == "chat"
     assert data["timestamp"] == "2024-01-01T12:00:00+00:00"
 
-def test_serialize_message_with_attachments(temp_file):
+def test_serialize_message_with_attachments(temp_file, caplog, test_log_level):
     """Test serializing message with attachments"""
+    caplog.set_level(test_log_level)
     attachments = [
         Attachment(id="att1", type="image/jpeg", filename="test.jpg"),
         Attachment(id="att2", type="text/plain", filename="test.txt")
@@ -52,8 +56,9 @@ def test_serialize_message_with_attachments(temp_file):
     assert data["attachments"][0]["filename"] == "test.jpg"
     assert data["attachments"][1]["type"] == "text/plain"
 
-def test_load_multiple_messages(temp_file):
+def test_load_multiple_messages(temp_file, caplog, test_log_level):
     """Test loading multiple messages from file"""
+    caplog.set_level(test_log_level)
     messages = [
         Message(
             content=f"Message {i}",
@@ -77,8 +82,9 @@ def test_load_multiple_messages(temp_file):
     assert len(lines) == 3
     assert all(json.loads(line) for line in lines)  # Each line should be valid JSON
 
-def test_append_multiple_messages(temp_file):
+def test_append_multiple_messages(temp_file, caplog, test_log_level):
     """Test appending multiple messages one by one"""
+    caplog.set_level(test_log_level)
     messages = [
         Message(
             content=f"Message {i}",
@@ -96,8 +102,9 @@ def test_append_multiple_messages(temp_file):
     assert len(loaded) == 3
     assert [msg.content for msg in loaded] == ["Message 0", "Message 1", "Message 2"]
 
-def test_load_empty_file(temp_file):
+def test_load_empty_file(temp_file, caplog, test_log_level):
     """Test loading from empty or non-existent file"""
+    caplog.set_level(test_log_level)
     # Non-existent file
     assert MessageStore.load_messages(temp_file) == []
     
@@ -105,8 +112,9 @@ def test_load_empty_file(temp_file):
     temp_file.touch()
     assert MessageStore.load_messages(temp_file) == []
 
-def test_metadata_handling(temp_file):
+def test_metadata_handling(temp_file, caplog, test_log_level):
     """Test handling of special metadata fields"""
+    caplog.set_level(test_log_level)
     message = Message(
         content="Test",
         metadata={
@@ -125,8 +133,9 @@ def test_metadata_handling(temp_file):
     assert loaded.timestamp == datetime.fromisoformat("2024-01-01T12:00:00+00:00")
     assert loaded.metadata == {"custom": "value"}
 
-def test_unicode_content(temp_file):
+def test_unicode_content(temp_file, caplog, test_log_level):
     """Test handling of unicode content"""
+    caplog.set_level(test_log_level)
     message = Message(
         content="Hello 👋 World 🌍",
         metadata={},

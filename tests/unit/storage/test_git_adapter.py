@@ -1,8 +1,12 @@
 import pytest
 import pytest_asyncio
 from pathlib import Path
+import tempfile
+import shutil
+from git import Repo
 import yaml
 from datetime import datetime
+import logging
 import json
 
 from chronicler.storage.interface import User, Topic, Message, Attachment
@@ -21,8 +25,9 @@ async def storage(tmp_path):
     return adapter  # Return the adapter directly, not a coroutine
 
 @pytest.mark.asyncio
-async def test_init_storage(tmp_path):
+async def test_init_storage(tmp_path, caplog, test_log_level):
     """Test storage initialization"""
+    caplog.set_level(test_log_level)
     adapter = GitStorageAdapter(base_path=tmp_path)
     user = User(id="test_user", name="Test User")
     
@@ -43,8 +48,9 @@ async def test_init_storage(tmp_path):
         assert metadata["topics"] == {}
 
 @pytest.mark.asyncio
-async def test_create_topic(storage):
+async def test_create_topic(storage, caplog, test_log_level):
     """Test topic creation"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -63,8 +69,9 @@ async def test_create_topic(storage):
         assert metadata["topics"][topic.id]["name"] == topic.name
 
 @pytest.mark.asyncio
-async def test_save_message(storage):
+async def test_save_message(storage, caplog, test_log_level):
     """Test saving a message to a topic"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -88,8 +95,9 @@ async def test_save_message(storage):
     assert data["metadata"]["type"] == "chat"
 
 @pytest.mark.asyncio
-async def test_save_attachment(storage):
+async def test_save_attachment(storage, caplog, test_log_level):
     """Test attachment saving"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     # Create topic first
     topic = Topic(id="topic_123", name="Test Topic")
@@ -111,8 +119,9 @@ async def test_save_attachment(storage):
     assert file_path.read_bytes() == test_data
 
 @pytest.mark.asyncio
-async def test_save_message_with_attachment(storage):
+async def test_save_message_with_attachment(storage, caplog, test_log_level):
     """Test saving message with attachment reference"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -142,8 +151,9 @@ async def test_save_message_with_attachment(storage):
     assert data["attachments"][0]["filename"] == "test.jpg"
 
 @pytest.mark.asyncio
-async def test_init_storage_twice(tmp_path):
+async def test_init_storage_twice(tmp_path, caplog, test_log_level):
     """Test initializing storage multiple times"""
+    caplog.set_level(test_log_level)
     adapter = GitStorageAdapter(base_path=tmp_path)
     user = User(id="test_user", name="Test User")
     
@@ -158,8 +168,9 @@ async def test_init_storage_twice(tmp_path):
     assert first_commit_hash == second_commit_hash
 
 @pytest.mark.asyncio
-async def test_create_topic_with_metadata(storage):
+async def test_create_topic_with_metadata(storage, caplog, test_log_level):
     """Test creating topic with additional metadata"""
+    caplog.set_level(test_log_level)
     adapter = await storage  # Get the actual adapter from the fixture
     topic = Topic(
         id="topic_123",
@@ -180,8 +191,9 @@ async def test_create_topic_with_metadata(storage):
         assert topic_data["tags"] == ["test", "example"]
 
 @pytest.mark.asyncio
-async def test_save_message_to_nonexistent_topic(storage):
+async def test_save_message_to_nonexistent_topic(storage, caplog, test_log_level):
     """Test saving message to non-existent topic raises error"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     message = Message(
         content="Test message",
@@ -194,9 +206,10 @@ async def test_save_message_to_nonexistent_topic(storage):
         await adapter.save_message("nonexistent_topic", message)
 
 @pytest.mark.asyncio
-async def test_save_attachment_without_data(storage):
+async def test_save_attachment_without_data(storage, caplog, test_log_level):
     """Test saving attachment without binary data"""
-    adapter = await storage  # Get the actual adapter from the fixture
+    caplog.set_level(test_log_level)
+    adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
     
@@ -214,8 +227,9 @@ async def test_save_attachment_without_data(storage):
     assert not file_path.exists() 
 
 @pytest.mark.asyncio
-async def test_save_multiple_messages(storage):
+async def test_save_multiple_messages(storage, caplog, test_log_level):
     """Test saving multiple messages to the same topic"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -240,8 +254,9 @@ async def test_save_multiple_messages(storage):
     assert "Message 2" in posts[2].content
 
 @pytest.mark.asyncio
-async def test_save_message_with_multiple_attachments(storage):
+async def test_save_message_with_multiple_attachments(storage, caplog, test_log_level):
     """Test saving message with multiple attachments"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -273,8 +288,9 @@ async def test_save_message_with_multiple_attachments(storage):
     assert len(saved_files) == 3
 
 @pytest.mark.asyncio
-async def test_create_topic_with_invalid_id(storage):
+async def test_create_topic_with_invalid_id(storage, caplog, test_log_level):
     """Test creating topic with invalid characters in ID"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="invalid/id", name="Test Topic")
     with pytest.raises(ValueError):
@@ -283,8 +299,9 @@ async def test_create_topic_with_invalid_id(storage):
 @pytest.mark.unit
 @pytest.mark.slow  # For large file tests
 @pytest.mark.asyncio
-async def test_save_large_message(storage):
+async def test_save_large_message(storage, caplog, test_log_level):
     """Test saving a large message"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -307,8 +324,9 @@ async def test_save_large_message(storage):
     assert len(data["content"]) == 102400
 
 @pytest.mark.asyncio
-async def test_save_binary_attachment(storage):
+async def test_save_binary_attachment(storage, caplog, test_log_level):
     """Test saving binary attachment with various content types"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -336,8 +354,9 @@ async def test_save_binary_attachment(storage):
 @pytest.mark.unit
 @pytest.mark.fs  # For filesystem-specific tests
 @pytest.mark.asyncio
-async def test_topic_directory_permissions(storage):
+async def test_topic_directory_permissions(storage, caplog, test_log_level):
     """Test that created directories have correct permissions"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -350,8 +369,9 @@ async def test_topic_directory_permissions(storage):
     assert media_path.stat().st_mode & 0o777 == 0o755 
 
 @pytest.mark.asyncio
-async def test_create_duplicate_topic(storage):
+async def test_create_duplicate_topic(storage, caplog, test_log_level):
     """Test creating a topic that already exists"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -361,8 +381,9 @@ async def test_create_duplicate_topic(storage):
         await adapter.create_topic(topic)
 
 @pytest.mark.asyncio
-async def test_save_attachment_invalid_topic(storage):
+async def test_save_attachment_invalid_topic(storage, caplog, test_log_level):
     """Test saving attachment to non-existent topic"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     attachment = Attachment(
         id="att_123",
@@ -375,8 +396,9 @@ async def test_save_attachment_invalid_topic(storage):
         await adapter.save_attachment("nonexistent", "msg_123", attachment)
 
 @pytest.mark.asyncio
-async def test_invalid_base_path(tmp_path):
+async def test_invalid_base_path(tmp_path, caplog, test_log_level):
     """Test initializing storage with invalid base path"""
+    caplog.set_level(test_log_level)
     nonexistent_path = tmp_path / "nonexistent"
     adapter = GitStorageAdapter(base_path=nonexistent_path)
     user = User(id="test_user", name="Test User")
@@ -386,8 +408,9 @@ async def test_invalid_base_path(tmp_path):
     assert nonexistent_path.exists()
 
 @pytest.mark.asyncio
-async def test_empty_message_content(storage):
+async def test_empty_message_content(storage, caplog, test_log_level):
     """Test saving message with empty content"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -406,8 +429,9 @@ async def test_empty_message_content(storage):
     assert data["content"] == ""
 
 @pytest.mark.asyncio
-async def test_unicode_content(storage):
+async def test_unicode_content(storage, caplog, test_log_level):
     """Test handling of unicode content in messages"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)
@@ -426,8 +450,9 @@ async def test_unicode_content(storage):
     assert "🌍" in data["content"]
 
 @pytest.mark.asyncio
-async def test_create_topic_ignore_exists(storage):
+async def test_create_topic_ignore_exists(storage, caplog, test_log_level):
     """Test creating a topic that already exists with ignore_exists=True"""
+    caplog.set_level(test_log_level)
     adapter = await storage
     topic = Topic(id="topic_123", name="Test Topic")
     await adapter.create_topic(topic)

@@ -4,6 +4,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class User:
@@ -27,10 +30,12 @@ class Message:
 
     def to_json(self) -> str:
         """Convert message to JSON string"""
+        logger.debug(f"Serializing message from {self.source}")
         data = asdict(self)
         data['timestamp'] = self.timestamp.isoformat()
         # Handle attachments - convert bytes to None for serialization
         if data.get('attachments'):
+            logger.debug(f"Processing {len(data['attachments'])} attachments")
             for att in data['attachments']:
                 if 'data' in att:
                     att['data'] = None
@@ -39,13 +44,16 @@ class Message:
     @classmethod
     def from_json(cls, json_str: str) -> 'Message':
         """Create message from JSON string with validation"""
+        logger.debug("Deserializing message from JSON")
         data = json.loads(json_str)
         # Validate required fields
         for field in ['content', 'source', 'timestamp']:
             if field not in data:
+                logger.error(f"Missing required field in JSON: {field}")
                 raise ValueError(f"Missing required field: {field}")
         
         # Convert timestamp back to datetime
+        logger.debug(f"Converting timestamp: {data['timestamp']}")
         data['timestamp'] = datetime.fromisoformat(data['timestamp'])
         # Clean metadata - remove special fields
         if 'metadata' in data:

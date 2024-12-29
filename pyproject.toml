@@ -15,7 +15,12 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "--import-mode=importlib"
+addopts = """
+    --import-mode=importlib
+    --log-cli-level=DEBUG
+    --log-cli-format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    --log-cli-date-format='%Y-%m-%d %H:%M:%S'
+"""
 markers = [
     "unit: marks tests as unit tests",
     "integration: marks tests as integration tests",
@@ -23,6 +28,8 @@ markers = [
     "slow: marks tests as slow running",
     "fs: marks tests that depend on filesystem features"
 ]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 
 [project.optional-dependencies]
 test = [

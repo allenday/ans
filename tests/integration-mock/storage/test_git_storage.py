@@ -1,12 +1,17 @@
 import pytest
+import pytest_asyncio
 from pathlib import Path
 import tempfile
 import shutil
 from git import Repo
 import yaml
+import logging
+
 from chronicler.storage import GitStorageAdapter
 from chronicler.storage.interface import User, Topic, Message
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def temp_dir():
@@ -15,14 +20,16 @@ def temp_dir():
     yield tmp_path
     shutil.rmtree(tmp_path)
 
-@pytest.fixture
-def bare_repo():
+@pytest_asyncio.fixture
+async def bare_repo(temp_dir):
     """Creates a bare repo that acts as a remote with initial structure"""
-    tmp_path = Path(tempfile.mkdtemp())
-    bare_repo = Repo.init(tmp_path / "remote.git", bare=True, initial_branch='main')
+    logger.debug("Setting up bare repo for testing")
+    repo_path = temp_dir / "remote.git"
+    bare_repo = Repo.init(repo_path, bare=True, initial_branch='main')
     
     # Create a temporary clone to set up initial structure
-    working_dir = tmp_path / "setup"
+    working_dir = temp_dir / "setup"
+    working_dir.mkdir()
     setup_repo = Repo.clone_from(bare_repo.working_dir, working_dir)
     
     # Create initial structure
@@ -32,11 +39,12 @@ def bare_repo():
     setup_repo.git.push('origin', 'main')
     
     yield bare_repo
-    shutil.rmtree(tmp_path)
+    # Cleanup handled by temp_dir fixture
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def storage_with_remote(temp_dir, bare_repo):
     """Provides a GitStorageAdapter instance configured with a remote"""
+    logger.debug("Setting up storage with remote")
     # Initialize storage first (this creates the directory)
     adapter = GitStorageAdapter(base_path=temp_dir)
     user = User(id="test_user", name="Test User")
