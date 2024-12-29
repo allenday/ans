@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import yaml
 from datetime import datetime
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -52,9 +53,10 @@ async def github_storage(tmp_path, github_repo):
 
 @pytest.mark.slow
 @pytest.mark.asyncio
-async def test_github_push(github_storage):
+async def test_github_push(github_storage, caplog, test_log_level):
     """Test pushing changes to GitHub"""
-    adapter = await github_storage  # Await the fixture
+    caplog.set_level(test_log_level)
+    adapter = await github_storage
     topic = Topic(id="live_test_topic", name="Live Test Topic")
     await adapter.create_topic(topic, ignore_exists=True)
     
