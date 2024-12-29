@@ -1,9 +1,13 @@
-from .git import GitStorageAdapter
 from .interface import StorageAdapter, User, Topic, Message, Attachment
-import logging
+from .git import GitStorageAdapter
+from .messages import MessageStore
 
-# Configure module-level logger
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())  # Avoid "No handler found" warnings
-
-__all__ = ['GitStorageAdapter', 'StorageAdapter', 'User', 'Topic', 'Message', 'Attachment']
+__all__ = [
+    'StorageAdapter',
+    'GitStorageAdapter',
+    'MessageStore',
+    'User',
+    'Topic',
+    'Message',
+    'Attachment'
+]
