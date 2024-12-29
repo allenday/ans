@@ -8,8 +8,11 @@ import uuid
 from typing import Generator, Any
 import logging
 
-from .interface import StorageAdapter, User, Topic, Message, Attachment
-from .messages import MessageStore
+from chronicler.storage.interface import (
+    StorageAdapter, User, Topic, Message, 
+    Attachment
+)
+from chronicler.storage.messages import MessageStore
 
 logger = logging.getLogger(__name__)
 
@@ -163,16 +166,52 @@ class GitStorageAdapter(StorageAdapter):
         # Push changes to remote if available
         if 'origin' in self._repo.remotes:
             try:
+                logger.debug("Fetching from remote")
+                self._repo.git.fetch('origin')
+                
+                # Check if we need to pull
+                if self._repo.is_dirty() or self._repo.head.ref.commit != self._repo.refs['origin/main'].commit:
+                    logger.debug("Changes detected, pulling with rebase")
+                    self._repo.git.pull('--rebase', 'origin', 'main')
+                
                 logger.debug("Pushing changes to remote")
                 self._repo.git.push('-u', 'origin', 'main')
             except Exception as e:
-                logger.warning(f"Push failed: {e}. Attempting pull and retry")
-                self._repo.git.pull('--rebase', 'origin', 'main')
-                self._repo.git.push('-u', 'origin', 'main')
+                logger.error(f"Git sync failed: {e}")
+                raise
     
     def add_remote(self, name: str, url: str) -> None:
         """Add a remote repository"""
         logger.info(f"Adding remote '{name}' with URL: {url}")
         if not self._repo:
             self._repo = Repo(self.repo_path)
-        self._repo.create_remote(name, url) 
+        self._repo.create_remote(name, url)
+
+    async def set_github_config(self, token: str, repo: str) -> None:
+        """Set GitHub configuration"""
+        logger.info("Setting GitHub configuration")
+        if not self._repo:
+            logger.error("Repository not initialized")
+            raise RuntimeError("Must initialize repository first")
+
+        # Update remote URL with token
+        remote_url = f"https://{token}@github.com/{repo}.git"
+        if 'origin' in self._repo.remotes:
+            self._repo.delete_remote('origin')
+        self._repo.create_remote('origin', remote_url)
+        
+        # Save config in metadata
+        metadata_path = self.repo_path / "metadata.yaml"
+        with open(metadata_path) as f:
+            metadata = yaml.safe_load(f)
+        
+        metadata['github'] = {
+            'repo': repo,
+            # Don't save token in metadata for security
+        }
+        
+        with open(metadata_path, 'w') as f:
+            yaml.dump(metadata, f)
+            
+        self._repo.index.add(['metadata.yaml'])
+        self._repo.index.commit("Updated GitHub configuration") 

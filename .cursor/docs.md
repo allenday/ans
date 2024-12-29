@@ -17,82 +17,83 @@
 
 ## Next Sprint: Telegram Bot Integration
 
-### Requirements
-1. Bot Setup and Configuration
-   - Bot token management
-   - User authentication
-   - Command handling framework
+### Bot Core
+1. Message Handling
+   - Private chat configuration
+   - Group chat monitoring
+   - Message to storage pipeline
+   - Media attachment handling
 
-2. Message Processing
-   - Parse incoming messages
-   - Create topics from conversations
-   - Handle media attachments
-   - Map Telegram messages to storage format
+2. Configuration Management
+   - GitHub token setup
+   - Repository configuration
+   - User preferences
+   - Per-group settings
 
-3. User Session Management
-   - Track active conversations
-   - Manage topic context
-   - Handle user preferences
+3. State Management
+   - User sessions
+   - Configuration flows
+   - Active conversations
 
-4. Storage Integration
-   - Map Telegram chats to topics
-   - Save messages using storage adapter
-   - Handle media file downloads
-   - Periodic sync with remote
+### Interface Classes
 
-### Technical Design
-1. Bot Framework
-   ```python
-   class TelegramBot:
-       async def start(self):
-           """Initialize bot and start polling"""
-           
-       async def handle_message(self, message):
-           """Process incoming messages"""
-           
-       async def handle_command(self, command):
-           """Handle bot commands"""
-   ```
+```python
+class BotConfig:
+    """Bot configuration and settings"""
+    token: str
+    admin_users: List[int]
+    github_token: Optional[str]
+    github_repo: Optional[str]
 
-2. Session Management
-   ```python
-   class UserSession:
-       def __init__(self, user_id: str):
-           self.current_topic: Optional[str] = None
-           self.storage: StorageAdapter = None
-   ```
+class UserSession:
+    """Track user interaction state"""
+    user_id: int
+    state: str
+    context: Dict[str, Any]
+    config: BotConfig
 
-3. Message Processing Pipeline
-   ```python
-   class MessageProcessor:
-       async def process(self, message):
-           """Convert Telegram message to storage format"""
-           
-       async def handle_media(self, message):
-           """Process media attachments"""
-   ```
+class GroupConfig:
+    """Per-group settings"""
+    group_id: int
+    topic_id: str
+    enabled: bool
+    filters: Dict[str, Any]
 
-## Testing Strategy
+class ChroniclerBot:
+    """Main bot class"""
+    async def start(self):
+        """Start the bot"""
+    
+    async def handle_message(self, update: Update):
+        """Process incoming messages"""
+    
+    async def handle_command(self, update: Update):
+        """Handle bot commands"""
+```
+
+### Development Tasks
+1. [ ] Set up bot framework with python-telegram-bot
+2. [ ] Implement configuration management
+3. [ ] Add private chat command handling
+4. [ ] Add group chat monitoring
+5. [ ] Integrate with storage system
+6. [ ] Add user session management
+7. [ ] Implement configuration flows
+8. [ ] Add comprehensive tests
+9. [ ] Document bot usage and commands
+
+### Testing Strategy
 1. Unit Tests
-   - Command parsing
-   - Message conversion
-   - Session management
+   - Command handling
+   - Configuration management
+   - Message processing
 
 2. Integration Tests
    - Bot initialization
-   - Message handling flow
    - Storage integration
+   - Configuration flows
 
-3. Live Tests
-   - Real Telegram API interaction
-   - End-to-end message flow
-
-## Development Tasks
-1. [ ] Set up Telegram bot framework
-2. [ ] Implement basic command handling
-3. [ ] Add message processing pipeline
-4. [ ] Integrate with storage system
-5. [ ] Add user session management
-6. [ ] Implement media handling
-7. [ ] Add comprehensive tests
-8. [ ] Document bot usage and commands 
+3. Mock Tests
+   - Telegram API interactions
+   - GitHub integration
+   - Message handling pipeline 

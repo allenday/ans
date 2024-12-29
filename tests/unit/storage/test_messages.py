@@ -7,15 +7,31 @@ import logging
 from chronicler.storage.interface import Message, Attachment
 from chronicler.storage.messages import MessageStore
 
-@pytest.fixture()
+@pytest.fixture
 def temp_file(tmp_path):
     """Provides a temporary file for testing"""
     return tmp_path / "messages.jsonl"
 
 @pytest.mark.unit
-def test_serialize_basic_message(temp_file, caplog, test_log_level):
-    """Test serializing a basic message"""
-    caplog.set_level(test_log_level)
+@pytest.mark.codex
+def test_message_creation():
+    """Test message object creation"""
+    message = Message(
+        content="Test message",
+        metadata={"type": "chat"},
+        source="test",
+        timestamp=datetime.fromisoformat("2024-01-01T12:00:00+00:00")
+    )
+    
+    assert message.content == "Test message"
+    assert message.metadata == {"type": "chat"}
+    assert message.source == "test"
+    assert message.timestamp == datetime.fromisoformat("2024-01-01T12:00:00+00:00")
+
+@pytest.mark.unit
+@pytest.mark.codex
+def test_message_serialization(temp_file):
+    """Test message serialization"""
     message = Message(
         content="Test message",
         metadata={"type": "chat"},
@@ -33,6 +49,8 @@ def test_serialize_basic_message(temp_file, caplog, test_log_level):
     assert data["metadata"]["type"] == "chat"
     assert data["timestamp"] == "2024-01-01T12:00:00+00:00"
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_serialize_message_with_attachments(temp_file, caplog, test_log_level):
     """Test serializing message with attachments"""
     caplog.set_level(test_log_level)
@@ -56,6 +74,8 @@ def test_serialize_message_with_attachments(temp_file, caplog, test_log_level):
     assert data["attachments"][0]["filename"] == "test.jpg"
     assert data["attachments"][1]["type"] == "text/plain"
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_load_multiple_messages(temp_file, caplog, test_log_level):
     """Test loading multiple messages from file"""
     caplog.set_level(test_log_level)
@@ -82,6 +102,8 @@ def test_load_multiple_messages(temp_file, caplog, test_log_level):
     assert len(lines) == 3
     assert all(json.loads(line) for line in lines)  # Each line should be valid JSON
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_append_multiple_messages(temp_file, caplog, test_log_level):
     """Test appending multiple messages one by one"""
     caplog.set_level(test_log_level)
@@ -102,6 +124,8 @@ def test_append_multiple_messages(temp_file, caplog, test_log_level):
     assert len(loaded) == 3
     assert [msg.content for msg in loaded] == ["Message 0", "Message 1", "Message 2"]
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_load_empty_file(temp_file, caplog, test_log_level):
     """Test loading from empty or non-existent file"""
     caplog.set_level(test_log_level)
@@ -112,6 +136,8 @@ def test_load_empty_file(temp_file, caplog, test_log_level):
     temp_file.touch()
     assert MessageStore.load_messages(temp_file) == []
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_metadata_handling(temp_file, caplog, test_log_level):
     """Test handling of special metadata fields"""
     caplog.set_level(test_log_level)
@@ -133,6 +159,8 @@ def test_metadata_handling(temp_file, caplog, test_log_level):
     assert loaded.timestamp == datetime.fromisoformat("2024-01-01T12:00:00+00:00")
     assert loaded.metadata == {"custom": "value"}
 
+@pytest.mark.unit
+@pytest.mark.codex
 def test_unicode_content(temp_file, caplog, test_log_level):
     """Test handling of unicode content"""
     caplog.set_level(test_log_level)

@@ -95,4 +95,9 @@ class StorageAdapter(ABC):
     @abstractmethod
     async def sync(self) -> None:
         """Synchronize with remote storage"""
+        pass
+
+    @abstractmethod
+    async def set_github_config(self, token: str, repo: str) -> None:
+        """Set GitHub configuration"""
         pass 
