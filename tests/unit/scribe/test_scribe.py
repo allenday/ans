@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import Mock, AsyncMock
-from telegram import Update, Message, Chat, User
+from telegram import Update, Message, Chat, User as TelegramUser
 from chronicler.scribe.core import Scribe
 from chronicler.scribe.interface import ScribeConfig, UserState, GroupConfig
-from chronicler.storage.interface import StorageAdapter
+from chronicler.storage.interface import StorageAdapter, User
 from chronicler.storage.config_interface import ConfigStorageAdapter
 
 # Mark all tests in this file
@@ -37,18 +37,21 @@ def mock_telegram_bot():
 @pytest.mark.unit
 @pytest.mark.scribe
 @pytest.mark.asyncio
-async def test_scribe_initialization(mock_storage, mock_telegram_bot, test_config, mock_config_store):
-    """Test basic scribe initialization"""
+async def test_scribe_initialization(test_config, mock_storage, mock_telegram_bot, mock_config_store, test_user):
+    """Test scribe initialization"""
     scribe = Scribe(test_config, mock_storage, mock_telegram_bot, mock_config_store)
     await scribe.start()
     
+    mock_storage.init_storage.assert_called_once_with(test_user)
     assert scribe.is_running
-    mock_storage.init_storage.assert_called_once()
+    
+    await scribe.stop()
+    assert not scribe.is_running
 
 @pytest.mark.unit
 @pytest.mark.scribe
 @pytest.mark.asyncio
-async def test_scribe_shutdown(mock_storage, mock_telegram_bot, test_config, mock_config_store):
+async def test_scribe_shutdown(test_config, mock_storage, mock_telegram_bot, mock_config_store, test_user):
     """Test scribe shutdown"""
     scribe = Scribe(test_config, mock_storage, mock_telegram_bot, mock_config_store)
     await scribe.start()

@@ -23,15 +23,21 @@ pytestmark = [
 ]
 
 @pytest.fixture
-def github_repo():
-    """Provides GitHub repository URL from environment"""
-    repo_url = os.getenv("GITHUB_TEST_REPO")
-    if not repo_url:
-        pytest.skip("GITHUB_TEST_REPO environment variable not set. Source .env file to run live tests.")
-    return repo_url
+def github_token() -> str:
+    """Get GitHub token from environment"""
+    token = os.getenv('GITHUB_TOKEN')
+    assert token, "GITHUB_TOKEN environment variable must be set"
+    return token
+
+@pytest.fixture
+def github_repo() -> str:
+    """Get GitHub test repo from environment"""
+    repo = os.getenv('GITHUB_TEST_REPO')
+    assert repo, "GITHUB_TEST_REPO environment variable must be set"
+    return repo
 
 @pytest_asyncio.fixture
-async def github_storage(tmp_path, github_repo):
+async def github_storage(tmp_path, github_repo, github_token):
     """Provides GitStorageAdapter configured with GitHub remote"""
     adapter = GitStorageAdapter(base_path=tmp_path)
     user = User(id="test_user", name="Test User")
@@ -43,8 +49,9 @@ async def github_storage(tmp_path, github_repo):
         cw.set_value('user', 'name', 'Integration Test')
         cw.set_value('user', 'email', 'test@example.com')
     
-    # Set up remote and sync
-    adapter.add_remote('origin', github_repo)
+    # Set up remote with authentication
+    remote_url = github_repo.replace('https://', f'https://{github_token}@')
+    adapter.add_remote('origin', remote_url)
     
     try:
         # Try to pull existing content
@@ -53,7 +60,13 @@ async def github_storage(tmp_path, github_repo):
         # Force push clean state
         repo.git.push('-u', 'origin', 'main', '--force')
     
-    return adapter
+    yield adapter
+    
+    # Cleanup
+    try:
+        shutil.rmtree(tmp_path)
+    except:
+        pass
 
 @pytest.mark.slow
 @pytest.mark.asyncio
@@ -61,7 +74,14 @@ async def test_github_push(github_storage, caplog, test_log_level):
     """Test pushing changes to GitHub"""
     caplog.set_level(test_log_level)
     adapter = await github_storage
-    topic = Topic(id="live_test_topic", name="Live Test Topic")
+    topic = Topic(
+        id="live_test_topic", 
+        name="Live Test Topic",
+        metadata={
+            'group_name': 'test-group',
+            'group_id': 123456
+        }
+    )
     await adapter.create_topic(topic, ignore_exists=True)
     
     # Add test message
@@ -73,6 +93,16 @@ async def test_github_push(github_storage, caplog, test_log_level):
     )
     await adapter.save_message(topic.id, message)
     
+    # Add test attachment
+    test_content = b"Test attachment content"
+    attachment = Attachment(
+        id="test_attachment",
+        type="text/plain",
+        filename="test.txt",
+        data=test_content
+    )
+    await adapter.save_attachment(topic.id, "test_message", attachment)
+    
     # Push changes
     await adapter.sync()
     
@@ -81,11 +111,16 @@ async def test_github_push(github_storage, caplog, test_log_level):
     try:
         cloned_repo = Repo.clone_from(adapter._repo.remotes.origin.url, clone_path)
         
-        # Check content
-        cloned_messages = clone_path / "topics" / topic.id / GitStorageAdapter.MESSAGES_FILE
+        # Check message content
+        cloned_messages = clone_path / "telegram" / "test-group" / topic.name / GitStorageAdapter.MESSAGES_FILE
         assert cloned_messages.exists(), "Messages file not found in clone"
         content = cloned_messages.read_text()
         assert "Test message from live integration" in content
+        
+        # Check attachment
+        cloned_attachment = clone_path / "telegram" / "test-group" / topic.name / "attachments" / "txt" / "test.txt"
+        assert cloned_attachment.exists(), "Attachment file not found in clone"
+        assert cloned_attachment.read_bytes() == test_content, "Attachment content mismatch"
         
         # Check metadata
         metadata_file = clone_path / "metadata.yaml"
@@ -93,5 +128,6 @@ async def test_github_push(github_storage, caplog, test_log_level):
         with open(metadata_file) as f:
             metadata = yaml.safe_load(f)
         assert topic.id in metadata['topics']
+        assert metadata['topics'][topic.id]['path'] == f"telegram/test-group/{topic.name}"
     finally:
         shutil.rmtree(clone_path)

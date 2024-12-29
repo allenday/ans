@@ -28,12 +28,13 @@ def temp_config_file(tmp_path):
 @pytest.mark.unit
 @pytest.mark.scribe
 @pytest.mark.asyncio
-async def test_state_persistence(temp_config_file, mock_storage, mock_telegram_bot, test_config):
+async def test_state_persistence(temp_config_file, mock_storage, mock_telegram_bot, test_config, test_user):
     """Test that scribe state persists across restarts"""
     config_store = JsonConfigStorage(temp_config_file)
 
     # Create first scribe instance
     scribe1 = Scribe(test_config, mock_storage, mock_telegram_bot, config_store)
+    await scribe1.start()
 
     # Set up some state
     await scribe1.enable_group(123, "test_topic")
@@ -57,7 +58,7 @@ async def test_state_persistence(temp_config_file, mock_storage, mock_telegram_b
 @pytest.mark.unit
 @pytest.mark.scribe
 @pytest.mark.asyncio
-async def test_config_persistence(temp_config_file, mock_storage, mock_telegram_bot, test_config):
+async def test_config_persistence(temp_config_file, mock_storage, mock_telegram_bot, test_config, test_user):
     """Test that configuration persists"""
     config_store = JsonConfigStorage(temp_config_file)
     scribe = Scribe(test_config, mock_storage, mock_telegram_bot, config_store)

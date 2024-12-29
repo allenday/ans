@@ -90,17 +90,50 @@ Messages are stored in a git repository with the following structure:
 user_journal/
 ├── metadata.yaml
 └── topics/
-    └── topic_123/
-       ├── messages.jsonl
+    └── topic_name/
+        ├── messages.jsonl
         └── media/
+            ├── jpg/
+            │   └── photo_123.jpg
+            ├── webp/
+            │   └── sticker_456.webp
+            ├── txt/
+            │   └── document_789.txt
+            ├── pdf/
+            ├── mp4/
+            ├── mp3/
+            └── ogg/
 ```
 
 Each message is stored in JSONL format (one JSON object per line) with the following structure:
 
+```json
+{
+    "content": "Message content here",
+    "source": "telegram_user_123",
+    "timestamp": "2024-01-01T12:00:00+00:00",
+    "metadata": {
+        "message_id": 123,
+        "chat_id": -1001234567890,
+        "from_user": 123456789,
+        "file_ids": ["file_id_from_telegram"]
+    },
+    "attachments": [
+        {
+            "id": "photo_123",
+            "type": "image/jpeg",
+            "filename": "photo_123.jpg",
+            "url": "topics/topic_name/media/jpg/photo_123.jpg"
+        }
+    ]
+}
 ```
-# messages.jsonl
-{"content": "Message content here", "source": "user", "timestamp": "2024-01-01T12:00:00+00:00", "metadata": {}}
-```
+
+Key features of the storage system:
+- Topics are organized by name rather than ID for better readability
+- Media files are organized by type in subdirectories
+- Messages reference local file paths for attachments
+- Original Telegram file IDs are preserved in metadata
 
 ## Development Setup
 
@@ -119,6 +152,51 @@ For running live integration tests with GitHub:
    - Go to GitHub Settings → Developer Settings → Personal Access Tokens
    - Create a token with `repo` scope
    - Copy token to .env file
+
+### Telegram Integration Testing
+
+For running live integration tests with Telegram:
+
+1. Create a Telegram Bot:
+   - Message [@BotFather](https://t.me/botfather) on Telegram
+   - Use `/newbot` command and follow instructions
+   - Save the provided bot token
+
+2. Set up Test Environment:
+   - Create a new Telegram group for testing
+   - Add your bot to the group
+   - If using topics, enable forum mode in group settings
+   - Create a test topic in the group
+
+3. Get Required IDs:
+   ```bash
+   # Replace YOUR_BOT_TOKEN with the token from step 1
+   curl https://api.telegram.org/botYOUR_BOT_TOKEN/getUpdates
+   ```
+   After sending a message in your test group/topic, you'll see a response containing:
+   - `message.chat.id` (Group ID, will be negative)
+   - `message.message_thread_id` (Topic ID, if using topics)
+
+4. Configure Environment:
+   ```bash
+   # Add to your .env file
+   echo "TELEGRAM_BOT_TOKEN=your_bot_token" >> .env
+   echo "TELEGRAM_TEST_GROUP_ID=your_group_id" >> .env
+   echo "TELEGRAM_TEST_GROUP_NAME=your_group_name" >> .env
+   echo "TELEGRAM_TEST_TOPIC_ID=your_topic_id" >> .env
+   echo "TELEGRAM_TEST_TOPIC_NAME=your_topic_name" >> .env
+   ```
+
+5. Optional User API Setup (if needed):
+   - Visit [https://my.telegram.org/apps](https://my.telegram.org/apps)
+   - Create a new application
+   - Save the `api_id` and `api_hash`
+   - Add to .env:
+     ```bash
+     echo "TELEGRAM_APP_ID=your_app_id" >> .env
+     echo "TELEGRAM_APP_HASH=your_api_hash" >> .env
+     echo "TELEGRAM_USER_PHONE=your_phone" >> .env
+     ```
 
 ### Running Tests
 

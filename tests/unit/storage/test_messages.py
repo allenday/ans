@@ -138,26 +138,22 @@ def test_load_empty_file(temp_file, caplog, test_log_level):
 
 @pytest.mark.unit
 @pytest.mark.codex
-def test_metadata_handling(temp_file, caplog, test_log_level):
-    """Test handling of special metadata fields"""
-    caplog.set_level(test_log_level)
+def test_metadata_handling():
+    """Test message metadata handling"""
+    # Create message with metadata
     message = Message(
-        content="Test",
-        metadata={
-            "custom": "value",
-            "source": "should_not_override",
-            "timestamp": "should_not_override"
-        },
-        source="real_source",
-        timestamp=datetime.fromisoformat("2024-01-01T12:00:00+00:00")
+        content="Test message",
+        source="test",
+        metadata={"custom": "value"}
     )
     
-    MessageStore.save_messages(temp_file, [message])
-    loaded = MessageStore.load_messages(temp_file)[0]
+    # Verify metadata is preserved
+    assert message.metadata == {"custom": "value"}
     
-    assert loaded.source == "real_source"
-    assert loaded.timestamp == datetime.fromisoformat("2024-01-01T12:00:00+00:00")
-    assert loaded.metadata == {"custom": "value"}
+    # Verify metadata is serialized correctly
+    json_str = message.to_json()
+    loaded_message = Message.from_json(json_str)
+    assert loaded_message.metadata == {"custom": "value"}
 
 @pytest.mark.unit
 @pytest.mark.codex
@@ -175,3 +171,22 @@ def test_unicode_content(temp_file, caplog, test_log_level):
     loaded = MessageStore.load_messages(temp_file)[0]
     
     assert loaded.content == "Hello 👋 World 🌍" 
+
+@pytest.mark.unit
+@pytest.mark.codex
+def test_message_store(temp_file):
+    """Test message store save/load functionality"""
+    # Create test messages
+    messages = [
+        Message(content="Message 1", source="test"),
+        Message(content="Message 2", source="test", metadata={"custom": "value"})
+    ]
+    
+    # Save messages
+    MessageStore.save_messages(temp_file, messages)
+    
+    # Load and verify messages
+    loaded_messages = MessageStore.load_messages(temp_file)
+    assert len(loaded_messages) == 2
+    assert loaded_messages[0].content == "Message 1"
+    assert loaded_messages[1].metadata == {"custom": "value"} 

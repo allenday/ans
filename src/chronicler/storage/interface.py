@@ -10,64 +10,76 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class User:
+    """User data"""
     id: str
     name: str
     metadata: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        logger.debug(f"Creating user {self.id} with name {self.name}")
+        if self.metadata is None:
+            self.metadata = {}
 
 @dataclass
 class Topic:
+    """Topic data"""
     id: str
     name: str
     metadata: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        logger.debug(f"Creating topic {self.id} with name {self.name}")
+        if self.metadata is None:
+            self.metadata = {}
 
 @dataclass
 class Message:
+    """Message data"""
     content: str
     source: str
-    timestamp: datetime
+    timestamp: datetime = None
     metadata: Dict[str, Any] = None
     attachments: List['Attachment'] = None
-
+    
+    def __post_init__(self):
+        logger.debug(f"Creating message from {self.source} with {len(self.content)} chars")
+        if self.metadata is None:
+            self.metadata = {}
+        if self.timestamp is None:
+            self.timestamp = datetime.utcnow()
+        if self.attachments:
+            logger.debug(f"Message has {len(self.attachments)} attachments")
+    
     def to_json(self) -> str:
         """Convert message to JSON string"""
-        logger.debug(f"Serializing message from {self.source}")
+        logger.debug(f"Converting message from {self.source} to JSON")
         data = asdict(self)
         data['timestamp'] = self.timestamp.isoformat()
-        # Handle attachments - convert bytes to None for serialization
-        if data.get('attachments'):
-            logger.debug(f"Processing {len(data['attachments'])} attachments")
-            for att in data['attachments']:
-                if 'data' in att:
-                    att['data'] = None
         return json.dumps(data)
-
+    
     @classmethod
     def from_json(cls, json_str: str) -> 'Message':
-        """Create message from JSON string with validation"""
-        logger.debug("Deserializing message from JSON")
+        """Create message from JSON string"""
+        logger.debug("Creating message from JSON string")
         data = json.loads(json_str)
-        # Validate required fields
-        for field in ['content', 'source', 'timestamp']:
-            if field not in data:
-                logger.error(f"Missing required field in JSON: {field}")
-                raise ValueError(f"Missing required field: {field}")
-        
-        # Convert timestamp back to datetime
-        logger.debug(f"Converting timestamp: {data['timestamp']}")
         data['timestamp'] = datetime.fromisoformat(data['timestamp'])
-        # Clean metadata - remove special fields
-        if 'metadata' in data:
-            data['metadata'] = {k:v for k,v in data['metadata'].items()
-                              if k not in ('source', 'timestamp', 'type')}
         return cls(**data)
 
 @dataclass
 class Attachment:
+    """Attachment data"""
     id: str
     type: str
     filename: str
     data: Optional[bytes] = None
     url: Optional[str] = None
+    
+    def __post_init__(self):
+        logger.debug(f"Creating attachment {self.id} of type {self.type}")
+        if self.data:
+            logger.debug(f"Attachment has {len(self.data)} bytes of data")
+        if self.url:
+            logger.debug(f"Attachment has URL: {self.url}")
 
 class StorageAdapter(ABC):
     """Base class for storage implementations"""
