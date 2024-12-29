@@ -11,13 +11,13 @@ class JsonConfigStorage(ConfigStorageAdapter):
         if not self.config_file.exists():
             self.config_file.write_text("{}")
 
-    async def load(self) -> Dict[str, Any]:
+    async def load_state(self) -> Dict[str, Any]:
         """Load state from JSON file"""
         try:
             return json.loads(self.config_file.read_text())
         except json.JSONDecodeError:
             return {}
 
-    async def save(self, state: Dict[str, Any]) -> None:
+    async def save_state(self, state: Dict[str, Any]) -> None:
         """Save state to JSON file"""
         self.config_file.write_text(json.dumps(state, indent=2)) 

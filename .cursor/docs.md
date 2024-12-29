@@ -97,3 +97,36 @@ class ChroniclerBot:
    - Telegram API interactions
    - GitHub integration
    - Message handling pipeline 
+
+# Repository Structure
+
+The repository follows this structure:
+
+```
+<github root>/
+  telegram/
+    <group name>/
+      <topic name>/
+        messages.jsonl
+        attachments/
+          jpg/
+          png/
+          etc/
+  metadata.yaml
+```
+
+## Key Points
+
+1. All topics are under the `telegram` directory
+2. Topics are organized by group name (default if not specified)
+3. Each topic has:
+   - `messages.jsonl` for message content
+   - `attachments` directory with media type subdirectories
+4. Metadata is stored in root `metadata.yaml`
+
+## Path Construction
+
+When constructing paths:
+1. Topic path: `telegram/<group_name>/<topic_name>`
+2. Messages file: `telegram/<group_name>/<topic_name>/messages.jsonl`
+3. Attachments: `telegram/<group_name>/<topic_name>/attachments/<media_type>/<filename>` 

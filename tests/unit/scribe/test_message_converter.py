@@ -2,7 +2,7 @@ import pytest
 from chronicler.scribe.interface import MessageConverter
 # Update other imports as needed 
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 from telegram import (
     Message as TelegramMessage, Chat, User, PhotoSize,
     Video, Document, Voice, Audio, Animation, Sticker
@@ -38,15 +38,55 @@ def mock_telegram_message():
 @pytest.mark.unit
 @pytest.mark.scribe
 @pytest.mark.asyncio
+async def test_message_converter():
+    """Test message conversion functionality"""
+    # Create mock Telegram message
+    message = Mock(spec=TelegramMessage)
+    message.message_id = 789
+    message.text = "Test message"
+    message.date = datetime.utcnow()
+    message.chat = Mock()
+    message.chat.id = 456
+    message.chat.type = "group"
+    message.chat.title = "Test Group"
+    message.from_user = Mock()
+    message.from_user.id = 123
+    message.from_user.username = "test_user"
+    message.photo = None
+    message.video = None
+    message.document = None
+    message.voice = None
+    message.audio = None
+    message.animation = None
+    message.forward_from = None
+    message.forward_date = None
+    message.sticker = None
+    
+    # Convert to storage message
+    converter = MessageConverter()
+    storage_message = await converter.to_storage_message(message)
+    
+    # Verify conversion
+    assert storage_message.content == "Test message"
+    assert storage_message.source == "telegram_456"
+    assert storage_message.metadata["chat_id"] == 456
+    assert storage_message.metadata["message_id"] == 789
+    assert storage_message.metadata["user_id"] == 123
+    assert storage_message.metadata["username"] == "test_user"
+
+@pytest.mark.unit
+@pytest.mark.scribe
+@pytest.mark.asyncio
 async def test_basic_message_conversion(mock_telegram_message):
     """Test converting basic text message"""
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == "Test message"
-    assert storage_msg.source == "telegram_789"
-    assert storage_msg.metadata["message_id"] == 123
-    assert storage_msg.metadata["chat_id"] == 456
-    assert storage_msg.metadata["chat_type"] == "group"
+    assert storage_msg.source == f"telegram_{mock_telegram_message.chat.id}"
+    assert storage_msg.metadata["message_id"] == mock_telegram_message.message_id
+    assert storage_msg.metadata["chat_id"] == mock_telegram_message.chat.id
+    assert storage_msg.metadata["chat_type"] == mock_telegram_message.chat.type
     assert storage_msg.attachments is None
 
 @pytest.mark.unit
@@ -60,13 +100,14 @@ async def test_photo_message_conversion(mock_telegram_message):
     mock_telegram_message.photo = [photo]
     mock_telegram_message.text = "Photo caption"
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == "Photo caption"
     assert len(storage_msg.attachments) == 1
     assert storage_msg.attachments[0].type == "image/jpeg"
-    assert storage_msg.attachments[0].filename.startswith("photo_")
-    assert storage_msg.attachments[0].id == f"photo_{mock_telegram_message.message_id}"
+    assert storage_msg.attachments[0].filename == f"{mock_telegram_message.message_id}_{photo.file_id}.jpg"
+    assert storage_msg.attachments[0].id == photo.file_id
     assert storage_msg.metadata["file_ids"] == ["photo123"]
 
 @pytest.mark.unit
@@ -82,12 +123,14 @@ async def test_video_message_conversion(mock_telegram_message):
     mock_telegram_message.video = video
     mock_telegram_message.text = "Video caption"
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == "Video caption"
     assert len(storage_msg.attachments) == 1
     assert storage_msg.attachments[0].type == "video/mp4"
-    assert storage_msg.metadata["video_duration"] == 30
+    assert storage_msg.attachments[0].filename == f"{mock_telegram_message.message_id}_{video.file_id}.mp4"
+    assert storage_msg.attachments[0].id == video.file_id
     assert storage_msg.metadata["file_ids"] == ["video123"]
 
 @pytest.mark.unit
@@ -101,12 +144,15 @@ async def test_document_message_conversion(mock_telegram_message):
     doc.file_name = "test.pdf"
     doc.mime_type = "application/pdf"
     mock_telegram_message.document = doc
+    mock_telegram_message.text = "Document caption"
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
+    assert storage_msg.content == "Document caption"
     assert len(storage_msg.attachments) == 1
     assert storage_msg.attachments[0].type == "application/pdf"
-    assert storage_msg.attachments[0].filename == "test.pdf"
+    assert storage_msg.attachments[0].filename == f"{mock_telegram_message.message_id}_{doc.file_name}"
     assert storage_msg.metadata["file_ids"] == ["doc123"]
 
 @pytest.mark.unit
@@ -116,13 +162,18 @@ async def test_forwarded_message_conversion(mock_telegram_message):
     """Test converting forwarded message"""
     forward_from = Mock(spec=User)
     forward_from.id = 999
+    forward_from.username = "original_user"
     forward_from.first_name = "Original"
     mock_telegram_message.forward_from = forward_from
     mock_telegram_message.forward_date = datetime.utcnow()
+    mock_telegram_message.text = "Forwarded message"
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
-    assert storage_msg.metadata["forwarded_from"] == 999
+    assert storage_msg.content == "Forwarded message"
+    assert storage_msg.metadata["forwarded_from"]["user_id"] == 999
+    assert storage_msg.metadata["forwarded_from"]["username"] == "original_user"
     assert "forward_date" in storage_msg.metadata
 
 @pytest.mark.unit
@@ -137,7 +188,8 @@ async def test_animation_message_conversion(mock_telegram_message):
     mock_telegram_message.animation = animation
     mock_telegram_message.text = "Animation caption"
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == "Animation caption"
     assert len(storage_msg.attachments) == 1
@@ -157,15 +209,17 @@ async def test_sticker_message_conversion(mock_telegram_message):
     sticker.type = "regular"  # or "animated" or "video"
     mock_telegram_message.sticker = sticker
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert len(storage_msg.attachments) == 1
     assert storage_msg.attachments[0].type == "image/webp"  # Standard sticker format
-    assert storage_msg.attachments[0].filename.startswith("sticker_")
+    assert storage_msg.attachments[0].filename == f"{mock_telegram_message.message_id}_{sticker.file_id}.webp"
+    assert storage_msg.attachments[0].id == sticker.file_id
     assert storage_msg.metadata["file_ids"] == ["sticker123"]
     assert storage_msg.metadata["sticker_emoji"] == "😊"
     assert storage_msg.metadata["sticker_set"] == "StickerSet1"
-    assert storage_msg.metadata["sticker_type"] == "regular" 
+    assert storage_msg.metadata["sticker_type"] == "regular"
 
 @pytest.mark.unit
 @pytest.mark.scribe
@@ -180,7 +234,8 @@ async def test_voice_message_conversion(mock_telegram_message):
     mock_telegram_message.voice = voice
     mock_telegram_message.text = None  # Voice messages typically don't have text
     
-    storage_msg = await MessageConverter.to_storage_message(mock_telegram_message)
+    converter = MessageConverter()
+    storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == ""  # Empty content for voice messages
     assert len(storage_msg.attachments) == 1

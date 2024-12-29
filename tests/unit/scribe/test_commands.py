@@ -191,4 +191,45 @@ async def test_list_command(mock_update, test_config, mock_storage, mock_config_
     
     assert isinstance(response, CommandResponse)
     assert "no monitored groups" in response.text.lower()
-    assert not response.error 
+    assert not response.error
+
+@pytest.mark.unit
+@pytest.mark.scribe
+@pytest.mark.asyncio
+async def test_command_handling(mock_update, test_config, mock_config_store):
+    """Test command handling functionality"""
+    # Setup
+    mock_update.message.text = "/test arg1 arg2"
+    mock_update.effective_chat = Mock()
+    mock_update.effective_chat.type = "private"
+    mock_update.effective_user = Mock()
+    mock_update.effective_user.id = 123
+    
+    scribe = Scribe(test_config, storage=Mock(), telegram_bot=Mock(), config_store=mock_config_store)
+    
+    # Add test command handler
+    async def _handle_test(self, update: Update, args: list[str] = None) -> CommandResponse:
+        return CommandResponse(text=f"Executed test with args: {args}")
+    
+    # Monkey patch the handler
+    original_handle = getattr(Scribe, "handle_command", None)
+    async def handle_command(self, update: Update) -> CommandResponse:
+        if update.message.text.startswith("/test"):
+            return await _handle_test(self, update, update.message.text.split()[1:])
+        return await original_handle(self, update)
+    
+    setattr(Scribe, "handle_command", handle_command)
+    
+    # Execute command
+    response = await scribe.handle_command(mock_update)
+    
+    # Verify
+    assert isinstance(response, CommandResponse)
+    assert "Executed test with args: ['arg1', 'arg2']" in response.text
+    assert not response.error
+    
+    # Clean up
+    if original_handle:
+        setattr(Scribe, "handle_command", original_handle)
+    else:
+        delattr(Scribe, "handle_command") 
