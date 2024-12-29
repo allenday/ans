@@ -1,159 +1,98 @@
-# Project Documentation Reference
+# Project Documentation
 
-## Core Documentation
-The primary project documentation is located in `/docs/README.md`. Key points for AI assistance:
-
-### Project Scope
-- Telegram-based journaling system with LLM integration
-- Git-based persistence (one repo per user)
-- Markdown format for entries
-- Support for media attachments
-
-### Key Technical Requirements
-1. Telegram Integration
-   - Supergroups and topics for organization
-   - Multi-participant support (human + AI)
-
-2. Storage
-   - Git-based (one commit per entry)
-   - Markdown formatted
-   - Media attachment support
-
-3. LLM Integration
-   - Swappable backends
-   - System command interface
-   - Extensible agent architecture
-
-## Development Priorities
-1. Core Telegram bot functionality
-2. Git operations and storage
-3. LLM service abstraction
-4. Command parsing system 
-
-# Technical Documentation
-
-## Architecture Principles
-
-### Adapter Pattern
-We use adapters to abstract external services, allowing easy swapping of implementations:
-
-1. **Storage Adapters**
-   ```
-   StorageAdapter (Interface)
-   ├── GitStorageAdapter
-   │   ├── GitHubStorage (Implemented)
-   │   └── GitLabStorage (Future)
-   └── Other Storage Implementations (Future)
-   ```
-
-2. **Message Source Adapters**
-   ```
-   MessageSourceAdapter (Interface)
-   ├── TelegramAdapter (Next)
-   ├── DiscordAdapter (Future)
-   ├── TwitterAdapter (Future)
-   └── Other Platform Adapters
-   ```
-
-## Component Architecture
+## Current State
 
 ### Storage System (Completed)
-- **Core Interface**: `StorageAdapter`
-  - Message persistence
-  - Topic management
-  - Content organization
+- Git-based storage implementation ✓
+- Topic and message organization ✓
+- Local and remote repository support ✓
+- JSONL format for messages ✓
+- Attachment handling ✓
+- Comprehensive test coverage ✓
 
-- **Git Implementation**: `GitStorageAdapter`
-  - Repository operations (init, commit)
-  - Remote operations (abstract from specific providers)
-  - Data format: YAML frontmatter in markdown
+### Core Components
+- Message interface and data models ✓
+- Storage adapter abstraction ✓
+- GitHub integration for remote storage ✓
 
-- **Current Provider**: `GitHubStorage`
-  - GitHub-specific remote operations
-  - Authentication handling
-  - API integration
+## Next Sprint: Telegram Bot Integration
 
-### Message Sources (Next)
-- **Core Interface**: `MessageSourceAdapter`
-  ```python
-  class MessageSourceAdapter:
-      async def listen(self) -> AsyncIterator[Message]
-      async def reply(self, message: Message) -> None
-      async def create_topic(self, name: str) -> Topic
-  ```
+### Requirements
+1. Bot Setup and Configuration
+   - Bot token management
+   - User authentication
+   - Command handling framework
 
-- **Telegram Implementation** (Next)
-  - Message handling
-  - Session management
-  - Platform-specific features
+2. Message Processing
+   - Parse incoming messages
+   - Create topics from conversations
+   - Handle media attachments
+   - Map Telegram messages to storage format
 
-### Common Data Models
-```python
-@dataclass
-class Message:
-    content: str
-    metadata: dict
-    source: str  # Platform identifier
-    timestamp: datetime
-    attachments: list[Attachment]  # Media files
+3. User Session Management
+   - Track active conversations
+   - Manage topic context
+   - Handle user preferences
 
-@dataclass
-class Attachment:
-    id: str
-    type: str  # mime type
-    filename: str
-    data: bytes | None  # None if not yet downloaded
-    url: str | None    # Source URL if available
-    metadata: dict
+4. Storage Integration
+   - Map Telegram chats to topics
+   - Save messages using storage adapter
+   - Handle media file downloads
+   - Periodic sync with remote
 
-@dataclass
-class Topic:
-    id: str
-    name: str
-    metadata: dict
-``` 
-
-## Implementation Plan
-
-### Current Sprint: Interface Layer
-1. **Core Data Models** (Next)
+### Technical Design
+1. Bot Framework
    ```python
-   # src/chronicler/models.py
-   class Message, Topic, User, Attachment
+   class TelegramBot:
+       async def start(self):
+           """Initialize bot and start polling"""
+           
+       async def handle_message(self, message):
+           """Process incoming messages"""
+           
+       async def handle_command(self, command):
+           """Handle bot commands"""
    ```
 
-2. **Storage Interface** (Next)
+2. Session Management
    ```python
-   # src/chronicler/storage/interface.py
-   class StorageAdapter:
-       async def init_storage(self, user: User) -> None
-       async def create_topic(self, topic: Topic) -> None
-       async def save_message(self, topic_id: str, message: Message) -> None
-       async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None
-       async def sync(self) -> None
+   class UserSession:
+       def __init__(self, user_id: str):
+           self.current_topic: Optional[str] = None
+           self.storage: StorageAdapter = None
    ```
 
-3. **Refactor Current Implementation**
-   - Move GitStorage to GitStorageAdapter
-   - Implement StorageAdapter interface
-   - Split GitHub-specific code to GitHubStorage
-
-4. **Message Source Interface**
+3. Message Processing Pipeline
    ```python
-   # src/chronicler/sources/interface.py
-   class MessageSourceAdapter:
-       async def listen(self) -> AsyncIterator[Message]
-       async def reply(self, message: Message) -> None
-       async def create_topic(self, name: str) -> Topic
-       async def download_attachment(self, attachment: Attachment) -> Attachment  # Updates data field
+   class MessageProcessor:
+       async def process(self, message):
+           """Convert Telegram message to storage format"""
+           
+       async def handle_media(self, message):
+           """Process media attachments"""
    ```
 
-### Future Work
-- Telegram adapter implementation
-- Additional storage providers (GitLab)
-- Additional message sources (Discord)
+## Testing Strategy
+1. Unit Tests
+   - Command parsing
+   - Message conversion
+   - Session management
 
-### Migration Notes
-- Current GitStorage implementation will need refactoring
-- Keep existing tests but reorganize for new structure
-- Add interface compliance tests 
+2. Integration Tests
+   - Bot initialization
+   - Message handling flow
+   - Storage integration
+
+3. Live Tests
+   - Real Telegram API interaction
+   - End-to-end message flow
+
+## Development Tasks
+1. [ ] Set up Telegram bot framework
+2. [ ] Implement basic command handling
+3. [ ] Add message processing pipeline
+4. [ ] Integrate with storage system
+5. [ ] Add user session management
+6. [ ] Implement media handling
+7. [ ] Add comprehensive tests
+8. [ ] Document bot usage and commands 

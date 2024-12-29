@@ -16,6 +16,13 @@ build-backend = "hatchling.build"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "--import-mode=importlib"
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+    "live: marks tests as live integration tests",
+    "slow: marks tests as slow running",
+    "fs: marks tests that depend on filesystem features"
+]
 
 [project.optional-dependencies]
 test = [
