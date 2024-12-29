@@ -16,7 +16,11 @@ import logging
 load_dotenv()
 
 # Mark all tests in this file as live integration tests
-pytestmark = [pytest.mark.live, pytest.mark.integration]
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.integration,
+    pytest.mark.codex  # These are storage/codex tests, not scribe tests
+]
 
 @pytest.fixture
 def github_repo():
