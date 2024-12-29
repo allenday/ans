@@ -40,4 +40,9 @@ config.local.yaml
 .env
 
 # Media files that get stored in git repos
-media/ 
+media/
+
+# Environment variables
+.env
+.env.*
+!.env.example 
