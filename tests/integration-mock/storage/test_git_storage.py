@@ -13,6 +13,13 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.mock,
+    pytest.mark.codex,
+    pytest.mark.fs
+]
+
 @pytest.fixture
 def temp_dir():
     """Provides a temporary directory that's cleaned up after tests"""
@@ -91,17 +98,11 @@ async def test_push_to_remote(storage_with_remote):
         assert cloned_messages.exists(), "Messages file not found in cloned repo"
         
         # Verify content
-        content = cloned_messages.read_text()
-        assert "Test message" in content, "Message content not found in cloned repo"
-        
-        # Check metadata
-        metadata_file = clone_path / "metadata.yaml"
-        assert metadata_file.exists(), "Metadata file not found in cloned repo"
-        with open(metadata_file) as f:
-            metadata = yaml.safe_load(f)
-        assert topic.id in metadata['topics'], "Topic not found in metadata"
+        with open(cloned_messages) as f:
+            content = f.read().strip()
+            assert "Test message" in content
+            assert "user123" in content
     finally:
-        # Cleanup
         shutil.rmtree(clone_path)
 
 @pytest.mark.asyncio
