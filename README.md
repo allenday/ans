@@ -100,6 +100,7 @@ Each message is stored in JSONL format (one JSON object per line) with the follo
 ```
 # messages.jsonl
 {"content": "Message content here", "source": "user", "timestamp": "2024-01-01T12:00:00+00:00", "metadata": {}}
+```
 
 ## Development Setup
 
