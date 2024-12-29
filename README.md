@@ -34,11 +34,72 @@ We follow a strict branching strategy:
    # Create PR through GitHub interface
    ```
 
+### Development Workflow
+
+We follow Test-Driven Development (TDD):
+
+1. Create Feature Branch
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+
+2. Write Tests (in order):
+   - Unit tests (`tests/unit/`)
+   - Mock integration tests (`tests/integration-mock/`)
+   - Live integration tests (`tests/integration-live/`)
+
+3. Implement Feature:
+   - Write minimal code to make tests pass
+   - Refactor while keeping tests green
+   - Document in code and README
+
+4. Push and Create PR:
+   ```bash
+   git push -u origin feature/your-feature
+   # Create PR through GitHub interface
+   ```
+
+### Component Development Status
+
+- [x] Storage System
+  - Git-based storage with YAML frontmatter
+  - Local and remote repository support
+  - Comprehensive test coverage
+
+- [ ] Telegram Bot (Next)
+  - Message handling and routing
+  - User session management
+  - Integration with storage system
+
+- [ ] LLM Integration (Future)
+  - Context management
+  - Response generation
+  - Model configuration
+
 ## Project Structure
 [Project structure details to be added as we develop]
 
 ## Setup
 [Setup instructions to be added]
+
+## Storage Format
+
+Messages are stored in a git repository with the following structure:
+
+```
+user_journal/
+├── metadata.yaml
+└── topics/
+    └── topic_123/
+       ├── messages.jsonl
+        └── media/
+```
+
+Each message is stored in JSONL format (one JSON object per line) with the following structure:
+
+```
+# messages.jsonl
+{"content": "Message content here", "source": "user", "timestamp": "2024-01-01T12:00:00+00:00", "metadata": {}}
 
 ## Development Setup
 
