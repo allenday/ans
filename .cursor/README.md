@@ -6,6 +6,7 @@ This directory contains development documentation for the Chronicler project.
 
 - `architecture.md`: Overview of the pipeline-based architecture
 - `backlog.md`: Development roadmap and known issues
+- `checklist.md`: **Mandatory** development checklist (must follow for all changes)
 - `conventions.md`: Code style and development conventions
 - `docs.md`: Detailed documentation of components and APIs
 - `git-workflow.md`: Git workflow and branching strategy
@@ -39,11 +40,17 @@ This directory contains development documentation for the Chronicler project.
 
 ## Development Flow
 
+**Important**: Follow the [Development Checklist](checklist.md) for ALL changes.
+
 1. Create feature branch
 2. Write tests first (TDD)
-3. Implement changes
-4. Add operation logging
-5. Run tests
+3. Implement changes with:
+   - Comprehensive logging
+   - Exception handling
+   - Type hints
+   - Docstrings
+4. Run all tests
+5. Review checklist items
 6. Submit PR
 
 ## Key Components
