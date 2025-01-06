@@ -4,8 +4,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 
-from chronicler.frames import Frame, TextFrame, ImageFrame, DocumentFrame
-from chronicler.pipeline import BaseTransport
+from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, BaseTransport
 
 logger = logging.getLogger(__name__)
 

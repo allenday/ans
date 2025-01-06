@@ -1,10 +1,11 @@
+from typing import List, Type
 import asyncio
 import logging
 import signal
 from pathlib import Path
 
-from chronicler.frames import Frame
-from chronicler.pipeline import Pipeline
+from .frames import Frame
+from .pipeline import Pipeline
 from chronicler.transports.telegram_transport import TelegramTransport
 from chronicler.processors.storage_processor import StorageProcessor
 

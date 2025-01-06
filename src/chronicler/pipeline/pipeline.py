@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 import logging
 
-from chronicler.frames import Frame
+from .frames import Frame
 
 logger = logging.getLogger(__name__)
 
