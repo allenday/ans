@@ -1,11 +1,11 @@
 from .interface import StorageAdapter, User, Topic, Message, Attachment
 from .git import GitStorageAdapter
-from .messages import MessageStore
+from .coordinator import StorageCoordinator
 
 __all__ = [
     'StorageAdapter',
     'GitStorageAdapter',
-    'MessageStore',
+    'StorageCoordinator',
     'User',
     'Topic',
     'Message',

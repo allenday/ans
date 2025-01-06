@@ -14,7 +14,6 @@ from chronicler.storage.interface import (
     StorageAdapter, User, Topic, Message, 
     Attachment
 )
-from chronicler.storage.messages import MessageStore
 
 logger = logging.getLogger(__name__)
 

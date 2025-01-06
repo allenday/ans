@@ -3,7 +3,11 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, BaseProcessor
+from chronicler.pipeline import (
+    Frame, TextFrame, ImageFrame, DocumentFrame,
+    AudioFrame, VoiceFrame, StickerFrame,
+    BaseProcessor
+)
 from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
 
@@ -67,6 +71,15 @@ class StorageProcessor(BaseProcessor):
             elif isinstance(frame, DocumentFrame):
                 logger.info("PROC - Processing document frame")
                 await self._process_document_frame(topic_id, frame, metadata)
+            elif isinstance(frame, AudioFrame):
+                logger.info("PROC - Processing audio frame")
+                await self._process_audio_frame(topic_id, frame, metadata)
+            elif isinstance(frame, VoiceFrame):
+                logger.info("PROC - Processing voice frame")
+                await self._process_voice_frame(topic_id, frame, metadata)
+            elif isinstance(frame, StickerFrame):
+                logger.info("PROC - Processing sticker frame")
+                await self._process_sticker_frame(topic_id, frame, metadata)
             else:
                 logger.warning(f"PROC - Unsupported frame type: {type(frame)}")
                 
@@ -177,4 +190,101 @@ class StorageProcessor(BaseProcessor):
             logger.info(f"PROC - Saved document message to topic {topic_id}")
         except Exception as e:
             logger.error(f"PROC - Failed to process document frame: {e}", exc_info=True)
+            raise
+
+    async def _process_audio_frame(self, topic_id: str, frame: AudioFrame, metadata: dict) -> None:
+        """Process an audio frame."""
+        try:
+            logger.info(f"PROC - Processing audio frame for topic {topic_id}")
+            file_id = metadata.get('file_id', f"audio_{datetime.utcnow().isoformat()}")
+            
+            # Add duration to metadata
+            metadata = {**metadata, 'duration': frame.duration}
+            
+            attachment = Attachment(
+                id=file_id,
+                type=frame.mime_type,
+                filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
+                data=frame.audio
+            )
+            logger.debug(f"PROC - Created audio attachment: {attachment.filename}")
+            
+            message = Message(
+                content='',  # Empty string by default for audio
+                source='telegram',
+                metadata=metadata,
+                attachments=[attachment]
+            )
+            logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
+            
+            await self.storage.save_message(topic_id, message)
+            logger.info(f"PROC - Saved audio message to topic {topic_id}")
+        except Exception as e:
+            logger.error(f"PROC - Failed to process audio frame: {e}", exc_info=True)
+            raise
+
+    async def _process_voice_frame(self, topic_id: str, frame: VoiceFrame, metadata: dict) -> None:
+        """Process a voice frame."""
+        try:
+            logger.info(f"PROC - Processing voice frame for topic {topic_id}")
+            file_id = metadata.get('file_id', f"voice_{datetime.utcnow().isoformat()}")
+            
+            # Add duration to metadata
+            metadata = {**metadata, 'duration': frame.duration}
+            
+            attachment = Attachment(
+                id=file_id,
+                type=frame.mime_type,
+                filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
+                data=frame.audio
+            )
+            logger.debug(f"PROC - Created voice attachment: {attachment.filename}")
+            
+            message = Message(
+                content='',  # Empty string by default for voice messages
+                source='telegram',
+                metadata=metadata,
+                attachments=[attachment]
+            )
+            logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
+            
+            await self.storage.save_message(topic_id, message)
+            logger.info(f"PROC - Saved voice message to topic {topic_id}")
+        except Exception as e:
+            logger.error(f"PROC - Failed to process voice frame: {e}", exc_info=True)
+            raise
+
+    async def _process_sticker_frame(self, topic_id: str, frame: StickerFrame, metadata: dict) -> None:
+        """Process a sticker frame."""
+        try:
+            logger.info(f"PROC - Processing sticker frame for topic {topic_id}")
+            file_id = metadata.get('file_id', f"sticker_{datetime.utcnow().isoformat()}")
+            
+            # Add sticker metadata
+            metadata = {
+                **metadata,
+                'emoji': frame.emoji,
+                'set_name': frame.set_name
+            }
+            
+            attachment = Attachment(
+                id=file_id,
+                type="image/webp",  # Stickers are typically WebP format
+                filename=f"{file_id}.webp",
+                data=frame.sticker
+            )
+            logger.debug(f"PROC - Created sticker attachment: {attachment.filename}")
+            
+            message = Message(
+                content=frame.emoji,  # Use emoji as content
+                source='telegram',
+                metadata=metadata,
+                attachments=[attachment]
+            )
+            logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
+            
+            await self.storage.save_message(topic_id, message)
+            logger.info(f"PROC - Saved sticker message to topic {topic_id}")
+        except Exception as e:
+            logger.error(f"PROC - Failed to process sticker frame: {e}", exc_info=True)
             raise 

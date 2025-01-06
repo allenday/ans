@@ -1,49 +1,54 @@
-from abc import ABC, abstractmethod
-from typing import List, Optional
+"""Pipeline infrastructure."""
 import logging
-
+from typing import List
 from .frames import Frame
+from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
-
-class BaseProcessor(ABC):
-    """Base class for all processors in the pipeline."""
-    
-    def __init__(self):
-        self.next_processor: Optional[BaseProcessor] = None
-        logger.debug(f"Initialized {self.__class__.__name__}")
-        
-    async def push_frame(self, frame: Frame):
-        """Push a frame to the next processor in the pipeline."""
-        if self.next_processor:
-            logger.debug(f"Pushing {type(frame).__name__} from {self.__class__.__name__} to {self.next_processor.__class__.__name__}")
-            await self.next_processor.process_frame(frame)
-        else:
-            logger.debug(f"No next processor for {type(frame).__name__} in {self.__class__.__name__}")
-    
-    @abstractmethod
-    async def process_frame(self, frame: Frame):
-        """Process a frame."""
-        pass
 
 class Pipeline:
     """A pipeline that processes frames through a series of processors."""
     
-    def __init__(self, processors: List[BaseProcessor]):
-        self.processors = processors
-        logger.info(f"Creating pipeline with {len(processors)} processors")
+    def __init__(self, processors: List['BaseProcessor'] = None):
+        """Initialize the pipeline with optional processors."""
+        logger.info("PIPE - Initializing pipeline")
+        self.processors = processors or []
+        logger.debug(f"PIPE - Added {len(self.processors)} processors")
+        
         # Link processors
-        for i in range(len(processors) - 1):
-            logger.debug(f"Linking {processors[i].__class__.__name__} to {processors[i + 1].__class__.__name__}")
-            processors[i].next_processor = processors[i + 1]
+        for i in range(len(self.processors) - 1):
+            logger.debug(f"PIPE - Linking {self.processors[i].__class__.__name__} to {self.processors[i + 1].__class__.__name__}")
+            self.processors[i].next_processor = self.processors[i + 1]
+        
+    async def process_frame(self, frame: Frame) -> None:
+        """Process a frame through all processors in sequence."""
+        logger.info(f"PIPE - Processing frame of type {type(frame).__name__}")
+        try:
+            if self.processors:
+                logger.debug(f"PIPE - Starting pipeline with {len(self.processors)} processors")
+                await self.processors[0].process_frame(frame)
+                logger.debug("PIPE - Frame processing complete")
+            else:
+                logger.warning("PIPE - Attempted to process frame through empty pipeline")
+        except Exception as e:
+            logger.error(f"PIPE - Failed to process frame: {e}", exc_info=True)
+            raise
+
+class BaseProcessor:
+    """Base class for frame processors."""
     
-    async def process_frame(self, frame: Frame):
-        """Process a frame through the pipeline."""
-        if self.processors:
-            logger.debug(f"Starting pipeline processing for {type(frame).__name__}")
-            await self.processors[0].process_frame(frame)
-        else:
-            logger.warning("Attempted to process frame through empty pipeline")
+    def __init__(self):
+        """Initialize the processor."""
+        self.next_processor = None
+    
+    async def process_frame(self, frame: Frame) -> None:
+        """Process a frame. Must be implemented by subclasses."""
+        raise NotImplementedError("Processors must implement process_frame")
+        
+    async def push_frame(self, frame: Frame) -> None:
+        """Push a frame to the next processor in the pipeline."""
+        if self.next_processor:
+            await self.next_processor.process_frame(frame)
 
 class BaseTransport(BaseProcessor):
     """Base class for transports that handle input/output."""
