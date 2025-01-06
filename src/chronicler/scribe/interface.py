@@ -196,7 +196,7 @@ class MessageConverter:
         
         return Message(
             content=message.text or message.caption or "",
-            source=f"telegram_{message.chat.id}",
+            source=metadata['source'],
             timestamp=message.date,
             metadata=metadata,
             attachments=attachments if attachments else None

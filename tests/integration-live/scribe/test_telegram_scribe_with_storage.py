@@ -157,7 +157,7 @@ async def test_telegram_scribe_with_git_storage(
     logger.info(f"Chat title: {storage_message.metadata.get('chat_title', 'None')}")
     logger.info(f"Chat type: {storage_message.metadata.get('chat_type', 'None')}")
     logger.info(f"Chat ID: {storage_message.metadata.get('chat_id', 'None')}")
-    logger.info(f"Messages file path: {storage.repo_path / 'telegram' / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE}")
+    logger.info(f"Messages file path: {storage.repo_path / 'telegram' / str(test_group_id) / test_topic_id / GitStorageAdapter.MESSAGES_FILE}")
     # Update the chat_title in the message metadata
     storage_message.metadata['chat_title'] = 'chronicler-dev'
     await scribe.handle_message(update)
@@ -166,7 +166,7 @@ async def test_telegram_scribe_with_git_storage(
     await asyncio.sleep(2)
     
     # Verify message was stored
-    messages_file = storage.repo_path / "telegram" / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE
+    messages_file = storage.repo_path / "telegram" / str(test_group_id) / test_topic_id / GitStorageAdapter.MESSAGES_FILE
     logger.info(f"Checking file: {messages_file}")
     assert messages_file.exists(), "Messages file not found"
     content = messages_file.read_text()
@@ -221,7 +221,7 @@ async def test_telegram_scribe_media_with_git_storage(
     logger.info(f"Chat title: {storage_message.metadata.get('chat_title', 'None')}")
     logger.info(f"Chat type: {storage_message.metadata.get('chat_type', 'None')}")
     logger.info(f"Chat ID: {storage_message.metadata.get('chat_id', 'None')}")
-    logger.info(f"Messages file path: {storage.repo_path / 'telegram' / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE}")
+    logger.info(f"Messages file path: {storage.repo_path / 'telegram' / str(test_group_id) / test_topic_id / GitStorageAdapter.MESSAGES_FILE}")
     # Update the chat_title in the message metadata
     storage_message.metadata['chat_title'] = 'chronicler-dev'
     await scribe.handle_message(update)
@@ -247,7 +247,7 @@ async def test_telegram_scribe_media_with_git_storage(
     await asyncio.sleep(2)
     
     # Verify message and media were stored
-    messages_file = storage.repo_path / "telegram" / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE
+    messages_file = storage.repo_path / "telegram" / str(test_group_id) / test_topic_id / GitStorageAdapter.MESSAGES_FILE
     logger.info(f"Checking file: {messages_file}")
     assert messages_file.exists(), "Messages file not found"
     content = messages_file.read_text()
@@ -256,14 +256,14 @@ async def test_telegram_scribe_media_with_git_storage(
     
     # Verify photo file exists with new naming format
     photo_id = message.photo[-1].file_id
-    photo_dir = storage.repo_path / "telegram" / storage_message.metadata['chat_title'] / test_topic_name / "attachments" / "jpg"
-    photo_file = photo_dir / f"{message.message_id}_{photo_id}.jpg"
+    photo_dir = storage.repo_path / "telegram" / str(test_group_id) / test_topic_id / "attachments" / "jpg"
+    photo_file = photo_dir / f"{photo_id}.jpg"
     assert photo_file.exists(), "Photo file not found"
     
     # Verify sticker file exists
     sticker_id = sticker_message.sticker.file_id
-    sticker_dir = storage.repo_path / "telegram" / storage_message.metadata['chat_title'] / test_topic_name / "attachments" / "webp"
-    sticker_file = sticker_dir / f"{sticker_message.message_id}_{sticker_id}.webp"
+    sticker_dir = storage.repo_path / "telegram" / str(test_group_id) / test_topic_id / "attachments" / "webp"
+    sticker_file = sticker_dir / f"{sticker_id}.webp"
     assert sticker_file.exists(), "Sticker file not found"
     
     # Verify sticker metadata in messages.jsonl

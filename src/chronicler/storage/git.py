@@ -228,6 +228,7 @@ class GitStorageAdapter(StorageAdapter):
                 
                 source = message.metadata.get('source')
                 if source:
+                    # Use the source as is, don't split by underscore
                     group_id = str(message.metadata.get('chat_id', 'default'))
                     logger.debug(f"Processing {source} message for group {group_id}")
                     if ('sources' in metadata and 

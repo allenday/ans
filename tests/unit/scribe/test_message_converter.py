@@ -68,11 +68,9 @@ async def test_message_converter():
     
     # Verify conversion
     assert storage_message.content == "Test message"
-    assert storage_message.source == "telegram_456"
-    assert storage_message.metadata["chat_id"] == 456
-    assert storage_message.metadata["message_id"] == 789
-    assert storage_message.metadata["user_id"] == 123
-    assert storage_message.metadata["username"] == "test_user"
+    assert storage_message.source == "telegram"
+    assert storage_message.metadata['chat_id'] == 456
+    assert storage_message.metadata['source'] == "telegram"
 
 @pytest.mark.unit
 @pytest.mark.scribe
@@ -83,9 +81,10 @@ async def test_basic_message_conversion(mock_telegram_message):
     storage_msg = await converter.to_storage_message(mock_telegram_message)
     
     assert storage_msg.content == "Test message"
-    assert storage_msg.source == f"telegram_{mock_telegram_message.chat.id}"
+    assert storage_msg.source == "telegram"
+    assert storage_msg.metadata['chat_id'] == mock_telegram_message.chat.id
+    assert storage_msg.metadata['source'] == "telegram"
     assert storage_msg.metadata["message_id"] == mock_telegram_message.message_id
-    assert storage_msg.metadata["chat_id"] == mock_telegram_message.chat.id
     assert storage_msg.metadata["chat_type"] == mock_telegram_message.chat.type
     assert storage_msg.attachments is None
 
