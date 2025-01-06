@@ -105,25 +105,25 @@ The repository follows this structure for storing Telegram messages and media:
 ```
 <github root>/
   telegram/
-    <group name>/           # From chat.title or "default"
-      <topic name>/         # User-specified topic name
-        messages.jsonl      # Message content and metadata
-        attachments/        # Media attachments directory
-          jpg/             # Photo attachments
-          mp4/             # Video attachments
-          webp/            # Sticker attachments
-          pdf/             # Document attachments
-          ogg/             # Voice message attachments
-          mp3/             # Audio attachments
-  metadata.yaml            # Repository-wide metadata
+    <group_id>/           # Numerical Telegram chat_id
+      <topic_id>/         # Numerical Telegram topic_id
+        messages.jsonl    # Message content and metadata
+        attachments/      # Media attachments directory
+          jpg/           # Photo attachments
+          mp4/           # Video attachments
+          webp/          # Sticker attachments
+          pdf/           # Document attachments
+          ogg/           # Voice message attachments
+          mp3/           # Audio attachments
+  metadata.yaml          # Repository-wide metadata and name mappings
 ```
 
 ## Key Points
 
 1. Directory Structure
    - All content is under the `telegram` directory
-   - Group names come from chat titles (falls back to "default")
-   - Topics are user-defined and organized under group directories
+   - Groups are identified by Telegram chat_id (numerical)
+   - Topics are identified by Telegram topic_id (numerical)
    - Media files are stored in type-specific subdirectories
 
 2. File Organization
@@ -132,7 +132,8 @@ The repository follows this structure for storing Telegram messages and media:
    - Media subdirectories are created based on file types (jpg, mp4, etc.)
 
 3. Attachment Handling
-   - Files are saved with format: `<message_id>_<file_id>.<extension>`
+   - Files are saved using Telegram's unique file_id: `<file_id>.<extension>`
+   - Original filenames are preserved in message metadata
    - Supported media types:
      * Photos: `.jpg` in `jpg/`
      * Videos: `.mp4` in `mp4/`
@@ -141,31 +142,57 @@ The repository follows this structure for storing Telegram messages and media:
      * Voice messages: `.ogg` in `ogg/`
      * Audio files: `.mp3` in `mp3/`
 
-4. Metadata
-   - Repository-wide settings in `metadata.yaml`
-   - Per-message metadata stored in `messages.jsonl`
-   - Media metadata (duration, size, etc.) included in message entries
+4. Metadata and Mappings
+   - Repository-wide settings and mappings in `metadata.yaml`:
+     ```yaml
+     telegram:
+       groups:
+         "123456789":           # group_id
+           name: "Group Name"   # human-readable name
+           topics:
+             "987654321":       # topic_id
+               name: "Topic Name" # human-readable name
+     ```
+   - Per-message metadata in `messages.jsonl` includes:
+     ```json
+     {
+       "content": "message text",
+       "attachments": [
+         {
+           "file_id": "ABC123",
+           "original_name": "photo.jpg",
+           "mime_type": "image/jpeg"
+         }
+       ]
+     }
+     ```
 
 ## Path Construction
 
 When constructing paths:
-1. Topic directory: `telegram/<group_name>/<topic_name>/`
-2. Messages file: `telegram/<group_name>/<topic_name>/messages.jsonl`
-3. Attachments: `telegram/<group_name>/<topic_name>/attachments/<media_type>/<message_id>_<file_id>.<extension>`
+1. Topic directory: `telegram/<group_id>/<topic_id>/`
+2. Messages file: `telegram/<group_id>/<topic_id>/messages.jsonl`
+3. Attachments: `telegram/<group_id>/<topic_id>/attachments/<media_type>/<file_id>.<extension>`
 
 ## Implementation Notes
 
 1. Directory Creation
-   - Directories are created on-demand when saving messages
-   - Media type directories are created when first needed
+   - Directories are created using numerical IDs
+   - Human-readable names stored only in metadata.yaml
    - All paths are sanitized to be filesystem-safe
 
 2. File Handling
    - Messages are appended to JSONL files
-   - Attachments are saved with unique IDs to prevent conflicts
+   - Attachments are saved using Telegram's unique file_ids
+   - Original filenames preserved in message metadata
    - File permissions preserve read/write access
 
 3. Git Integration
    - All changes are tracked in Git
    - Commits are atomic per message/attachment
-   - Remote synchronization via GitHub 
+   - Remote synchronization via GitHub
+
+4. Name Resolution
+   - Group and topic names are resolved through metadata.yaml
+   - UI/Bot can present human-readable names while using IDs internally
+   - Names can be updated without affecting the directory structure 

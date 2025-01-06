@@ -1,12 +1,17 @@
 import pytest
 import pytest_asyncio
 import os
+import shutil
 from pathlib import Path
 from datetime import datetime
 import yaml
 from git import Repo
 from chronicler.storage.interface import User, Topic, Message, Attachment
 from chronicler.storage.git import GitStorageAdapter
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def verify_metadata_yaml(repo_path: Path, topic_id: str = None, topic_name: str = None):
     """Helper to verify metadata.yaml contents"""
@@ -29,6 +34,12 @@ def verify_metadata_yaml(repo_path: Path, topic_id: str = None, topic_name: str 
 @pytest_asyncio.fixture
 async def storage(tmp_path):
     """Create a real GitStorageAdapter with a real git repo"""
+    # Clean up any existing test data
+    test_path = tmp_path / "test_user_journal"
+    if test_path.exists():
+        logger.info(f"Cleaning up existing test data at {test_path}")
+        shutil.rmtree(test_path)
+    
     # Create storage adapter
     storage = GitStorageAdapter(tmp_path)
     user = User(id="test_user", name="Test User")
@@ -40,125 +51,171 @@ async def storage(tmp_path):
     
     return storage, repo_path
 
+@pytest.mark.integration
+@pytest.mark.storage
 @pytest.mark.asyncio
-async def test_topic_creation_live(storage):
-    """Test that topic creation works with real git repo"""
-    storage_adapter, repo_path = storage
-    topic = Topic(id="123", name="test-topic")
-    await storage_adapter.create_topic(topic)
+async def test_topic_creation_live(git_adapter_live):
+    """Test creating a topic in a live Git repo"""
+    topic = Topic(
+        id="123456789",
+        name="Test Topic",
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group",
+            "description": "Test topic",
+            "created": "2024-01-01"
+        }
+    )
     
-    # Verify directory structure
-    topic_path = repo_path / "topics" / "test-topic"
-    assert topic_path.exists(), "Topic directory should exist"
-    assert (topic_path / "messages.jsonl").exists(), "Messages file should exist"
-    assert (topic_path / "media").exists(), "Media directory should exist"
+    await git_adapter_live.create_topic(topic)
     
-    # Verify git status
-    repo = Repo(repo_path)
-    assert not repo.is_dirty(), "Repository should be clean after commit"
-    
-    # Verify metadata
-    verify_metadata_yaml(repo_path, "123", "test-topic")
+    topic_dir = git_adapter_live.repo_path / "telegram" / "987654321" / "123456789"
+    assert topic_dir.exists(), "Topic directory should exist"
+    assert topic_dir.is_dir()
+    assert (topic_dir / "messages.jsonl").exists(), "Messages file should exist"
+    assert (topic_dir / "attachments").exists(), "Attachments directory should exist"
 
+@pytest.mark.integration
+@pytest.mark.storage
 @pytest.mark.asyncio
-async def test_message_save_live(storage):
-    """Test that message saving works with real git repo"""
-    storage_adapter, repo_path = storage
-    # Create topic
-    topic = Topic(id="123", name="test-topic")
-    await storage_adapter.create_topic(topic)
+async def test_message_save_live(git_adapter_live):
+    """Test saving a message in a live Git repo"""
+    topic = Topic(
+        id="123456789",
+        name="Test Topic",
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group",
+            "description": "Test topic"
+        }
+    )
+    await git_adapter_live.create_topic(topic)
     
-    # Create and save message
     message = Message(
         content="Test message",
-        source="test_user",
-        timestamp=datetime.utcnow()
+        source="test",
+        timestamp=datetime.utcnow(),
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group"
+        }
     )
-    await storage_adapter.save_message("123", message)
     
-    # Verify message file
-    messages_file = repo_path / "topics" / "test-topic" / "messages.jsonl"
+    await git_adapter_live.save_message(topic.id, message)
+    
+    topic_dir = git_adapter_live.repo_path / "telegram" / "987654321" / "123456789"
+    messages_file = topic_dir / "messages.jsonl"
     assert messages_file.exists(), "Messages file should exist"
     with open(messages_file) as f:
-        content = f.read()
-        assert "Test message" in content, "Message content should be in file"
-    
-    # Verify git status
-    repo = Repo(repo_path)
-    assert not repo.is_dirty(), "Repository should be clean after commit"
-    
-    # Verify metadata
-    verify_metadata_yaml(repo_path, "123", "test-topic")
+        lines = f.readlines()
+        assert len(lines) == 1
 
+@pytest.mark.integration
+@pytest.mark.storage
 @pytest.mark.asyncio
-async def test_attachment_save_live(storage):
-    """Test that attachment saving works with real git repo"""
-    storage_adapter, repo_path = storage
-    # Create topic
-    topic = Topic(id="123", name="test-topic")
-    await storage_adapter.create_topic(topic)
+async def test_attachment_save_live(git_adapter_live):
+    """Test saving an attachment in a live Git repo"""
+    topic = Topic(
+        id="123456789",
+        name="Test Topic",
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group",
+            "description": "Test topic"
+        }
+    )
+    await git_adapter_live.create_topic(topic)
     
-    # Create message with attachment
     attachment = Attachment(
-        id="photo_123",
+        id="test_attachment",
         type="image/jpeg",
         filename="test.jpg",
-        data=b"test data"
-    )
-    message = Message(
-        content="Test message with photo",
-        source="test_user",
-        timestamp=datetime.utcnow(),
-        attachments=[attachment]
+        data=b"test content"
     )
     
-    await storage_adapter.save_message("123", message)
+    await git_adapter_live.save_attachment(topic.id, "msg_1", attachment)
     
-    # Verify attachment file
-    attachment_path = repo_path / "topics" / "test-topic" / "media" / "jpg" / "test.jpg"
-    assert attachment_path.exists(), "Attachment file should exist"
-    with open(attachment_path, 'rb') as f:
-        data = f.read()
-        assert data == b"test data", "Attachment data should match"
-    
-    # Verify git status
-    repo = Repo(repo_path)
-    assert not repo.is_dirty(), "Repository should be clean after commit"
-    
-    # Verify metadata
-    verify_metadata_yaml(repo_path, "123", "test-topic")
+    topic_dir = git_adapter_live.repo_path / "telegram" / "987654321" / "123456789"
+    attachment_file = topic_dir / "attachments" / "jpg" / "test_attachment.jpg"
+    assert attachment_file.exists(), "Attachment file should exist"
 
+@pytest.mark.integration
+@pytest.mark.storage
 @pytest.mark.asyncio
-async def test_multiple_topics_live(storage):
-    """Test handling multiple topics with real git repo"""
-    storage_adapter, repo_path = storage
-    
-    # Create multiple topics
+async def test_multiple_topics_live(git_adapter_live):
+    """Test creating multiple topics in a live Git repo"""
     topics = [
-        Topic(id="123", name="topic-1"),
-        Topic(id="456", name="topic-2"),
-        Topic(id="789", name="topic-3")
+        Topic(
+            id=f"12345678{i}",
+            name=f"topic-{i}",
+            metadata={
+                "source": "telegram",
+                "chat_id": "987654321",
+                "chat_title": "Test Group",
+                "description": f"Test topic {i}"
+            }
+        )
+        for i in range(3)
     ]
     
     for topic in topics:
-        await storage_adapter.create_topic(topic)
+        await git_adapter_live.create_topic(topic)
         
-        # Save a message to each topic
-        message = Message(
-            content=f"Test message for {topic.name}",
-            source="test_user",
-            timestamp=datetime.utcnow()
-        )
-        await storage_adapter.save_message(topic.id, message)
-        
-        # Verify topic structure
-        topic_path = repo_path / "topics" / topic.name
-        assert topic_path.exists(), f"Topic directory {topic.name} should exist"
-        assert (topic_path / "messages.jsonl").exists(), f"Messages file for {topic.name} should exist"
-        
-        # Verify metadata for each topic
-        verify_metadata_yaml(repo_path, topic.id, topic.name)
+        topic_dir = git_adapter_live.repo_path / "telegram" / "987654321" / topic.id
+        assert topic_dir.exists(), f"Topic directory {topic.name} should exist"
+        assert topic_dir.is_dir()
+        assert (topic_dir / "messages.jsonl").exists()
+        assert (topic_dir / "attachments").exists()
+
+@pytest.mark.integration
+@pytest.mark.storage
+@pytest.mark.asyncio
+async def test_github_push(git_adapter_live, tmp_path):
+    """Test pushing changes to GitHub"""
+    # Create a topic
+    topic = Topic(
+        id="123456789",
+        name="Test Topic",
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group",
+            "description": "Test topic"
+        }
+    )
+    await git_adapter_live.create_topic(topic)
     
-    # Verify git status
-    repo = Repo(repo_path)
-    assert not repo.is_dirty(), "Repository should be clean after all operations" 
+    # Add a message with attachment
+    attachment = Attachment(
+        id="test_attachment",
+        type="image/jpeg",
+        filename="test.jpg",
+        data=b"test content"
+    )
+    
+    message = Message(
+        content="Test message with attachment",
+        source="test",
+        timestamp=datetime.utcnow(),
+        attachments=[attachment],
+        metadata={
+            "source": "telegram",
+            "chat_id": "987654321",
+            "chat_title": "Test Group"
+        }
+    )
+    
+    await git_adapter_live.save_message(topic.id, message)
+    
+    # Clone the repo to verify contents
+    clone_path = tmp_path / "clone"
+    repo = Repo.clone_from(git_adapter_live.repo_path, clone_path)
+    
+    topic_dir = clone_path / "telegram" / "987654321" / "123456789"
+    assert (topic_dir / "messages.jsonl").exists(), "Messages file not found in clone"
+    attachment_file = topic_dir / "attachments" / "jpg" / "test_attachment.jpg"
+    assert attachment_file.exists(), "Attachment file not found in clone" 

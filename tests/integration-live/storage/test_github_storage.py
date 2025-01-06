@@ -78,8 +78,10 @@ async def test_github_push(github_storage, caplog, test_log_level):
         id="live_test_topic", 
         name="Live Test Topic",
         metadata={
-            'group_name': 'test-group',
-            'group_id': 123456
+            'source': 'telegram',
+            'chat_id': '123456',
+            'chat_title': 'chronicler-dev',
+            'description': 'Test topic'
         }
     )
     await adapter.create_topic(topic, ignore_exists=True)
@@ -87,7 +89,11 @@ async def test_github_push(github_storage, caplog, test_log_level):
     # Add test message
     message = Message(
         content="Test message from live integration",
-        metadata={},
+        metadata={
+            'source': 'telegram',
+            'chat_id': '123456',
+            'chat_title': 'chronicler-dev'
+        },
         source="test",
         timestamp=datetime.utcnow()
     )
@@ -112,13 +118,13 @@ async def test_github_push(github_storage, caplog, test_log_level):
         cloned_repo = Repo.clone_from(adapter._repo.remotes.origin.url, clone_path)
         
         # Check message content
-        cloned_messages = clone_path / "telegram" / "test-group" / topic.name / GitStorageAdapter.MESSAGES_FILE
+        cloned_messages = clone_path / "telegram" / "123456" / topic.id / GitStorageAdapter.MESSAGES_FILE
         assert cloned_messages.exists(), "Messages file not found in clone"
         content = cloned_messages.read_text()
         assert "Test message from live integration" in content
         
         # Check attachment
-        cloned_attachment = clone_path / "telegram" / "test-group" / topic.name / "attachments" / "txt" / "test.txt"
+        cloned_attachment = clone_path / "telegram" / "123456" / topic.id / "attachments" / "txt" / "test_attachment.txt"
         assert cloned_attachment.exists(), "Attachment file not found in clone"
         assert cloned_attachment.read_bytes() == test_content, "Attachment content mismatch"
         
@@ -127,7 +133,7 @@ async def test_github_push(github_storage, caplog, test_log_level):
         assert metadata_file.exists()
         with open(metadata_file) as f:
             metadata = yaml.safe_load(f)
-        assert topic.id in metadata['topics']
-        assert metadata['topics'][topic.id]['path'] == f"telegram/test-group/{topic.name}"
+        assert topic.id in metadata['sources']['telegram']['groups']['123456']['topics']
+        assert metadata['sources']['telegram']['groups']['123456']['topics'][topic.id]['name'] == topic.name
     finally:
         shutil.rmtree(clone_path)

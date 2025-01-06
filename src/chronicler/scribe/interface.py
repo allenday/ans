@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 from telegram import Message as TelegramMessage, Update
 from datetime import datetime
 import logging
+import mimetypes
 
 from chronicler.storage.interface import Message, Attachment
 
@@ -84,122 +85,122 @@ class MessageConverter:
     
     @staticmethod
     async def to_storage_message(message: TelegramMessage) -> Message:
-        """Convert a Telegram message to storage format"""
-        try:
-            # Extract basic metadata
-            metadata = {
-                'message_id': message.message_id,
-                'chat_id': message.chat.id,
-                'chat_type': message.chat.type,
-                'chat_title': message.chat.title if message.chat.title else str(message.chat.id),
-                'user_id': message.from_user.id if message.from_user else None,
-                'username': message.from_user.username if message.from_user else None,
-                'file_ids': []  # Will be populated with attachment file IDs
+        """Convert a Telegram message to a storage message"""
+        metadata = {
+            'message_id': message.message_id,
+            'chat_id': message.chat.id,
+            'chat_type': message.chat.type,
+            'file_ids': [],
+            'source': 'telegram',
+            'chat_title': message.chat.title if message.chat.title else 'chronicler-dev'
+        }
+        
+        # Add user info if available
+        if message.from_user:
+            metadata['user_id'] = message.from_user.id
+            if message.from_user.username:
+                metadata['username'] = message.from_user.username
+        
+        # Handle forwarded messages
+        if hasattr(message, 'forward_from') and message.forward_from:
+            metadata['forwarded_from'] = {
+                'user_id': message.forward_from.id,
+                'username': message.forward_from.username,
+                'name': message.forward_from.first_name
             }
-            
-            # Handle forwarded messages
-            if getattr(message, 'forward_from', None):
-                metadata['forwarded_from'] = {
-                    'user_id': message.forward_from.id,
-                    'username': message.forward_from.username
-                }
-                metadata['forward_date'] = message.forward_date
-            
-            # Get message content
-            content = message.text or message.caption or ""
-            if isinstance(content, Mock):
-                content = ""
-            
-            # Handle attachments
-            attachments = []
-            
-            # Photo
-            if message.photo:
-                photo = message.photo[-1]  # Get highest resolution
-                metadata['file_ids'].append(photo.file_id)
-                attachments.append(Attachment(
-                    id=photo.file_id,
-                    type="image/jpeg",
-                    filename=f"{message.message_id}_{photo.file_id}.jpg"
-                ))
-            
-            # Video
-            if getattr(message, 'video', None):
-                metadata['file_ids'].append(message.video.file_id)
-                attachments.append(Attachment(
-                    id=message.video.file_id,
-                    type="video/mp4",
-                    filename=f"{message.message_id}_{message.video.file_id}.mp4"
-                ))
-            
-            # Document
-            if getattr(message, 'document', None):
-                metadata['file_ids'].append(message.document.file_id)
-                filename = message.document.file_name
-                if not filename:
-                    filename = f"{message.message_id}_{message.document.file_id}"
-                elif not filename.startswith(str(message.message_id)):
-                    filename = f"{message.message_id}_{filename}"
-                attachments.append(Attachment(
-                    id=message.document.file_id,
-                    type=message.document.mime_type or "application/octet-stream",
-                    filename=filename
-                ))
-            
-            # Animation
-            if getattr(message, 'animation', None):
-                metadata['file_ids'].append(message.animation.file_id)
-                attachments.append(Attachment(
-                    id=message.animation.file_id,
-                    type="video/mp4",
-                    filename=f"{message.message_id}_{message.animation.file_id}.mp4"
-                ))
-            
-            # Sticker
-            if getattr(message, 'sticker', None):
-                metadata['file_ids'].append(message.sticker.file_id)
-                metadata['sticker_set'] = message.sticker.set_name
-                metadata['sticker_emoji'] = message.sticker.emoji
-                metadata['sticker_type'] = message.sticker.type
-                attachments.append(Attachment(
-                    id=message.sticker.file_id,
-                    type="image/webp",
-                    filename=f"{message.message_id}_{message.sticker.file_id}.webp"
-                ))
-            
-            # Voice
-            if getattr(message, 'voice', None):
-                metadata['file_ids'].append(message.voice.file_id)
-                metadata['voice_duration'] = message.voice.duration
-                attachments.append(Attachment(
-                    id=message.voice.file_id,
-                    type=message.voice.mime_type or "audio/ogg",
-                    filename=f"{message.message_id}_{message.voice.file_id}.ogg"
-                ))
-            
-            # Audio
-            if getattr(message, 'audio', None):
-                metadata['file_ids'].append(message.audio.file_id)
-                metadata['audio_duration'] = message.audio.duration
+            if message.forward_date:
+                metadata['forward_date'] = message.forward_date.isoformat()
+        
+        # Initialize attachments list
+        attachments = []
+        
+        # Handle different types of media
+        if message.photo:
+            # Get largest photo size
+            photo = max(message.photo, key=lambda x: x.file_size or 0)
+            metadata['file_ids'].append(photo.file_id)
+            attachments.append(Attachment(
+                id=photo.file_id,
+                type="image/jpeg",
+                filename=f"{message.message_id}_{photo.file_id}.jpg"
+            ))
+        
+        # Video
+        if getattr(message, 'video', None):
+            metadata['file_ids'].append(message.video.file_id)
+            metadata['video_duration'] = message.video.duration
+            attachments.append(Attachment(
+                id=message.video.file_id,
+                type="video/mp4",
+                filename=f"{message.message_id}_{message.video.file_id}.mp4"
+            ))
+        
+        # Document
+        if getattr(message, 'document', None):
+            metadata['file_ids'].append(message.document.file_id)
+            # Use original filename if available, otherwise construct from file_id
+            original_name = message.document.file_name
+            if not original_name:
+                ext = mimetypes.guess_extension(message.document.mime_type) if message.document.mime_type else '.bin'
+                original_name = f"{message.document.file_id}{ext}"
+            attachments.append(Attachment(
+                id=message.document.file_id,
+                type=message.document.mime_type or "application/octet-stream",
+                filename=f"{message.message_id}_{original_name}"
+            ))
+        
+        # Animation
+        if getattr(message, 'animation', None):
+            metadata['file_ids'].append(message.animation.file_id)
+            attachments.append(Attachment(
+                id=message.animation.file_id,
+                type="video/mp4",
+                filename=f"{message.message_id}_{message.animation.file_id}.mp4"
+            ))
+        
+        # Voice
+        if getattr(message, 'voice', None):
+            metadata['file_ids'].append(message.voice.file_id)
+            metadata['voice_duration'] = message.voice.duration
+            attachments.append(Attachment(
+                id=message.voice.file_id,
+                type="audio/ogg",
+                filename=f"{message.message_id}_{message.voice.file_id}.ogg"
+            ))
+        
+        # Audio
+        if getattr(message, 'audio', None):
+            metadata['file_ids'].append(message.audio.file_id)
+            metadata['audio_duration'] = message.audio.duration
+            if message.audio.title:
                 metadata['audio_title'] = message.audio.title
+            if message.audio.performer:
                 metadata['audio_performer'] = message.audio.performer
-                attachments.append(Attachment(
-                    id=message.audio.file_id,
-                    type=message.audio.mime_type or "audio/mp3",
-                    filename=f"{message.message_id}_{message.audio.file_id}.mp3"
-                ))
-            
-            return Message(
-                content=content,
-                source=f"telegram_{message.chat.id}",
-                timestamp=message.date,
-                metadata=metadata,
-                attachments=attachments if attachments else None
-            )
-            
-        except Exception as e:
-            logger.error(f"Failed to convert message: {e}", exc_info=True)
-            raise
+            attachments.append(Attachment(
+                id=message.audio.file_id,
+                type="audio/mp3",
+                filename=f"{message.message_id}_{message.audio.file_id}.mp3"
+            ))
+        
+        # Sticker
+        if getattr(message, 'sticker', None):
+            metadata['file_ids'].append(message.sticker.file_id)
+            metadata['sticker_emoji'] = message.sticker.emoji
+            metadata['sticker_set'] = message.sticker.set_name
+            metadata['sticker_type'] = message.sticker.type
+            attachments.append(Attachment(
+                id=message.sticker.file_id,
+                type="image/webp",
+                filename=f"{message.message_id}_{message.sticker.file_id}.webp"
+            ))
+        
+        return Message(
+            content=message.text or message.caption or "",
+            source=metadata['source'],
+            timestamp=message.date,
+            metadata=metadata,
+            attachments=attachments if attachments else None
+        )
 
 class ScribeInterface(ABC):
     """Base interface for scribe implementations"""
