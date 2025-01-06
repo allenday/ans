@@ -5,6 +5,7 @@ This directory contains development documentation for the Chronicler project.
 ## Key Files
 
 - `architecture.md`: Overview of the pipeline-based architecture
+- `backlog.md`: Development roadmap and known issues
 - `conventions.md`: Code style and development conventions
 - `docs.md`: Detailed documentation of components and APIs
 - `git-workflow.md`: Git workflow and branching strategy
