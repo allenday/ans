@@ -23,6 +23,15 @@
      - Raises
      - Examples (if complex)
 
+4. **Code Organization**
+   - Follow MECE principle:
+     - Methods should be mutually exclusive (no overlapping functionality)
+     - Class coverage should be collectively exhaustive (no missing cases)
+     - Error handling should cover all cases
+   - Keep methods focused and small
+   - Organize by responsibility
+   - Group related functionality
+
 ## Project Structure
 
 1. **Directory Organization**

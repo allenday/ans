@@ -7,6 +7,10 @@
 - [ ] Verify acceptance criteria are testable
 - [ ] Check alignment with architecture
 - [ ] Check for similar implementations
+- [ ] Verify MECE principles:
+  - [ ] Cases are mutually exclusive (no overlap)
+  - [ ] Cases are collectively exhaustive (no gaps)
+  - [ ] Edge cases are identified and covered
 
 ## Scope Control
 - [ ] Document initial scope hash (requirements + acceptance)
