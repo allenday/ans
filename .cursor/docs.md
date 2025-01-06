@@ -100,33 +100,72 @@ class ChroniclerBot:
 
 # Repository Structure
 
-The repository follows this structure:
+The repository follows this structure for storing Telegram messages and media:
 
 ```
 <github root>/
   telegram/
-    <group name>/
-      <topic name>/
-        messages.jsonl
-        attachments/
-          jpg/
-          png/
-          etc/
-  metadata.yaml
+    <group name>/           # From chat.title or "default"
+      <topic name>/         # User-specified topic name
+        messages.jsonl      # Message content and metadata
+        attachments/        # Media attachments directory
+          jpg/             # Photo attachments
+          mp4/             # Video attachments
+          webp/            # Sticker attachments
+          pdf/             # Document attachments
+          ogg/             # Voice message attachments
+          mp3/             # Audio attachments
+  metadata.yaml            # Repository-wide metadata
 ```
 
 ## Key Points
 
-1. All topics are under the `telegram` directory
-2. Topics are organized by group name (default if not specified)
-3. Each topic has:
-   - `messages.jsonl` for message content
-   - `attachments` directory with media type subdirectories
-4. Metadata is stored in root `metadata.yaml`
+1. Directory Structure
+   - All content is under the `telegram` directory
+   - Group names come from chat titles (falls back to "default")
+   - Topics are user-defined and organized under group directories
+   - Media files are stored in type-specific subdirectories
+
+2. File Organization
+   - `messages.jsonl`: Contains message content and metadata in JSONL format
+   - `attachments/`: Directory for all media files
+   - Media subdirectories are created based on file types (jpg, mp4, etc.)
+
+3. Attachment Handling
+   - Files are saved with format: `<message_id>_<file_id>.<extension>`
+   - Supported media types:
+     * Photos: `.jpg` in `jpg/`
+     * Videos: `.mp4` in `mp4/`
+     * Stickers: `.webp` in `webp/`
+     * Documents: preserved extension in matching directory
+     * Voice messages: `.ogg` in `ogg/`
+     * Audio files: `.mp3` in `mp3/`
+
+4. Metadata
+   - Repository-wide settings in `metadata.yaml`
+   - Per-message metadata stored in `messages.jsonl`
+   - Media metadata (duration, size, etc.) included in message entries
 
 ## Path Construction
 
 When constructing paths:
-1. Topic path: `telegram/<group_name>/<topic_name>`
+1. Topic directory: `telegram/<group_name>/<topic_name>/`
 2. Messages file: `telegram/<group_name>/<topic_name>/messages.jsonl`
-3. Attachments: `telegram/<group_name>/<topic_name>/attachments/<media_type>/<filename>` 
+3. Attachments: `telegram/<group_name>/<topic_name>/attachments/<media_type>/<message_id>_<file_id>.<extension>`
+
+## Implementation Notes
+
+1. Directory Creation
+   - Directories are created on-demand when saving messages
+   - Media type directories are created when first needed
+   - All paths are sanitized to be filesystem-safe
+
+2. File Handling
+   - Messages are appended to JSONL files
+   - Attachments are saved with unique IDs to prevent conflicts
+   - File permissions preserve read/write access
+
+3. Git Integration
+   - All changes are tracked in Git
+   - Commits are atomic per message/attachment
+   - Remote synchronization via GitHub 
