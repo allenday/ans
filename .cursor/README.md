@@ -80,7 +80,30 @@ To start a new development session:
    - Follow conventions.md
    - Update backlog.md
 
-3. Example scope:
+3. Scope Control:
+   - Initial scope is locked once validated
+   - New requirements MUST go to backlog.md
+   - AI will respond to scope creep with:
+     ```
+     <SCOPE_CREEP>
+     ORIGINAL_SCOPE: [Brief reminder of original scope]
+     NEW_REQUEST: [What was just requested]
+     RECOMMENDATION: Add to backlog and complete current scope first
+     RATIONALE: [Why this should wait]
+     ACTION: Adding to backlog.md under Future Work
+     </SCOPE_CREEP>
+     ```
+   - Scope changes require explicit approval:
+     ```
+     <SCOPE_CHANGE>
+     IMPACT: [What would change]
+     RISKS: [What could go wrong]
+     TIMELINE: [How it affects delivery]
+     APPROVE?: [y/n]
+     </SCOPE_CHANGE>
+     ```
+
+4. Example scope:
    ```
    <SCOPE>
    GOAL: Add support for video note messages in Telegram

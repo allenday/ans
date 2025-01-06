@@ -8,6 +8,13 @@
 - [ ] Check alignment with architecture
 - [ ] Check for similar implementations
 
+## Scope Control
+- [ ] Document initial scope hash (requirements + acceptance)
+- [ ] Flag any deviations from initial scope
+- [ ] Push new requirements to backlog.md
+- [ ] Maintain focus on original acceptance criteria
+- [ ] Get explicit approval for scope changes
+
 ## Pre-Implementation
 - [ ] Create feature branch
 - [ ] Write unit tests first
