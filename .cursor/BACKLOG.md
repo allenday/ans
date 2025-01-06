@@ -23,6 +23,28 @@
 - [ ] Add support for message reactions
 - [ ] Add support for message threads (supergroups)
 - [ ] Add support for message search
+- [ ] Add Twitter Transport for bookmark archival
+  - Requirements:
+    - Authenticate with Twitter API
+    - Poll for new bookmarks periodically
+    - Download tweet content and media
+    - Store in Git with metadata
+    - Remove bookmark after successful storage
+  - Components:
+    - TwitterTransport class
+    - Tweet to DocumentFrame conversion
+    - Media attachment handling
+    - Bookmark management
+  - Constraints:
+    - Must handle Twitter API rate limits
+    - Must verify successful storage before unbookmarking
+    - Must handle network failures gracefully
+    - Must preserve all tweet metadata
+  - Storage Format:
+    - tweets/
+      - YYYY-MM-DD/
+        - tweet_id.json (metadata)
+        - media/ (attachments)
 
 ### Improvements
 - [ ] Optimize media file storage
