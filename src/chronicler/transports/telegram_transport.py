@@ -4,7 +4,9 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 
-from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, BaseTransport
+from chronicler.frames.base import Frame
+from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame
+from chronicler.transports.base import BaseTransport
 from chronicler.commands.frames import CommandFrame
 
 logger = logging.getLogger(__name__)
@@ -530,7 +532,12 @@ class TelegramTransport(BaseTransport):
             
     async def process_frame(self, frame: Frame):
         """Process frames (not used in this transport as it's input-only)."""
-        logger.debug(f"Ignoring incoming frame of type {type(frame)}") 
+        logger.debug(f"Ignoring incoming frame of type {type(frame)}")
+
+    async def send(self, frame: Frame) -> Optional[Frame]:
+        """Send a frame through the transport (not implemented as this is input-only)."""
+        logger.debug(f"Send not implemented for frame type {type(frame)}")
+        return None
 
     async def _handle_command(self, update: Update, context) -> None:
         """Handle bot commands."""

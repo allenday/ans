@@ -1,172 +1,160 @@
-"""Unit tests for Frame classes."""
+"""Unit tests for frame classes."""
 import pytest
-from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, AudioFrame, VoiceFrame, StickerFrame
+
+from chronicler.frames import (
+    Frame,
+    TextFrame,
+    ImageFrame,
+    DocumentFrame,
+    AudioFrame,
+    VoiceFrame,
+    StickerFrame,
+)
 
 def test_text_frame_creation():
-    """Test creating a TextFrame."""
-    frame = TextFrame(text="test message", metadata={'key': 'value'})
+    """Test text frame creation."""
+    frame = TextFrame(text="test message", metadata={})
+    assert isinstance(frame, Frame)
     assert frame.text == "test message"
-    assert frame.metadata['key'] == 'value'
 
 def test_text_frame_validation():
-    """Test TextFrame validation."""
+    """Test text frame validation."""
     with pytest.raises(TypeError):
-        TextFrame()  # text is required
-    
-    with pytest.raises(TypeError):
-        TextFrame(metadata={'key': 'value'})  # text is required
+        TextFrame(text=123, metadata={})
 
 def test_image_frame_creation():
-    """Test creating an ImageFrame."""
+    """Test image frame creation."""
     frame = ImageFrame(
-        image=b"test_image_data",
-        size=(100, 200),
+        image=b"test_data",
+        size=(100, 100),
         format="jpeg",
-        metadata={'key': 'value'}
+        metadata={}
     )
-    assert frame.image == b"test_image_data"
-    assert frame.size == (100, 200)
+    assert isinstance(frame, Frame)
+    assert frame.image == b"test_data"
+    assert frame.size == (100, 100)
     assert frame.format == "jpeg"
-    assert frame.metadata['key'] == 'value'
 
 def test_image_frame_validation():
-    """Test ImageFrame validation."""
+    """Test image frame validation."""
     with pytest.raises(TypeError):
-        ImageFrame()  # required fields missing
-    
-    with pytest.raises(TypeError):
-        ImageFrame(image=b"data")  # size and format required
-    
-    with pytest.raises(TypeError):
-        ImageFrame(image=b"data", size=(100, 200))  # format required
+        ImageFrame(
+            image="not_bytes",
+            size=(100, 100),
+            format="jpeg",
+            metadata={}
+        )
 
 def test_document_frame_creation():
-    """Test creating a DocumentFrame."""
+    """Test document frame creation."""
     frame = DocumentFrame(
-        content=b"test_document_data",
+        content=b"test_data",
         filename="test.txt",
         mime_type="text/plain",
-        caption="Test Caption",
-        metadata={'key': 'value'}
+        caption="Test document",
+        metadata={}
     )
-    assert frame.content == b"test_document_data"
+    assert isinstance(frame, Frame)
+    assert frame.content == b"test_data"
     assert frame.filename == "test.txt"
     assert frame.mime_type == "text/plain"
-    assert frame.caption == "Test Caption"
-    assert frame.metadata['key'] == 'value'
+    assert frame.caption == "Test document"
+    assert frame.text == "Test document"
 
 def test_document_frame_validation():
-    """Test DocumentFrame validation."""
+    """Test document frame validation."""
     with pytest.raises(TypeError):
-        DocumentFrame()  # required fields missing
-    
-    with pytest.raises(TypeError):
-        DocumentFrame(content=b"data")  # filename and mime_type required
-    
-    # Caption is optional
-    frame = DocumentFrame(
-        content=b"data",
-        filename="test.txt",
-        mime_type="text/plain"
-    )
-    assert frame.caption is None
+        DocumentFrame(
+            content="not_bytes",
+            filename=123,
+            mime_type="text/plain",
+            metadata={}
+        )
 
 def test_audio_frame_creation():
-    """Test creating an AudioFrame."""
+    """Test audio frame creation."""
     frame = AudioFrame(
-        audio=b"test_audio_data",
-        duration=120,  # 2 minutes
+        audio=b"test_data",
+        duration=60,
         mime_type="audio/mp3",
-        metadata={'key': 'value'}
+        metadata={}
     )
-    assert frame.audio == b"test_audio_data"
-    assert frame.duration == 120
+    assert isinstance(frame, Frame)
+    assert frame.audio == b"test_data"
+    assert frame.duration == 60
     assert frame.mime_type == "audio/mp3"
-    assert frame.metadata['key'] == 'value'
 
 def test_audio_frame_validation():
-    """Test AudioFrame validation."""
+    """Test audio frame validation."""
     with pytest.raises(TypeError):
-        AudioFrame()  # required fields missing
-    
-    with pytest.raises(TypeError):
-        AudioFrame(audio=b"data")  # duration and mime_type required
-    
-    with pytest.raises(TypeError):
-        AudioFrame(audio=b"data", duration=120)  # mime_type required
+        AudioFrame(
+            audio="not_bytes",
+            duration="not_int",
+            mime_type="audio/mp3",
+            metadata={}
+        )
 
 def test_voice_frame_creation():
-    """Test creating a VoiceFrame."""
+    """Test voice frame creation."""
     frame = VoiceFrame(
-        audio=b"test_voice_data",
-        duration=30,  # 30 seconds
+        audio=b"test_data",
+        duration=30,
         mime_type="audio/ogg",
-        metadata={'key': 'value'}
+        metadata={}
     )
-    assert frame.audio == b"test_voice_data"
+    assert isinstance(frame, Frame)
+    assert frame.audio == b"test_data"
     assert frame.duration == 30
     assert frame.mime_type == "audio/ogg"
-    assert frame.metadata['key'] == 'value'
 
 def test_voice_frame_validation():
-    """Test VoiceFrame validation."""
+    """Test voice frame validation."""
     with pytest.raises(TypeError):
-        VoiceFrame()  # required fields missing
-    
-    with pytest.raises(TypeError):
-        VoiceFrame(audio=b"data")  # duration and mime_type required
-    
-    with pytest.raises(TypeError):
-        VoiceFrame(audio=b"data", duration=30)  # mime_type required
+        VoiceFrame(
+            audio="not_bytes",
+            duration="not_int",
+            mime_type="audio/ogg",
+            metadata={}
+        )
 
 def test_sticker_frame_creation():
-    """Test creating a StickerFrame."""
+    """Test sticker frame creation."""
     frame = StickerFrame(
-        sticker=b"test_sticker_data",
-        emoji="😀",
-        set_name="TestSet",
-        metadata={'key': 'value'}
+        sticker=b"test_data",
+        emoji="👍",
+        set_name="test_set",
+        metadata={}
     )
-    assert frame.sticker == b"test_sticker_data"
-    assert frame.emoji == "😀"
-    assert frame.set_name == "TestSet"
-    assert frame.metadata['key'] == 'value'
+    assert isinstance(frame, Frame)
+    assert frame.sticker == b"test_data"
+    assert frame.emoji == "👍"
+    assert frame.set_name == "test_set"
 
 def test_sticker_frame_validation():
-    """Test StickerFrame validation."""
+    """Test sticker frame validation."""
     with pytest.raises(TypeError):
-        StickerFrame()  # required fields missing
-    
-    with pytest.raises(TypeError):
-        StickerFrame(sticker=b"data")  # emoji and set_name required
-    
-    with pytest.raises(TypeError):
-        StickerFrame(sticker=b"data", emoji="😀")  # set_name required
+        StickerFrame(
+            sticker="not_bytes",
+            emoji=123,
+            set_name=456,
+            metadata={}
+        )
 
 def test_frame_metadata():
-    """Test metadata handling for all frame types."""
-    frames = [
-        TextFrame(text="test", metadata={'key': 'value'}),
-        ImageFrame(image=b"data", size=(100,100), format="jpeg", metadata={'key': 'value'}),
-        DocumentFrame(content=b"data", filename="test.txt", mime_type="text/plain", metadata={'key': 'value'}),
-        AudioFrame(audio=b"data", duration=120, mime_type="audio/mp3", metadata={'key': 'value'}),
-        VoiceFrame(audio=b"data", duration=30, mime_type="audio/ogg", metadata={'key': 'value'}),
-        StickerFrame(sticker=b"data", emoji="😀", set_name="TestSet", metadata={'key': 'value'})
-    ]
-    
-    for frame in frames:
-        assert frame.metadata['key'] == 'value'
-        assert isinstance(frame.metadata, dict)
+    """Test frame metadata handling."""
+    metadata = {"user_id": 123, "chat_id": 456}
+    frame = TextFrame(text="test", metadata=metadata)
+    assert frame.metadata == metadata
 
 def test_frame_inheritance():
-    """Test that all frame types inherit from Frame."""
+    """Test frame inheritance hierarchy."""
     frames = [
-        TextFrame(text="test"),
-        ImageFrame(image=b"data", size=(100,100), format="jpeg"),
-        DocumentFrame(content=b"data", filename="test.txt", mime_type="text/plain"),
-        AudioFrame(audio=b"data", duration=120, mime_type="audio/mp3"),
-        VoiceFrame(audio=b"data", duration=30, mime_type="audio/ogg"),
-        StickerFrame(sticker=b"data", emoji="😀", set_name="TestSet")
+        TextFrame(text="test", metadata={}),
+        ImageFrame(image=b"test", size=(100, 100), format="jpeg", metadata={}),
+        DocumentFrame(content=b"test", filename="test.txt", mime_type="text/plain", metadata={}),
+        AudioFrame(audio=b"test", duration=60, mime_type="audio/mp3", metadata={}),
+        VoiceFrame(audio=b"test", duration=30, mime_type="audio/ogg", metadata={}),
+        StickerFrame(sticker=b"test", emoji="👍", set_name="test_set", metadata={})
     ]
     
     for frame in frames:

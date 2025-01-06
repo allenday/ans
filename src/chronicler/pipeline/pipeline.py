@@ -1,64 +1,47 @@
-"""Pipeline infrastructure."""
+"""Pipeline implementation."""
 import logging
-from typing import List
-from .frames import Frame
-from abc import ABC, abstractmethod
+from typing import List, Optional
+from chronicler.frames.base import Frame
+from chronicler.processors.base import BaseProcessor
 
 logger = logging.getLogger(__name__)
 
 class Pipeline:
     """A pipeline that processes frames through a series of processors."""
     
-    def __init__(self, processors: List['BaseProcessor'] = None):
-        """Initialize the pipeline with optional processors."""
-        logger.info("PIPE - Initializing pipeline")
-        self.processors = processors or []
-        logger.debug(f"PIPE - Added {len(self.processors)} processors")
-        
-        # Link processors
-        for i in range(len(self.processors) - 1):
-            logger.debug(f"PIPE - Linking {self.processors[i].__class__.__name__} to {self.processors[i + 1].__class__.__name__}")
-            self.processors[i].next_processor = self.processors[i + 1]
-        
-    async def process_frame(self, frame: Frame) -> None:
-        """Process a frame through all processors in sequence."""
-        logger.info(f"PIPE - Processing frame of type {type(frame).__name__}")
-        try:
-            if self.processors:
-                logger.debug(f"PIPE - Starting pipeline with {len(self.processors)} processors")
-                await self.processors[0].process_frame(frame)
-                logger.debug("PIPE - Frame processing complete")
-            else:
-                logger.warning("PIPE - Attempted to process frame through empty pipeline")
-        except Exception as e:
-            logger.error(f"PIPE - Failed to process frame: {e}", exc_info=True)
-            raise
-
-class BaseProcessor:
-    """Base class for frame processors."""
-    
     def __init__(self):
-        """Initialize the processor."""
-        self.next_processor = None
-    
-    async def process_frame(self, frame: Frame) -> None:
-        """Process a frame. Must be implemented by subclasses."""
-        raise NotImplementedError("Processors must implement process_frame")
+        """Initialize pipeline."""
+        self.processors: List[BaseProcessor] = []
+        logger.info("PIPELINE - Initialized empty pipeline")
         
-    async def push_frame(self, frame: Frame) -> None:
-        """Push a frame to the next processor in the pipeline."""
-        if self.next_processor:
-            await self.next_processor.process_frame(frame)
-
-class BaseTransport(BaseProcessor):
-    """Base class for transports that handle input/output."""
-    
-    @abstractmethod
-    async def start(self):
-        """Start the transport."""
-        pass
-    
-    @abstractmethod
-    async def stop(self):
-        """Stop the transport."""
-        pass 
+    def add_processor(self, processor: BaseProcessor) -> None:
+        """Add a processor to the pipeline."""
+        if not isinstance(processor, BaseProcessor):
+            logger.error(f"PIPELINE - Invalid processor type: {type(processor)} (must be BaseProcessor)")
+            raise TypeError("Processor must be an instance of BaseProcessor")
+        self.processors.append(processor)
+        logger.info(f"PIPELINE - Added processor: {processor.__class__.__name__} (total: {len(self.processors)})")
+        
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a frame through all processors in sequence."""
+        logger.info(f"PIPELINE - Processing frame of type {type(frame).__name__}")
+        current_frame = frame
+        
+        for i, processor in enumerate(self.processors, 1):
+            try:
+                logger.debug(f"PIPELINE - Running processor {i}/{len(self.processors)}: {processor.__class__.__name__}")
+                result = await processor.process(current_frame)
+                if result is not None:
+                    logger.debug(f"PIPELINE - Processor {processor.__class__.__name__} transformed frame to {type(result).__name__}")
+                    current_frame = result
+                else:
+                    logger.debug(f"PIPELINE - Processor {processor.__class__.__name__} returned None, keeping current frame")
+            except Exception as e:
+                logger.error(
+                    f"PIPELINE - Error in processor {processor.__class__.__name__} ({i}/{len(self.processors)}): {e}",
+                    exc_info=True
+                )
+                raise
+                
+        logger.info(f"PIPELINE - Frame processing complete, final type: {type(current_frame).__name__}")
+        return current_frame 

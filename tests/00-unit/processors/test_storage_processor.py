@@ -1,207 +1,245 @@
-"""Unit tests for StorageProcessor."""
+"""Tests for storage processor."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import Mock, AsyncMock, create_autospec
 from datetime import datetime
-from pathlib import Path
 
-from chronicler.pipeline import (
-    TextFrame, ImageFrame, DocumentFrame,
-    AudioFrame, VoiceFrame, StickerFrame
-)
-from chronicler.processors import StorageProcessor
-from chronicler.storage import Message, Attachment
+from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, AudioFrame, VoiceFrame, StickerFrame
+from chronicler.processors.storage import StorageProcessor
+from chronicler.storage import StorageAdapter
+from chronicler.storage.interface import Message, Attachment
 
 @pytest.fixture
-def mock_storage():
-    """Create a mock storage instance."""
-    storage = AsyncMock()
-    storage.save_message = AsyncMock()
+def storage_mock():
+    """Create a mock storage adapter."""
+    storage = create_autospec(StorageAdapter)
+    storage.init_storage.return_value = storage
+    storage.create_topic.return_value = None
+    storage.save_message = AsyncMock(return_value="msg_123")
+    storage.save_attachment = AsyncMock(return_value=None)
+    storage.sync = AsyncMock(return_value=None)
+    storage.set_github_config = AsyncMock(return_value=None)
+    storage.is_initialized.return_value = True
     return storage
 
-@pytest.fixture
-def storage_processor(mock_storage):
-    """Create a StorageProcessor instance with mock storage."""
-    with patch('chronicler.processors.storage_processor.StorageCoordinator', return_value=mock_storage):
-        processor = StorageProcessor(storage_path=Path('/tmp/test'))
-        return processor
-
 @pytest.mark.asyncio
-async def test_process_text_frame(storage_processor, mock_storage):
+async def test_process_text_frame(storage_mock):
     """Test processing a text frame."""
-    frame = TextFrame(text="test message", metadata={'key': 'value'})
-    topic_id = "test_topic"
+    # Setup
+    processor = StorageProcessor(storage_mock)
+    frame = TextFrame(text="test message", metadata={"chat_id": 123})
     
-    await storage_processor._process_text_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    call_args = storage_mock.save_message.call_args[0]
+    assert call_args[0] == "default"
     message = call_args[1]
     assert isinstance(message, Message)
     assert message.content == "test message"
-    assert message.metadata == {'key': 'value'}
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    assert isinstance(message.timestamp, datetime)
 
 @pytest.mark.asyncio
-async def test_process_image_frame(storage_processor, mock_storage):
+async def test_process_image_frame(storage_mock):
     """Test processing an image frame."""
-    frame = ImageFrame(
-        image=b"test_image_data",
-        size=(100, 200),
-        format="jpeg",
-        metadata={'file_id': 'test123'}
-    )
-    topic_id = "test_topic"
+    # Setup
+    processor = StorageProcessor(storage_mock)
+    frame = ImageFrame(image=b"test image", format="jpg", size=(100, 100), metadata={"chat_id": 123})
     
-    await storage_processor._process_image_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
-    message = call_args[1]
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    storage_mock.save_attachment.assert_called_once()
+    
+    message_call = storage_mock.save_message.call_args[0]
+    assert message_call[0] == "default"
+    message = message_call[1]
     assert isinstance(message, Message)
-    assert message.content == ''  # Empty content for images
-    assert message.metadata == {'file_id': 'test123'}
-    assert len(message.attachments) == 1
-    attachment = message.attachments[0]
-    assert attachment.type == "image/jpeg"
-    assert attachment.data == b"test_image_data"
-    assert attachment.id == "test123"
+    assert message.content == "[Image]"
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    
+    attachment_call = storage_mock.save_attachment.call_args[0]
+    assert attachment_call[0] == "default"
+    assert attachment_call[1] == "msg_123"
+    attachment = attachment_call[2]
+    assert isinstance(attachment, Attachment)
+    assert attachment.id == "image"
+    assert attachment.type == "image"
+    assert attachment.filename == "image.jpg"
+    assert attachment.data == b"test image"
 
 @pytest.mark.asyncio
-async def test_process_document_frame(storage_processor, mock_storage):
+async def test_process_document_frame(storage_mock):
     """Test processing a document frame."""
+    # Setup
+    processor = StorageProcessor(storage_mock)
     frame = DocumentFrame(
-        content=b"test_document_data",
+        content=b"test doc",
         filename="test.txt",
         mime_type="text/plain",
-        caption="Test Caption",
-        metadata={'file_id': 'test123'}
+        caption="Test document",
+        metadata={"chat_id": 123}
     )
-    topic_id = "test_topic"
     
-    await storage_processor._process_document_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
-    message = call_args[1]
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    storage_mock.save_attachment.assert_called_once()
+    
+    message_call = storage_mock.save_message.call_args[0]
+    assert message_call[0] == "default"
+    message = message_call[1]
     assert isinstance(message, Message)
-    assert message.content == "Test Caption"
-    assert message.metadata == {'file_id': 'test123'}
-    assert len(message.attachments) == 1
-    attachment = message.attachments[0]
-    assert attachment.type == "text/plain"
-    assert attachment.data == b"test_document_data"
-    assert attachment.id == "test123"
+    assert message.content == "Test document"
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    
+    attachment_call = storage_mock.save_attachment.call_args[0]
+    assert attachment_call[0] == "default"
+    assert attachment_call[1] == "msg_123"
+    attachment = attachment_call[2]
+    assert isinstance(attachment, Attachment)
+    assert attachment.id == "document"
+    assert attachment.type == "document"
     assert attachment.filename == "test.txt"
+    assert attachment.data == b"test doc"
 
 @pytest.mark.asyncio
-async def test_process_audio_frame(storage_processor, mock_storage):
+async def test_process_audio_frame(storage_mock):
     """Test processing an audio frame."""
+    # Setup
+    processor = StorageProcessor(storage_mock)
     frame = AudioFrame(
-        audio=b"test_audio_data",
-        duration=120,
+        audio=b"test audio",
+        duration=60,
         mime_type="audio/mp3",
-        metadata={'file_id': 'test123'}
+        metadata={"chat_id": 123}
     )
-    topic_id = "test_topic"
     
-    await storage_processor._process_audio_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
-    message = call_args[1]
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    storage_mock.save_attachment.assert_called_once()
+    
+    message_call = storage_mock.save_message.call_args[0]
+    assert message_call[0] == "default"
+    message = message_call[1]
     assert isinstance(message, Message)
-    assert message.content == ''  # Empty content for audio
-    assert message.metadata == {'file_id': 'test123', 'duration': 120}
-    assert len(message.attachments) == 1
-    attachment = message.attachments[0]
-    assert attachment.type == "audio/mp3"
-    assert attachment.data == b"test_audio_data"
-    assert attachment.id == "test123"
+    assert message.content == "[Audio: 60s]"
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    
+    attachment_call = storage_mock.save_attachment.call_args[0]
+    assert attachment_call[0] == "default"
+    assert attachment_call[1] == "msg_123"
+    attachment = attachment_call[2]
+    assert isinstance(attachment, Attachment)
+    assert attachment.id == "audio"
+    assert attachment.type == "audio"
+    assert attachment.filename == "audio.mp3"
+    assert attachment.data == b"test audio"
 
 @pytest.mark.asyncio
-async def test_process_voice_frame(storage_processor, mock_storage):
+async def test_process_voice_frame(storage_mock):
     """Test processing a voice frame."""
+    # Setup
+    processor = StorageProcessor(storage_mock)
     frame = VoiceFrame(
-        audio=b"test_voice_data",
+        audio=b"test voice",
         duration=30,
         mime_type="audio/ogg",
-        metadata={'file_id': 'test123'}
+        metadata={"chat_id": 123}
     )
-    topic_id = "test_topic"
     
-    await storage_processor._process_voice_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
-    message = call_args[1]
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    storage_mock.save_attachment.assert_called_once()
+    
+    message_call = storage_mock.save_message.call_args[0]
+    assert message_call[0] == "default"
+    message = message_call[1]
     assert isinstance(message, Message)
-    assert message.content == ''  # Empty content for voice
-    assert message.metadata == {'file_id': 'test123', 'duration': 30}
-    assert len(message.attachments) == 1
-    attachment = message.attachments[0]
-    assert attachment.type == "audio/ogg"
-    assert attachment.data == b"test_voice_data"
-    assert attachment.id == "test123"
+    assert message.content == "[Voice: 30s]"
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    
+    attachment_call = storage_mock.save_attachment.call_args[0]
+    assert attachment_call[0] == "default"
+    assert attachment_call[1] == "msg_123"
+    attachment = attachment_call[2]
+    assert isinstance(attachment, Attachment)
+    assert attachment.id == "voice"
+    assert attachment.type == "voice"
+    assert attachment.filename == "voice.ogg"
+    assert attachment.data == b"test voice"
 
 @pytest.mark.asyncio
-async def test_process_sticker_frame(storage_processor, mock_storage):
+async def test_process_sticker_frame(storage_mock):
     """Test processing a sticker frame."""
+    # Setup
+    processor = StorageProcessor(storage_mock)
     frame = StickerFrame(
-        sticker=b"test_sticker_data",
+        sticker=b"test sticker",
         emoji="😀",
-        set_name="TestSet",
-        metadata={'file_id': 'test123'}
+        set_name="test_set",
+        metadata={"chat_id": 123}
     )
-    topic_id = "test_topic"
     
-    await storage_processor._process_sticker_frame(topic_id, frame, frame.metadata)
+    # Execute
+    result = await processor.process(frame)
     
-    mock_storage.save_message.assert_called_once()
-    call_args = mock_storage.save_message.call_args[0]
-    assert call_args[0] == topic_id
-    message = call_args[1]
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_called_once()
+    storage_mock.save_attachment.assert_called_once()
+    
+    message_call = storage_mock.save_message.call_args[0]
+    assert message_call[0] == "default"
+    message = message_call[1]
     assert isinstance(message, Message)
-    assert message.content == '😀'  # Emoji as content
-    assert message.metadata == {
-        'file_id': 'test123',
-        'emoji': '😀',
-        'set_name': 'TestSet'
-    }
-    assert len(message.attachments) == 1
-    attachment = message.attachments[0]
-    assert attachment.type == "image/webp"  # Stickers are typically WebP
-    assert attachment.data == b"test_sticker_data"
-    assert attachment.id == "test123"
+    assert message.content == "[Sticker: 😀]"
+    assert message.source == "telegram"
+    assert message.metadata == {"chat_id": 123}
+    
+    attachment_call = storage_mock.save_attachment.call_args[0]
+    assert attachment_call[0] == "default"
+    assert attachment_call[1] == "msg_123"
+    attachment = attachment_call[2]
+    assert isinstance(attachment, Attachment)
+    assert attachment.id == "sticker"
+    assert attachment.type == "sticker"
+    assert attachment.filename == "sticker_test_set.webp"
+    assert attachment.data == b"test sticker"
 
 @pytest.mark.asyncio
-async def test_process_frame_with_missing_file_id(storage_processor, mock_storage):
-    """Test processing frames without file_id in metadata."""
-    frames = [
-        ImageFrame(image=b"data", size=(100,100), format="jpeg", metadata={'chat_id': '123', 'thread_id': '456'}),
-        DocumentFrame(content=b"data", filename="test.txt", mime_type="text/plain", metadata={'chat_id': '123', 'thread_id': '456'}),
-        AudioFrame(audio=b"data", duration=120, mime_type="audio/mp3", metadata={'chat_id': '123', 'thread_id': '456'}),
-        VoiceFrame(audio=b"data", duration=30, mime_type="audio/ogg", metadata={'chat_id': '123', 'thread_id': '456'}),
-        StickerFrame(sticker=b"data", emoji="😀", set_name="TestSet", metadata={'chat_id': '123', 'thread_id': '456'})
-    ]
+async def test_process_unsupported_frame(storage_mock):
+    """Test processing an unsupported frame type."""
+    # Setup
+    processor = StorageProcessor(storage_mock)
+    frame = Mock()
     
-    prefixes = {
-        ImageFrame: "image_",
-        DocumentFrame: "unknown",
-        AudioFrame: "audio_",
-        VoiceFrame: "voice_",
-        StickerFrame: "sticker_"
-    }
+    # Execute
+    result = await processor.process(frame)
     
-    for frame in frames:
-        await storage_processor.process_frame(frame)
-        
-        call_args = mock_storage.save_message.call_args[0]
-        message = call_args[1]
-        assert len(message.attachments) == 1
-        attachment = message.attachments[0]
-        # Should generate a timestamp-based ID with appropriate prefix
-        assert attachment.id.startswith(prefixes[frame.__class__]) 
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_not_called()
+    storage_mock.save_attachment.assert_not_called() 

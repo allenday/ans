@@ -112,4 +112,9 @@ class StorageAdapter(ABC):
     @abstractmethod
     async def set_github_config(self, token: str, repo: str) -> None:
         """Set GitHub configuration"""
+        pass
+    
+    @abstractmethod
+    def is_initialized(self) -> bool:
+        """Check if storage is initialized"""
         pass 
