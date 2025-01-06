@@ -6,8 +6,6 @@ from pathlib import Path
 
 from .frames import Frame
 from .pipeline import Pipeline
-from chronicler.transports.telegram_transport import TelegramTransport
-from chronicler.processors.storage_processor import StorageProcessor
 
 # Set up logging
 logging.basicConfig(
@@ -19,12 +17,35 @@ logger = logging.getLogger(__name__)
 async def run_bot(token: str, storage_path: str):
     """Run the Telegram bot with pipeline-based processing."""
     
-    # Initialize components
-    transport = TelegramTransport(token)
-    storage = StorageProcessor(Path(storage_path))
+    # Import components here to avoid circular imports
+    from chronicler.transports.telegram_transport import TelegramTransport
+    from chronicler.processors.storage_processor import StorageProcessor
+    from chronicler.commands import CommandProcessor
+    from chronicler.commands.handlers import (
+        StartCommandHandler,
+        ConfigCommandHandler,
+        StatusCommandHandler
+    )
     
-    # Create pipeline
-    pipeline = Pipeline([transport, storage])
+    # Initialize components
+    storage_path = Path(storage_path)
+    transport = TelegramTransport(token)
+    storage = StorageProcessor(storage_path)
+    
+    # Initialize command processor with handlers
+    command_processor = CommandProcessor()
+    command_processor.register_handler("/start", StartCommandHandler(storage))
+    command_processor.register_handler("/config", ConfigCommandHandler(storage))
+    command_processor.register_handler("/status", StatusCommandHandler(storage))
+    logger.debug("Registered command handlers")
+    
+    # Create pipeline with command processor
+    pipeline = Pipeline([
+        transport,
+        command_processor,  # Handle commands before storage
+        storage
+    ])
+    logger.debug("Created pipeline with command handling")
     
     # Setup shutdown handler
     loop = asyncio.get_event_loop()

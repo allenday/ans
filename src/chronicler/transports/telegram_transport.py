@@ -2,9 +2,10 @@ from typing import Optional
 import logging
 
 from telegram import Update
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, MessageHandler, CommandHandler, filters
 
 from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, BaseTransport
+from chronicler.commands.frames import CommandFrame
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,15 @@ class TelegramTransport(BaseTransport):
         logger.info("Initializing TelegramTransport")
         self.token = token
         self.app = Application.builder().token(token).build()
-        # Handle ALL message types for diagnostic purposes
+        
+        # Add command handler first
+        self.app.add_handler(CommandHandler(
+            ["start", "config", "status"],
+            self._handle_command
+        ))
+        logger.debug("Added command handlers")
+        
+        # Handle all other message types
         self.app.add_handler(MessageHandler(
             filters.ALL,  # Capture all message types
             self._handle_message
@@ -522,3 +531,35 @@ class TelegramTransport(BaseTransport):
     async def process_frame(self, frame: Frame):
         """Process frames (not used in this transport as it's input-only)."""
         logger.debug(f"Ignoring incoming frame of type {type(frame)}") 
+
+    async def _handle_command(self, update: Update, context) -> None:
+        """Handle bot commands."""
+        logger.info(f"Received command: {update.message.text}")
+        
+        # Extract command and args
+        parts = update.message.text.split()
+        command = parts[0].lower()
+        args = parts[1:]
+        
+        # Create metadata
+        metadata = {
+            'chat_id': update.message.chat.id,
+            'chat_title': update.message.chat.title or "Private Chat",
+            'sender_id': update.message.from_user.id,
+            'sender_name': update.message.from_user.username or update.message.from_user.first_name
+        }
+        
+        # Add thread info if present
+        thread_id = getattr(update.message, 'message_thread_id', None)
+        if thread_id:
+            metadata['thread_id'] = thread_id
+            if thread_id == 1:
+                metadata['thread_name'] = "General"
+            elif hasattr(update.message, 'forum_topic_created'):
+                metadata['thread_name'] = update.message.forum_topic_created.name
+        
+        # Create and push command frame
+        frame = CommandFrame(command=command, args=args, metadata=metadata)
+        logger.debug(f"Created CommandFrame: {command} with args: {args}")
+        await self.push_frame(frame)
+        logger.debug("CommandFrame pushed to pipeline") 
