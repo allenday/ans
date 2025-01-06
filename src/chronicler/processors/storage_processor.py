@@ -3,9 +3,8 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-from chronicler.pipeline import BaseProcessor
-from chronicler.frames import Frame, TextFrame, ImageFrame, DocumentFrame
-from chronicler.storage.interface import User, Topic, Message, Attachment
+from chronicler.pipeline import Frame, TextFrame, ImageFrame, DocumentFrame, BaseProcessor
+from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
 
 logger = logging.getLogger(__name__)
