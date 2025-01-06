@@ -1,5 +1,13 @@
 # Development Checklist
 
+## Scope Validation
+- [ ] Verify scope has clear goal
+- [ ] Verify requirements are specific
+- [ ] Verify constraints are understood
+- [ ] Verify acceptance criteria are testable
+- [ ] Check alignment with architecture
+- [ ] Check for similar implementations
+
 ## Pre-Implementation
 - [ ] Create feature branch
 - [ ] Write unit tests first

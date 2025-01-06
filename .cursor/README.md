@@ -53,6 +53,52 @@ This directory contains development documentation for the Chronicler project.
 5. Review checklist items
 6. Submit PR
 
+## Scope-Based Development
+
+To start a new development session:
+
+1. Define scope using the following template:
+   ```
+   <SCOPE>
+   GOAL: Clear one-sentence description of the goal
+   CONTEXT: Any relevant context or background
+   REQUIREMENTS:
+   - Specific requirement 1
+   - Specific requirement 2
+   CONSTRAINTS:
+   - Any technical or business constraints
+   ACCEPTANCE:
+   - Acceptance criteria 1
+   - Acceptance criteria 2
+   </SCOPE>
+   ```
+
+2. The AI will:
+   - Create feature branch
+   - Follow checklist.md step by step
+   - Implement according to architecture.md
+   - Follow conventions.md
+   - Update backlog.md
+
+3. Example scope:
+   ```
+   <SCOPE>
+   GOAL: Add support for video note messages in Telegram
+   CONTEXT: Video notes are circular, short video messages
+   REQUIREMENTS:
+   - Handle video note type in TelegramTransport
+   - Store as MP4 files with metadata
+   - Preserve duration and thumbnail
+   CONSTRAINTS:
+   - Must maintain backward compatibility
+   - Must handle missing thumbnails
+   ACCEPTANCE:
+   - Video notes saved with correct format
+   - Thumbnails saved separately
+   - Duration preserved in metadata
+   </SCOPE>
+   ```
+
 ## Key Components
 
 - `pipeline/`: Core pipeline architecture
