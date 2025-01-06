@@ -130,7 +130,9 @@ async def test_telegram_scribe_with_git_storage(
         id=test_topic_id, 
         name=test_topic_name,
         metadata={
-            'group_id': test_group_id
+            'source': 'telegram',
+            'chat_id': test_group_id,
+            'chat_title': 'chronicler-dev'
         }
     )
     await storage.create_topic(topic, ignore_exists=True)
@@ -156,6 +158,8 @@ async def test_telegram_scribe_with_git_storage(
     logger.info(f"Chat type: {storage_message.metadata.get('chat_type', 'None')}")
     logger.info(f"Chat ID: {storage_message.metadata.get('chat_id', 'None')}")
     logger.info(f"Messages file path: {storage.repo_path / 'telegram' / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE}")
+    # Update the chat_title in the message metadata
+    storage_message.metadata['chat_title'] = 'chronicler-dev'
     await scribe.handle_message(update)
     
     # Wait for message to be processed and saved
@@ -186,7 +190,9 @@ async def test_telegram_scribe_media_with_git_storage(
         id=test_topic_id, 
         name=test_topic_name,
         metadata={
-            'group_id': test_group_id
+            'source': 'telegram',
+            'chat_id': test_group_id,
+            'chat_title': 'chronicler-dev'
         }
     )
     await storage.create_topic(topic, ignore_exists=True)
@@ -216,6 +222,8 @@ async def test_telegram_scribe_media_with_git_storage(
     logger.info(f"Chat type: {storage_message.metadata.get('chat_type', 'None')}")
     logger.info(f"Chat ID: {storage_message.metadata.get('chat_id', 'None')}")
     logger.info(f"Messages file path: {storage.repo_path / 'telegram' / storage_message.metadata['chat_title'] / test_topic_name / GitStorageAdapter.MESSAGES_FILE}")
+    # Update the chat_title in the message metadata
+    storage_message.metadata['chat_title'] = 'chronicler-dev'
     await scribe.handle_message(update)
     
     # Wait for message to be processed and saved
@@ -231,6 +239,8 @@ async def test_telegram_scribe_media_with_git_storage(
     # Process the sticker message
     sticker_update = Update(update_id=2, message=sticker_message)
     storage_sticker_message = await MessageConverter.to_storage_message(sticker_message)
+    # Update the chat_title in the message metadata
+    storage_sticker_message.metadata['chat_title'] = 'chronicler-dev'
     await scribe.handle_message(sticker_update)
     
     # Wait for sticker message to be processed and saved

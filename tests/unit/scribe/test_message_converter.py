@@ -221,27 +221,38 @@ async def test_sticker_message_conversion(mock_telegram_message):
     assert storage_msg.metadata["sticker_set"] == "StickerSet1"
     assert storage_msg.metadata["sticker_type"] == "regular"
 
-@pytest.mark.unit
-@pytest.mark.scribe
 @pytest.mark.asyncio
-async def test_voice_message_conversion(mock_telegram_message):
-    """Test converting message with voice"""
-    voice = Mock(spec=Voice)
+async def test_voice_message_conversion():
+    """Test converting a voice message"""
+    voice = Mock()
     voice.file_id = "voice123"
-    voice.file_unique_id = "unique123"
+    voice.duration = 30
     voice.mime_type = "audio/ogg"
-    voice.duration = 15
-    mock_telegram_message.voice = voice
-    mock_telegram_message.text = None  # Voice messages typically don't have text
     
-    converter = MessageConverter()
-    storage_msg = await converter.to_storage_message(mock_telegram_message)
+    message = Mock()
+    message.message_id = 123
+    message.voice = voice
+    message.text = None
+    message.caption = None
+    message.date = datetime.utcnow()
+    message.chat = Mock(id=456, type="group")
+    message.from_user = Mock(id=789, username="test_user")
+    message.photo = []  # Empty list for no photos
+    message.video = None
+    message.document = None
+    message.animation = None
+    message.audio = None
+    message.sticker = None
     
-    assert storage_msg.content == ""  # Empty content for voice messages
-    assert len(storage_msg.attachments) == 1
-    assert storage_msg.attachments[0].type == "audio/ogg"
-    assert storage_msg.metadata["voice_duration"] == 15
-    assert storage_msg.metadata["file_ids"] == ["voice123"]
+    result = await MessageConverter.to_storage_message(message)
+    
+    assert result.attachments is not None
+    assert len(result.attachments) == 1
+    assert result.attachments[0].id == "voice123"
+    assert result.attachments[0].type == "audio/ogg"
+    assert result.attachments[0].filename == "123_voice123.ogg"
+    assert result.metadata["voice_duration"] == 30
+    assert result.metadata["file_ids"] == ["voice123"]
 
 @pytest.mark.unit
 @pytest.mark.scribe

@@ -90,12 +90,10 @@ class MessageConverter:
             'message_id': message.message_id,
             'chat_id': message.chat.id,
             'chat_type': message.chat.type,
-            'file_ids': []
+            'file_ids': [],
+            'source': 'telegram',
+            'chat_title': message.chat.title if message.chat.title else 'chronicler-dev'
         }
-        
-        # Add chat title if available
-        if hasattr(message.chat, 'title'):
-            metadata['chat_title'] = message.chat.title
         
         # Add user info if available
         if message.from_user:
@@ -104,7 +102,7 @@ class MessageConverter:
                 metadata['username'] = message.from_user.username
         
         # Handle forwarded messages
-        if message.forward_from:
+        if hasattr(message, 'forward_from') and message.forward_from:
             metadata['forwarded_from'] = {
                 'user_id': message.forward_from.id,
                 'username': message.forward_from.username,
@@ -124,7 +122,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=photo.file_id,
                 type="image/jpeg",
-                filename=f"{photo.file_id}.jpg"
+                filename=f"{message.message_id}_{photo.file_id}.jpg"
             ))
         
         # Video
@@ -134,7 +132,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.video.file_id,
                 type="video/mp4",
-                filename=f"{message.video.file_id}.mp4"
+                filename=f"{message.message_id}_{message.video.file_id}.mp4"
             ))
         
         # Document
@@ -148,7 +146,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.document.file_id,
                 type=message.document.mime_type or "application/octet-stream",
-                filename=original_name
+                filename=f"{message.message_id}_{original_name}"
             ))
         
         # Animation
@@ -157,7 +155,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.animation.file_id,
                 type="video/mp4",
-                filename=f"{message.animation.file_id}.mp4"
+                filename=f"{message.message_id}_{message.animation.file_id}.mp4"
             ))
         
         # Voice
@@ -167,7 +165,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.voice.file_id,
                 type="audio/ogg",
-                filename=f"{message.voice.file_id}.ogg"
+                filename=f"{message.message_id}_{message.voice.file_id}.ogg"
             ))
         
         # Audio
@@ -181,7 +179,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.audio.file_id,
                 type="audio/mp3",
-                filename=f"{message.audio.file_id}.mp3"
+                filename=f"{message.message_id}_{message.audio.file_id}.mp3"
             ))
         
         # Sticker
@@ -193,7 +191,7 @@ class MessageConverter:
             attachments.append(Attachment(
                 id=message.sticker.file_id,
                 type="image/webp",
-                filename=f"{message.sticker.file_id}.webp"
+                filename=f"{message.message_id}_{message.sticker.file_id}.webp"
             ))
         
         return Message(
