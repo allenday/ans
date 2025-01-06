@@ -1,6 +1,10 @@
-"""Processor implementations."""
-from .storage_processor import StorageProcessor
+"""Processor package exports."""
+from .base import BaseProcessor
+from .command import CommandProcessor
+from .storage import StorageProcessor
 
 __all__ = [
-    "StorageProcessor"
+    'BaseProcessor',
+    'CommandProcessor',
+    'StorageProcessor',
 ]

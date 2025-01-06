@@ -1,57 +1,33 @@
-"""Unit tests for CommandFrame."""
+"""Unit tests for command frames."""
 import pytest
-from chronicler.commands.frames import CommandFrame
+
+from chronicler.frames import Frame, CommandFrame
 
 def test_command_frame_basic():
-    """Test basic CommandFrame creation."""
-    frame = CommandFrame(
-        command="/test",
-        args=[],
-        metadata={}
-    )
+    """Test basic command frame creation."""
+    frame = CommandFrame(command="/test", metadata={})
+    assert isinstance(frame, Frame)
     assert frame.command == "/test"
     assert frame.args == []
-    assert frame.metadata == {}
 
 def test_command_frame_with_args():
-    """Test CommandFrame with arguments."""
-    frame = CommandFrame(
-        command="/test",
-        args=["arg1", "arg2"],
-        metadata={}
-    )
+    """Test command frame with arguments."""
+    frame = CommandFrame(command="/test", args=["arg1", "arg2"], metadata={})
     assert frame.command == "/test"
     assert frame.args == ["arg1", "arg2"]
-    assert len(frame.args) == 2
 
 def test_command_frame_with_metadata():
-    """Test CommandFrame with metadata."""
-    metadata = {'key': 'value', 'number': 123}
-    frame = CommandFrame(
-        command="/test",
-        args=[],
-        metadata=metadata
-    )
+    """Test command frame with metadata."""
+    metadata = {"user_id": 123, "chat_id": 456}
+    frame = CommandFrame(command="/test", metadata=metadata)
     assert frame.metadata == metadata
-    assert frame.metadata['key'] == 'value'
-    assert frame.metadata['number'] == 123
 
 def test_command_frame_command_validation():
     """Test command validation."""
-    # Commands should start with /
     with pytest.raises(ValueError):
-        CommandFrame(command="test", args=[], metadata={})
-    
-    # Commands should be lowercase
-    frame = CommandFrame(command="/TEST", args=[], metadata={})
-    assert frame.command == "/test"
+        CommandFrame(command="invalid", metadata={})
 
 def test_command_frame_args_validation():
-    """Test argument validation."""
-    # Args should be strings
+    """Test args validation."""
     with pytest.raises(TypeError):
-        CommandFrame(command="/test", args=[123], metadata={})
-    
-    # Args should not be None
-    with pytest.raises(ValueError):
-        CommandFrame(command="/test", args=None, metadata={}) 
+        CommandFrame(command="/test", args=[1, 2, 3], metadata={}) 

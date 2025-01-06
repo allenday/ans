@@ -1,205 +1,142 @@
-"""Mock integration tests for command handling system."""
+"""Integration tests for command handling."""
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
+from unittest.mock import Mock, create_autospec
+from datetime import datetime
 
-from chronicler.commands.frames import CommandFrame
-from chronicler.commands.processor import CommandProcessor
-from chronicler.commands.handlers import (
-    StartCommandHandler,
-    ConfigCommandHandler,
-    StatusCommandHandler
-)
-from chronicler.storage.interface import User
-from chronicler.pipeline import Frame
+from chronicler.frames import Frame
+from chronicler.frames.command import CommandFrame
+from chronicler.frames.media import TextFrame
+from chronicler.processors.command import CommandProcessor
+from chronicler.storage import StorageAdapter
+from chronicler.storage.interface import Message, User, Topic
 
-class TestCommandIntegration:
-    """Test command handling integration."""
+@pytest.fixture
+def storage_mock():
+    """Create a mock storage adapter."""
+    storage = create_autospec(StorageAdapter)
     
-    @pytest.fixture
-    def storage(self):
-        """Create a mock storage coordinator."""
-        storage = Mock()
-        storage.init_storage = AsyncMock()
-        storage.set_github_config = AsyncMock()
-        storage.sync = AsyncMock()
-        storage.repo_path = Path("/test")
-        return storage
+    # Mock required methods
+    storage.init_storage.return_value = storage
+    storage.create_topic.return_value = None
+    storage.save_message.return_value = "msg_123"
+    storage.save_attachment.return_value = None
+    storage.sync.return_value = None
+    storage.set_github_config.return_value = None
+    storage.is_initialized.return_value = True
     
-    @pytest.fixture
-    def processor(self, storage):
-        """Create a command processor with handlers."""
-        processor = CommandProcessor()
-        processor.register_handler("/start", StartCommandHandler(storage))
-        processor.register_handler("/config", ConfigCommandHandler(storage))
-        processor.register_handler("/status", StatusCommandHandler(storage))
-        return processor
+    # Add method call tracking
+    storage.init_storage.calls = []
+    storage.create_topic.calls = []
+    storage.save_message.calls = []
+    storage.save_attachment.calls = []
+    storage.sync.calls = []
+    storage.set_github_config.calls = []
     
-    @pytest.mark.asyncio
-    async def test_start_command_flow(self, processor, storage):
-        """Test complete /start command flow."""
-        # Create command frame
-        frame = CommandFrame(
-            command="/start",
-            args=[],
-            metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user',
-                'chat_id': 456,
-                'chat_title': 'Test Chat'
-            }
-        )
-        
-        # Process command
-        processor.push_frame = AsyncMock()
-        await processor.process_frame(frame)
-        
-        # Verify storage initialization
-        assert storage.init_storage.called
-        user = storage.init_storage.call_args[0][0]
-        assert isinstance(user, User)
-        assert user.id == 123
-        assert user.name == 'test_user'
-        
-        # Verify response
-        assert processor.push_frame.called
-        response = processor.push_frame.call_args[0][0]
-        assert isinstance(response, Frame)
-        assert "Welcome to Chronicler" in response.text
-        assert "/config" in response.text
+    return storage
+
+@pytest.fixture
+def processor(storage_mock):
+    """Create a command processor."""
+    return CommandProcessor(storage_mock)
+
+@pytest.mark.asyncio
+async def test_start_command(processor, storage_mock):
+    """Test handling /start command."""
+    # Setup
+    frame = CommandFrame(command="/start", args=[], metadata={"chat_id": 123})
     
-    @pytest.mark.asyncio
-    async def test_config_command_flow(self, processor, storage):
-        """Test complete /config command flow."""
-        # Create command frame
-        frame = CommandFrame(
-            command="/config",
-            args=["user/repo", "token123"],
-            metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user',
-                'chat_id': 456
-            }
-        )
-        
-        # Process command
-        processor.push_frame = AsyncMock()
-        await processor.process_frame(frame)
-        
-        # Verify GitHub configuration
-        storage.set_github_config.assert_called_with("token123", "user/repo")
-        assert storage.sync.called
-        
-        # Verify response
-        assert processor.push_frame.called
-        response = processor.push_frame.call_args[0][0]
-        assert isinstance(response, Frame)
-        assert "Repository configured successfully" in response.text
-        assert "user/repo" in response.text
+    # Execute
+    result = await processor.process(frame)
     
-    @pytest.mark.asyncio
-    async def test_status_command_flow(self, processor, storage):
-        """Test complete /status command flow."""
-        # Create command frame
-        frame = CommandFrame(
-            command="/status",
-            args=[],
-            metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user',
-                'chat_id': 456
-            }
-        )
-        
-        # Mock metadata file
-        metadata = {
-            'user': {'name': 'test_user', 'id': 123},
-            'github': {'repo': 'user/repo'},
-            'stats': {
-                'messages': 10,
-                'media': 5,
-                'last_sync': '2024-01-06T12:00:00'
-            }
-        }
-        
-        # Process command
-        processor.push_frame = AsyncMock()
-        with patch('pathlib.Path.exists', return_value=True), \
-             patch('builtins.open'), \
-             patch('yaml.safe_load', return_value=metadata):
-            await processor.process_frame(frame)
-        
-        # Verify response
-        assert processor.push_frame.called
-        response = processor.push_frame.call_args[0][0]
-        assert isinstance(response, Frame)
-        assert "Current Status" in response.text
-        assert "test_user" in response.text
-        assert "user/repo" in response.text
-        assert "Messages: 10" in response.text
+    # Verify
+    assert isinstance(result, TextFrame)
+    assert "Welcome to Chronicler!" in result.text
+    storage_mock.init_storage.assert_called_once()
+    storage_mock.create_topic.assert_called_once()
     
-    @pytest.mark.asyncio
-    async def test_error_handling_flow(self, processor, storage):
-        """Test error handling in command flow."""
-        # Make storage operations fail
-        storage.init_storage.side_effect = Exception("Storage error")
-        
-        # Create command frame
-        frame = CommandFrame(
-            command="/start",
-            args=[],
-            metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user'
-            }
-        )
-        
-        # Process command
-        processor.push_frame = AsyncMock()
-        await processor.process_frame(frame)
-        
-        # Verify error response
-        assert processor.push_frame.called
-        response = processor.push_frame.call_args[0][0]
-        assert isinstance(response, Frame)
-        assert "Error" in response.text
-        assert "Storage error" in response.text
+    # Verify user and topic creation
+    user_call = storage_mock.init_storage.call_args[0][0]
+    assert isinstance(user_call, User)
+    assert user_call.id == "123"
+    assert user_call.metadata == {"chat_id": 123}
     
-    @pytest.mark.asyncio
-    async def test_unknown_command_flow(self, processor):
-        """Test handling of unknown commands."""
-        # Create command frame
-        frame = CommandFrame(
-            command="/unknown",
-            args=[],
-            metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user'
-            }
-        )
-        
-        # Process command
-        processor.push_frame = AsyncMock()
-        await processor.process_frame(frame)
-        
-        # Verify response
-        assert processor.push_frame.called
-        response = processor.push_frame.call_args[0][0]
-        assert isinstance(response, Frame)
-        assert "Unknown command" in response.text
-        assert "/start" in response.text
-        assert "/config" in response.text
-        assert "/status" in response.text
+    topic_call = storage_mock.create_topic.call_args[0][0]
+    assert isinstance(topic_call, Topic)
+    assert topic_call.id == "default"
+    assert topic_call.metadata == {"chat_id": 123}
+
+@pytest.mark.asyncio
+async def test_config_command_no_args(processor, storage_mock):
+    """Test handling /config command with no args."""
+    # Setup
+    frame = CommandFrame(command="/config", args=[], metadata={"chat_id": 123})
     
-    @pytest.mark.asyncio
-    async def test_non_command_frame_flow(self, processor):
-        """Test handling of non-command frames."""
-        # Create regular frame
-        frame = Frame(text="Not a command")
-        
-        # Process frame
-        processor.push_frame = AsyncMock()
-        await processor.process_frame(frame)
-        
-        # Verify no response was sent
-        assert not processor.push_frame.called 
+    # Execute
+    result = await processor.process(frame)
+    
+    # Verify
+    assert isinstance(result, TextFrame)
+    assert "Usage: /config" in result.text
+    storage_mock.set_github_config.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_config_command_with_args(processor, storage_mock):
+    """Test handling /config command with args."""
+    # Setup
+    frame = CommandFrame(
+        command="/config",
+        args=["owner/repo", "main", "token123"],
+        metadata={"chat_id": 123}
+    )
+    
+    # Execute
+    result = await processor.process(frame)
+    
+    # Verify
+    assert isinstance(result, TextFrame)
+    assert "GitHub configuration updated" in result.text
+    storage_mock.set_github_config.assert_called_once_with(
+        token="token123",
+        repo="owner/repo"
+    )
+
+@pytest.mark.asyncio
+async def test_status_command(processor, storage_mock):
+    """Test handling /status command."""
+    # Setup
+    frame = CommandFrame(command="/status", args=[], metadata={"chat_id": 123})
+    
+    # Execute
+    result = await processor.process(frame)
+    
+    # Verify
+    assert isinstance(result, TextFrame)
+    assert "Chronicler Status" in result.text
+    storage_mock.sync.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_unknown_command(processor, storage_mock):
+    """Test handling unknown command."""
+    # Setup
+    frame = CommandFrame(command="/unknown", args=[], metadata={"chat_id": 123})
+    
+    # Execute
+    result = await processor.process(frame)
+    
+    # Verify
+    assert isinstance(result, TextFrame)
+    assert "Unknown command" in result.text
+    storage_mock.save_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_process_non_command_frame(processor, storage_mock):
+    """Test processing a non-command frame."""
+    # Setup
+    frame = TextFrame(text="Hello", metadata={"chat_id": 123})
+    
+    # Execute
+    result = await processor.process(frame)
+    
+    # Verify
+    assert result is None
+    storage_mock.save_message.assert_not_called() 

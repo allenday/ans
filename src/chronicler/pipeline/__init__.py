@@ -1,16 +1,4 @@
-"""Pipeline infrastructure."""
-from .frames import Frame, TextFrame, ImageFrame, DocumentFrame, AudioFrame, VoiceFrame, StickerFrame
-from .pipeline import Pipeline, BaseProcessor, BaseTransport
+"""Pipeline package exports."""
+from .pipeline import Pipeline
 
-__all__ = [
-    'Frame',
-    'TextFrame',
-    'ImageFrame',
-    'DocumentFrame',
-    'AudioFrame',
-    'VoiceFrame',
-    'StickerFrame',
-    'Pipeline',
-    'BaseProcessor',
-    'BaseTransport'
-] 
+__all__ = ['Pipeline'] 

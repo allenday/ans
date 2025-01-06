@@ -1,9 +1,9 @@
 """Command frame definitions."""
 import logging
-from typing import List, Dict, Any
+from typing import List
 from dataclasses import dataclass, field
 
-from chronicler.frames.base import Frame
+from .base import Frame
 
 logger = logging.getLogger(__name__)
 
@@ -28,5 +28,5 @@ class CommandFrame(Frame):
         if not all(isinstance(arg, str) for arg in self.args):
             raise TypeError("All command arguments must be strings")
         
-        logger.debug(f"Created CommandFrame: {self.command} with {len(self.args)} args")
+        logger.debug(f"FRAME - Created CommandFrame: {self.command} with {len(self.args)} args")
         super().__post_init__() 

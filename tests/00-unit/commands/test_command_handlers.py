@@ -1,81 +1,64 @@
-"""Unit tests for command handlers."""
+"""Tests for command handlers."""
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
-
+from unittest.mock import Mock, AsyncMock
 from chronicler.commands.frames import CommandFrame
+from chronicler.frames.media import TextFrame
 from chronicler.commands.handlers import (
     CommandHandler,
     StartCommandHandler,
     ConfigCommandHandler,
     StatusCommandHandler
 )
-from chronicler.storage.interface import User
 
 class TestCommandHandler:
     """Test base command handler."""
     
     def test_init(self):
         """Test handler initialization."""
-        storage = Mock()
-        # Create a concrete subclass for testing
-        class TestHandler(CommandHandler):
-            async def handle(self, frame: CommandFrame) -> str:
-                return "test"
-        
-        handler = TestHandler(storage)
-        assert handler.storage == storage
+        coordinator = Mock()
+        handler = StartCommandHandler(coordinator)
+        assert handler.coordinator == coordinator
 
 class TestStartCommandHandler:
     """Test start command handler."""
     
     @pytest.mark.asyncio
     async def test_handle_success(self):
-        """Test successful start command."""
-        # Arrange
-        storage = Mock()
-        storage.init_storage = AsyncMock()
-        handler = StartCommandHandler(storage)
-        
+        """Test successful start command handling."""
+        coordinator = AsyncMock()
+        handler = StartCommandHandler(coordinator)
         frame = CommandFrame(
             command="/start",
-            args=[],
             metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user'
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
             }
         )
         
-        # Act
-        response = await handler.handle(frame)
+        result = await handler.handle(frame)
         
-        # Assert
-        assert storage.init_storage.called
-        user = storage.init_storage.call_args[0][0]
-        assert isinstance(user, User)
-        assert user.id == 123
-        assert user.name == 'test_user'
-        assert "Welcome to Chronicler" in response
-
+        assert isinstance(result, TextFrame)
+        assert "Welcome to Chronicler!" in result.text
+        coordinator.init_storage.assert_called_once()
+        coordinator.create_topic.assert_called_once()
+    
     @pytest.mark.asyncio
     async def test_handle_error(self):
-        """Test start command with storage error."""
-        # Arrange
-        storage = Mock()
-        storage.init_storage = AsyncMock(side_effect=Exception("Test error"))
-        handler = StartCommandHandler(storage)
-        
+        """Test error handling in start command."""
+        coordinator = AsyncMock()
+        coordinator.init_storage.side_effect = RuntimeError("Test error")
+        handler = StartCommandHandler(coordinator)
         frame = CommandFrame(
             command="/start",
-            args=[],
             metadata={
-                'sender_id': 123,
-                'sender_name': 'test_user'
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
             }
         )
         
-        # Act & Assert
-        with pytest.raises(Exception):
+        with pytest.raises(RuntimeError):
             await handler.handle(frame)
 
 class TestConfigCommandHandler:
@@ -84,119 +67,108 @@ class TestConfigCommandHandler:
     @pytest.mark.asyncio
     async def test_handle_missing_args(self):
         """Test config command with missing arguments."""
-        # Arrange
-        handler = ConfigCommandHandler(Mock())
+        coordinator = AsyncMock()
+        handler = ConfigCommandHandler(coordinator)
         frame = CommandFrame(
             command="/config",
-            args=[],
-            metadata={'sender_id': 123}
+            args=["url"],
+            metadata={
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
+            }
         )
         
-        # Act
-        response = await handler.handle(frame)
-        
-        # Assert
-        assert "Invalid configuration format" in response
-
+        result = await handler.handle(frame)
+        assert isinstance(result, TextFrame)
+        assert "Usage: /config" in result.text
+        coordinator.set_github_config.assert_not_called()
+    
     @pytest.mark.asyncio
     async def test_handle_success(self):
-        """Test successful config command."""
-        # Arrange
-        storage = Mock()
-        storage.set_github_config = AsyncMock()
-        storage.sync = AsyncMock()
-        handler = ConfigCommandHandler(storage)
-        
+        """Test successful config command handling."""
+        coordinator = AsyncMock()
+        handler = ConfigCommandHandler(coordinator)
         frame = CommandFrame(
             command="/config",
-            args=["user/repo", "token123"],
-            metadata={'sender_id': 123}
+            args=["owner/repo", "token123"],
+            metadata={
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
+            }
         )
         
-        # Act
-        response = await handler.handle(frame)
+        result = await handler.handle(frame)
         
-        # Assert
-        storage.set_github_config.assert_called_with("token123", "user/repo")
-        assert storage.sync.called
-        assert "Repository configured successfully" in response
-
+        assert isinstance(result, TextFrame)
+        assert "GitHub configuration updated" in result.text
+        coordinator.set_github_config.assert_called_once_with(
+            token="token123",
+            repo="owner/repo"
+        )
+    
     @pytest.mark.asyncio
     async def test_handle_config_error(self):
-        """Test config command with configuration error."""
-        # Arrange
-        storage = Mock()
-        storage.set_github_config = AsyncMock(side_effect=Exception("Test error"))
-        handler = ConfigCommandHandler(storage)
-        
+        """Test error handling in config command."""
+        coordinator = AsyncMock()
+        coordinator.set_github_config.side_effect = RuntimeError("Test error")
+        handler = ConfigCommandHandler(coordinator)
         frame = CommandFrame(
             command="/config",
-            args=["user/repo", "token123"],
-            metadata={'sender_id': 123}
+            args=["owner/repo", "token123"],
+            metadata={
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
+            }
         )
         
-        # Act
-        response = await handler.handle(frame)
-        
-        # Assert
-        assert "Failed to configure repository" in response
+        with pytest.raises(RuntimeError):
+            await handler.handle(frame)
 
 class TestStatusCommandHandler:
     """Test status command handler."""
     
     @pytest.mark.asyncio
     async def test_handle_not_initialized(self):
-        """Test status command when bot is not initialized."""
-        # Arrange
-        storage = Mock()
-        storage.repo_path = Path("/test")
-        handler = StatusCommandHandler(storage)
-        
+        """Test status command when storage is not initialized."""
+        coordinator = AsyncMock()
+        coordinator.is_initialized.return_value = False
+        coordinator.sync = AsyncMock()
+        handler = StatusCommandHandler(coordinator)
         frame = CommandFrame(
             command="/status",
-            args=[],
-            metadata={'sender_id': 123}
+            metadata={
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
+            }
         )
         
-        # Act
-        with patch('pathlib.Path.exists', return_value=False):
-            response = await handler.handle(frame)
-        
-        # Assert
-        assert "Bot not initialized" in response
-
+        result = await handler.handle(frame)
+        assert isinstance(result, TextFrame)
+        assert "Storage not initialized" in result.text
+        coordinator.sync.assert_not_called()
+    
     @pytest.mark.asyncio
     async def test_handle_success(self):
-        """Test successful status command."""
-        # Arrange
-        storage = Mock()
-        storage.repo_path = Path("/test")
-        handler = StatusCommandHandler(storage)
-        
+        """Test successful status command handling."""
+        coordinator = AsyncMock()
+        coordinator.is_initialized.return_value = True
+        coordinator.sync = AsyncMock()
+        handler = StatusCommandHandler(coordinator)
         frame = CommandFrame(
             command="/status",
-            args=[],
-            metadata={'sender_id': 123}
+            metadata={
+                "chat_id": 123,
+                "sender_id": 456,
+                "sender_name": "testuser"
+            }
         )
         
-        metadata = {
-            'user': {'name': 'test_user', 'id': 123},
-            'github': {'repo': 'user/repo'},
-            'stats': {
-                'messages': 10,
-                'media': 5,
-                'last_sync': '2024-01-06T12:00:00'
-            }
-        }
+        result = await handler.handle(frame)
         
-        # Act
-        with patch('pathlib.Path.exists', return_value=True), \
-             patch('builtins.open'), \
-             patch('yaml.safe_load', return_value=metadata):
-            response = await handler.handle(frame)
-        
-        # Assert
-        assert "Current Status" in response
-        assert "test_user" in response
-        assert "user/repo" in response
-        assert "Messages: 10" in response 
+        assert isinstance(result, TextFrame)
+        assert "Chronicler Status" in result.text
+        coordinator.sync.assert_called_once() 

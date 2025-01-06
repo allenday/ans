@@ -1,48 +1,45 @@
-"""Unit tests for Pipeline class."""
+"""Tests for pipeline."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from chronicler.pipeline import Pipeline, BaseProcessor, Frame
+from unittest.mock import Mock, AsyncMock
+from chronicler.pipeline.pipeline import Pipeline
+from chronicler.processors.base import BaseProcessor
+from chronicler.frames.media import TextFrame
 
-class MockProcessor(BaseProcessor):
-    """Mock processor for testing."""
-    async def process_frame(self, frame: Frame):
-        await self.push_frame(frame)
-
-@pytest.mark.asyncio
-async def test_pipeline_creation():
-    """Test creating a pipeline with processors."""
-    processors = [MockProcessor(), MockProcessor()]
-    pipeline = Pipeline(processors)
-    assert len(pipeline.processors) == 2
-    assert pipeline.processors[0].next_processor == pipeline.processors[1]
+def test_pipeline_creation():
+    """Test pipeline creation."""
+    pipeline = Pipeline()
+    assert isinstance(pipeline, Pipeline)
+    assert len(pipeline.processors) == 0
 
 @pytest.mark.asyncio
 async def test_pipeline_processing():
-    """Test processing a frame through the pipeline."""
+    """Test frame processing through pipeline."""
+    pipeline = Pipeline()
+    
     # Create mock processors
-    processor1 = MockProcessor()
-    processor2 = MockProcessor()
+    processor1 = AsyncMock(spec=BaseProcessor)
+    processor1.process.return_value = TextFrame(text="modified1", metadata={})
     
-    # Create spy on process_frame methods
-    processor1.process_frame = AsyncMock(wraps=processor1.process_frame)
-    processor2.process_frame = AsyncMock(wraps=processor2.process_frame)
+    processor2 = AsyncMock(spec=BaseProcessor)
+    processor2.process.return_value = TextFrame(text="modified2", metadata={})
     
-    # Create pipeline
-    pipeline = Pipeline([processor1, processor2])
+    # Add processors to pipeline
+    pipeline.add_processor(processor1)
+    pipeline.add_processor(processor2)
     
-    # Create test frame
-    frame = MagicMock(spec=Frame)
+    # Process a frame
+    frame = TextFrame(text="original", metadata={})
+    result = await pipeline.process(frame)
     
-    # Process frame
-    await pipeline.process_frame(frame)
-    
-    # Verify both processors were called
-    processor1.process_frame.assert_called_once_with(frame)
-    processor2.process_frame.assert_called_once_with(frame)
+    # Verify processors were called in order
+    processor1.process.assert_called_once_with(frame)
+    processor2.process.assert_called_once()
+    assert result.text == "modified2"
 
 @pytest.mark.asyncio
 async def test_empty_pipeline():
-    """Test processing a frame through an empty pipeline."""
-    pipeline = Pipeline([])
-    frame = MagicMock(spec=Frame)
-    await pipeline.process_frame(frame)  # Should not raise any errors 
+    """Test processing through empty pipeline."""
+    pipeline = Pipeline()
+    frame = TextFrame(text="test", metadata={})
+    result = await pipeline.process(frame)
+    assert result == frame  # Empty pipeline should return original frame 
