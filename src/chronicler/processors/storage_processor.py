@@ -1,7 +1,9 @@
 """Storage processor for saving messages."""
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 from chronicler.pipeline import (
     Frame, TextFrame, ImageFrame, DocumentFrame,
@@ -10,6 +12,7 @@ from chronicler.pipeline import (
 )
 from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
+from chronicler.processors.git_processor import GitProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,60 @@ class StorageProcessor(BaseProcessor):
         self.storage = StorageCoordinator(storage_path)
         self._initialized = False
         
+        # Initialize git processor if configured
+        self.git_processor = self._init_git_processor(storage_path)
+        if self.git_processor:
+            logger.info("PROC - Git processor initialized")
+        else:
+            logger.info("PROC - Git processor not configured")
+    
+    def _init_git_processor(self, storage_path: Path) -> Optional[GitProcessor]:
+        """Initialize GitProcessor if environment variables are set."""
+        repo_url = os.getenv('GIT_REPO_URL')
+        branch = os.getenv('GIT_BRANCH', 'main')
+        username = os.getenv('GIT_USERNAME')
+        access_token = os.getenv('GIT_ACCESS_TOKEN')
+        
+        if not all([repo_url, username, access_token]):
+            logger.info("PROC - Git configuration not found in environment")
+            return None
+        
+        try:
+            return GitProcessor(
+                repo_url=repo_url,
+                branch=branch,
+                username=username,
+                access_token=access_token,
+                storage_path=storage_path
+            )
+        except Exception as e:
+            logger.error("PROC - Failed to initialize git processor", exc_info=True)
+            return None
+    
+    async def _commit_message(self, message_path: Path) -> None:
+        """Commit a message file if git is configured."""
+        if not self.git_processor:
+            return
+        
+        try:
+            self.git_processor.commit_message(message_path)
+            logger.info("PROC - Committed message file: %s", message_path)
+        except Exception as e:
+            logger.error("PROC - Failed to commit message", exc_info=True)
+            # Don't re-raise - git failures shouldn't break message processing
+    
+    async def _commit_media(self, media_paths: list[Path]) -> None:
+        """Commit media files if git is configured."""
+        if not self.git_processor or not media_paths:
+            return
+        
+        try:
+            self.git_processor.commit_media(media_paths)
+            logger.info("PROC - Committed %d media files", len(media_paths))
+        except Exception as e:
+            logger.error("PROC - Failed to commit media files", exc_info=True)
+            # Don't re-raise - git failures shouldn't break message processing
+    
     async def _ensure_initialized(self) -> None:
         """Ensure storage is initialized."""
         if not self._initialized:
@@ -126,8 +183,12 @@ class StorageProcessor(BaseProcessor):
                 source='telegram',
                 metadata=metadata
             )
-            await self.storage.save_message(topic_id, message)
+            message_path = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved text message to topic {topic_id}")
+            
+            # Commit message
+            await self._commit_message(message_path)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process text frame: {e}", exc_info=True)
             raise
@@ -136,10 +197,8 @@ class StorageProcessor(BaseProcessor):
         """Process an image frame."""
         try:
             logger.info(f"PROC - Processing image frame for topic {topic_id}")
-            # Get file ID from metadata, fallback to timestamp if not available
             file_id = metadata.get('file_id', f"image_{datetime.utcnow().isoformat()}")
             
-            # Create attachment with proper filename
             attachment = Attachment(
                 id=file_id,
                 type=f"image/{frame.format}",
@@ -148,17 +207,21 @@ class StorageProcessor(BaseProcessor):
             )
             logger.debug(f"PROC - Created image attachment: {attachment.filename}")
             
-            # Create message with empty string as default content
             message = Message(
-                content='',  # Empty string by default for images without captions
+                content='',
                 source='telegram',
                 metadata=metadata,
                 attachments=[attachment]
             )
             logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
             
-            await self.storage.save_message(topic_id, message)
+            message_path, media_paths = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved image message to topic {topic_id}")
+            
+            # Commit message and media
+            await self._commit_message(message_path)
+            await self._commit_media(media_paths)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process image frame: {e}", exc_info=True)
             raise
@@ -186,8 +249,12 @@ class StorageProcessor(BaseProcessor):
             )
             logger.debug(f"PROC - Message has {len(message.attachments)} attachments")
             
-            await self.storage.save_message(topic_id, message)
+            message_path = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved document message to topic {topic_id}")
+            
+            # Commit message
+            await self._commit_message(message_path)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process document frame: {e}", exc_info=True)
             raise
@@ -217,8 +284,12 @@ class StorageProcessor(BaseProcessor):
             )
             logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
             
-            await self.storage.save_message(topic_id, message)
+            message_path = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved audio message to topic {topic_id}")
+            
+            # Commit message
+            await self._commit_message(message_path)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process audio frame: {e}", exc_info=True)
             raise
@@ -248,8 +319,12 @@ class StorageProcessor(BaseProcessor):
             )
             logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
             
-            await self.storage.save_message(topic_id, message)
+            message_path = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved voice message to topic {topic_id}")
+            
+            # Commit message
+            await self._commit_message(message_path)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process voice frame: {e}", exc_info=True)
             raise
@@ -283,8 +358,12 @@ class StorageProcessor(BaseProcessor):
             )
             logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
             
-            await self.storage.save_message(topic_id, message)
+            message_path = await self.storage.save_message(topic_id, message)
             logger.info(f"PROC - Saved sticker message to topic {topic_id}")
+            
+            # Commit message
+            await self._commit_message(message_path)
+            
         except Exception as e:
             logger.error(f"PROC - Failed to process sticker frame: {e}", exc_info=True)
             raise 

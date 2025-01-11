@@ -51,16 +51,25 @@
   
 4. Implement asynchronous git operations  
    - Requirements:  
-     - Commit messages on a cron schedule  
-     - Decouple message receipt from git pushes  
-     - Provide operation status  
+     - Synchronous local commits on message receipt
+     - Asynchronous remote pushes on configurable interval
+     - Environment-based git configuration
+     - Basic retry mechanism for push failures
    - Components:  
-     - Cron-based GitOperationQueue  
-     - StatusReporter  
+     - GitProcessor for local commits
+     - GitSyncService for async pushes
+     - Configurable sync interval (.env)
    - Constraints:  
-     - Memory-efficient queuing  
-     - Performance optimization  
-     - Basic retry mechanism for failures  
+     - Local commits must be fast and reliable
+     - Push failures shouldn't affect message processing
+     - Git operations must preserve message order
+     - Must handle concurrent operations safely
+   - Configuration (.env):
+     - GIT_REPO_URL=https://github.com/user/repo
+     - GIT_BRANCH=main
+     - GIT_USERNAME=username
+     - GIT_ACCESS_TOKEN=token
+     - GIT_SYNC_INTERVAL=300  # seconds
   
 5. Add per-user multi-tenancy  
    - Requirements:  

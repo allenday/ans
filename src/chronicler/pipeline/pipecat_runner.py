@@ -2,6 +2,7 @@ from typing import List, Type
 import asyncio
 import logging
 import signal
+import os
 from pathlib import Path
 
 from .frames import Frame
@@ -20,6 +21,7 @@ async def run_bot(token: str, storage_path: str):
     # Import components here to avoid circular imports
     from chronicler.transports.telegram_transport import TelegramTransport
     from chronicler.processors.storage_processor import StorageProcessor
+    from chronicler.services.git_sync_service import GitSyncService
     from chronicler.commands import CommandProcessor
     from chronicler.commands.handlers import (
         StartCommandHandler,
@@ -31,6 +33,16 @@ async def run_bot(token: str, storage_path: str):
     storage_path = Path(storage_path)
     transport = TelegramTransport(token)
     storage = StorageProcessor(storage_path)
+    
+    # Initialize git sync service if configured
+    sync_service = None
+    if storage.git_processor:
+        sync_interval = int(os.getenv('GIT_SYNC_INTERVAL', '300'))
+        sync_service = GitSyncService(
+            storage.git_processor,
+            sync_interval=sync_interval
+        )
+        logger.info("Initialized git sync service (interval: %d seconds)", sync_interval)
     
     # Initialize command processor with handlers
     command_processor = CommandProcessor()
@@ -55,14 +67,26 @@ async def run_bot(token: str, storage_path: str):
         logger.info("Shutting down...")
         stop.set()
     
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, signal_handler)
-    
     try:
         logger.info("Starting bot...")
         await transport.start()
+        
+        # Start git sync service if configured
+        if sync_service:
+            await sync_service.start()
+            logger.info("Started git sync service")
+        
+        # Setup signal handlers after services are started
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, signal_handler)
+        
         await stop.wait()  # Wait until stop signal
     finally:
+        # Stop git sync service if running
+        if sync_service:
+            await sync_service.stop()
+            logger.info("Stopped git sync service")
+        
         await transport.stop()
 
 def main():
