@@ -1,1 +1,1 @@
-"""Mock integration tests package.""" 
+"""Mock test package.""" 

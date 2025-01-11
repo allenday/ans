@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 
 from chronicler.frames.base import Frame
-from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame
+from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, StickerFrame, AudioFrame, VoiceFrame
 from chronicler.transports.base import BaseTransport
 from chronicler.commands.frames import CommandFrame
 
@@ -285,7 +285,7 @@ class TelegramTransport(BaseTransport):
                 metadata['reply_to'] = reply_meta
             
             frame = ImageFrame(
-                image=bytes(photo_bytes),
+                content=bytes(photo_bytes),
                 size=(photo.width, photo.height),
                 format=format,
                 metadata=metadata
@@ -334,16 +334,15 @@ class TelegramTransport(BaseTransport):
             if reply_meta:
                 metadata['reply_to'] = reply_meta
             
-            frame = DocumentFrame(
+            frame = StickerFrame(
                 content=bytes(sticker_bytes),
-                filename=f"{sticker.file_unique_id}.{format}",
-                mime_type=mime_type,
-                caption=sticker.emoji,  # Store emoji as caption
+                emoji=sticker.emoji,
+                set_name=sticker.set_name,
                 metadata=metadata
             )
-            logger.debug(f"Created DocumentFrame for sticker (format={format}, set={sticker.set_name}), pushing to pipeline")
+            logger.debug(f"Created StickerFrame (format={format}, set={sticker.set_name}), pushing to pipeline")
             await self.push_frame(frame)
-            logger.debug("Sticker DocumentFrame pushed to pipeline")
+            logger.debug("StickerFrame pushed to pipeline")
 
         elif update.message.document:
             logger.info(f"{chat_info} Processing document message")
@@ -487,45 +486,69 @@ class TelegramTransport(BaseTransport):
                     filename = f"{audio.file_unique_id}.{ext}"
                 mime_type = getattr(audio, 'mime_type', 'audio/mpeg')
                 logger.debug(f"Audio file: name={filename}, type={mime_type}, ext={ext}")
+                
+                metadata = {
+                    'chat_id': update.message.chat.id,
+                    'chat_title': update.message.chat.title or "Private Chat",
+                    'thread_id': thread_id,
+                    'thread_name': topic_name,
+                    'sender_id': update.message.from_user.id,
+                    'sender_name': update.message.from_user.username or update.message.from_user.first_name,
+                    'duration': audio.duration,
+                    'file_size': getattr(audio, 'file_size', len(audio_bytes)),
+                    'file_id': audio.file_id,
+                    'file_unique_id': audio.file_unique_id,
+                    'performer': getattr(audio, 'performer', None),  # Audio file metadata
+                    'title': getattr(audio, 'title', None),         # Audio file metadata
+                    'original_filename': getattr(audio, 'file_name', None)  # Store original filename
+                }
+                
+                # Add reply-to information if present
+                reply_meta = self._get_reply_metadata(update.message.reply_to_message)
+                if reply_meta:
+                    metadata['reply_to'] = reply_meta
+                
+                frame = AudioFrame(
+                    content=bytes(audio_bytes),
+                    duration=audio.duration,
+                    mime_type=mime_type,
+                    metadata=metadata
+                )
+                logger.debug("Created AudioFrame, pushing to pipeline")
+                await self.push_frame(frame)
+                logger.debug("AudioFrame pushed to pipeline")
             else:  # Voice message
                 # Voice messages are always Opus encoded in OGG container
-                # Use .ogg extension for better compatibility
-                filename = f"{audio.file_unique_id}.ogg"
                 mime_type = 'audio/ogg'
                 logger.debug("Voice message: using OGG/Opus format")
-            
-            metadata = {
-                'chat_id': update.message.chat.id,
-                'chat_title': update.message.chat.title or "Private Chat",
-                'thread_id': thread_id,
-                'thread_name': topic_name,
-                'sender_id': update.message.from_user.id,
-                'sender_name': update.message.from_user.username or update.message.from_user.first_name,
-                'duration': audio.duration,
-                'file_size': getattr(audio, 'file_size', len(audio_bytes)),
-                'file_id': audio.file_id,
-                'file_unique_id': audio.file_unique_id,
-                'is_voice': bool(update.message.voice),
-                'performer': getattr(audio, 'performer', None),  # Audio file metadata
-                'title': getattr(audio, 'title', None),         # Audio file metadata
-                'original_filename': getattr(audio, 'file_name', None)  # Store original filename
-            }
-            
-            # Add reply-to information if present
-            reply_meta = self._get_reply_metadata(update.message.reply_to_message)
-            if reply_meta:
-                metadata['reply_to'] = reply_meta
-            
-            frame = DocumentFrame(
-                content=bytes(audio_bytes),
-                filename=filename,
-                mime_type=mime_type,
-                caption=update.message.caption,
-                metadata=metadata
-            )
-            logger.debug(f"Created DocumentFrame for {'voice message' if update.message.voice else 'audio file'} ({mime_type}), pushing to pipeline")
-            await self.push_frame(frame)
-            logger.debug("Audio DocumentFrame pushed to pipeline")
+                
+                metadata = {
+                    'chat_id': update.message.chat.id,
+                    'chat_title': update.message.chat.title or "Private Chat",
+                    'thread_id': thread_id,
+                    'thread_name': topic_name,
+                    'sender_id': update.message.from_user.id,
+                    'sender_name': update.message.from_user.username or update.message.from_user.first_name,
+                    'duration': audio.duration,
+                    'file_size': getattr(audio, 'file_size', len(audio_bytes)),
+                    'file_id': audio.file_id,
+                    'file_unique_id': audio.file_unique_id
+                }
+                
+                # Add reply-to information if present
+                reply_meta = self._get_reply_metadata(update.message.reply_to_message)
+                if reply_meta:
+                    metadata['reply_to'] = reply_meta
+                
+                frame = VoiceFrame(
+                    content=bytes(audio_bytes),
+                    duration=audio.duration,
+                    mime_type=mime_type,
+                    metadata=metadata
+                )
+                logger.debug("Created VoiceFrame, pushing to pipeline")
+                await self.push_frame(frame)
+                logger.debug("VoiceFrame pushed to pipeline")
 
         else:
             logger.info(f"{chat_info} Received unsupported message types: {message_types}")
