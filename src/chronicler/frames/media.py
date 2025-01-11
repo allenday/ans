@@ -22,14 +22,14 @@ class TextFrame(Frame):
 @dataclass
 class ImageFrame(Frame):
     """A frame containing image data."""
-    image: bytes
+    content: bytes
     size: Tuple[int, int]
     format: str
     
     def __post_init__(self):
         """Log image frame initialization."""
-        if not isinstance(self.image, bytes):
-            raise TypeError("image must be bytes")
+        if not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         if not isinstance(self.size, tuple) or len(self.size) != 2 or not all(isinstance(x, int) for x in self.size):
             raise TypeError("size must be a tuple of two integers")
         if not isinstance(self.format, str):
@@ -63,14 +63,14 @@ class DocumentFrame(Frame):
 @dataclass
 class AudioFrame(Frame):
     """A frame containing audio data."""
-    audio: bytes
+    content: bytes
     duration: int  # Duration in seconds
     mime_type: str
     
     def __post_init__(self):
         """Log audio frame initialization."""
-        if not isinstance(self.audio, bytes):
-            raise TypeError("audio must be bytes")
+        if not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         if not isinstance(self.duration, int):
             raise TypeError("duration must be an integer")
         if not isinstance(self.mime_type, str):
@@ -81,14 +81,14 @@ class AudioFrame(Frame):
 @dataclass
 class VoiceFrame(Frame):
     """A frame containing voice message data."""
-    audio: bytes
+    content: bytes
     duration: int  # Duration in seconds
     mime_type: str
     
     def __post_init__(self):
         """Log voice frame initialization."""
-        if not isinstance(self.audio, bytes):
-            raise TypeError("audio must be bytes")
+        if not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         if not isinstance(self.duration, int):
             raise TypeError("duration must be an integer")
         if not isinstance(self.mime_type, str):
@@ -99,14 +99,14 @@ class VoiceFrame(Frame):
 @dataclass
 class StickerFrame(Frame):
     """A frame containing sticker data."""
-    sticker: bytes
+    content: bytes
     emoji: str
     set_name: str
     
     def __post_init__(self):
         """Log sticker frame initialization."""
-        if not isinstance(self.sticker, bytes):
-            raise TypeError("sticker must be bytes")
+        if not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         if not isinstance(self.emoji, str):
             raise TypeError("emoji must be a string")
         if not isinstance(self.set_name, str):

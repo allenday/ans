@@ -48,7 +48,7 @@ async def test_process_image_frame(storage_mock):
     """Test processing an image frame."""
     # Setup
     processor = StorageProcessor(storage_mock)
-    frame = ImageFrame(image=b"test image", format="jpg", size=(100, 100), metadata={"chat_id": 123})
+    frame = ImageFrame(content=b"test image", format="jpg", size=(100, 100), metadata={"chat_id": 123})
     
     # Execute
     result = await processor.process(frame)
@@ -121,7 +121,7 @@ async def test_process_audio_frame(storage_mock):
     # Setup
     processor = StorageProcessor(storage_mock)
     frame = AudioFrame(
-        audio=b"test audio",
+        content=b"test audio",
         duration=60,
         mime_type="audio/mp3",
         metadata={"chat_id": 123}
@@ -159,7 +159,7 @@ async def test_process_voice_frame(storage_mock):
     # Setup
     processor = StorageProcessor(storage_mock)
     frame = VoiceFrame(
-        audio=b"test voice",
+        content=b"test voice",
         duration=30,
         mime_type="audio/ogg",
         metadata={"chat_id": 123}
@@ -197,7 +197,7 @@ async def test_process_sticker_frame(storage_mock):
     # Setup
     processor = StorageProcessor(storage_mock)
     frame = StickerFrame(
-        sticker=b"test sticker",
+        content=b"test sticker",
         emoji="😀",
         set_name="test_set",
         metadata={"chat_id": 123}

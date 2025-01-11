@@ -5,14 +5,17 @@ from typing import Optional
 
 from chronicler.frames.base import Frame
 
-logger = logging.getLogger(__name__)
-
 class BaseTransport(ABC):
-    """Base class for transport implementations."""
-    
+    """Base class for all transports."""
+
     def __init__(self):
-        """Initialize base transport."""
-        logger.debug("TRANSPORT - Initialized BaseTransport")
+        """Initialize the transport."""
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("TRANSPORT - Initialized BaseTransport")
+        self._start_time = None
+        self._message_count = 0
+        self._command_count = 0
+        self._error_count = 0
     
     @abstractmethod
     async def start(self) -> None:

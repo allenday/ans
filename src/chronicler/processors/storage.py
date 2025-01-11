@@ -35,7 +35,7 @@ class StorageProcessor(BaseProcessor):
             
             elif isinstance(frame, ImageFrame):
                 logger.debug("PROC - Processing image frame")
-                if not frame.image:
+                if not frame.content:
                     raise ValueError("Image frame has no image data")
                 
                 message = Message(
@@ -49,7 +49,7 @@ class StorageProcessor(BaseProcessor):
                     id="image",
                     type="image",
                     filename=f"image.{frame.format}",
-                    data=frame.image
+                    data=frame.content
                 )
                 await self.coordinator.save_attachment("default", message_id, attachment)
             
@@ -75,7 +75,7 @@ class StorageProcessor(BaseProcessor):
             
             elif isinstance(frame, AudioFrame):
                 logger.debug("PROC - Processing audio frame")
-                if not frame.audio:
+                if not frame.content:
                     raise ValueError("Audio frame has no audio data")
                 
                 message = Message(
@@ -89,13 +89,13 @@ class StorageProcessor(BaseProcessor):
                     id="audio",
                     type="audio",
                     filename=f"audio.{frame.mime_type.split('/')[-1]}",
-                    data=frame.audio
+                    data=frame.content
                 )
                 await self.coordinator.save_attachment("default", message_id, attachment)
             
             elif isinstance(frame, VoiceFrame):
                 logger.debug("PROC - Processing voice frame")
-                if not frame.audio:
+                if not frame.content:
                     raise ValueError("Voice frame has no audio data")
                 
                 message = Message(
@@ -109,13 +109,13 @@ class StorageProcessor(BaseProcessor):
                     id="voice",
                     type="voice",
                     filename=f"voice.{frame.mime_type.split('/')[-1]}",
-                    data=frame.audio
+                    data=frame.content
                 )
                 await self.coordinator.save_attachment("default", message_id, attachment)
             
             elif isinstance(frame, StickerFrame):
                 logger.debug("PROC - Processing sticker frame")
-                if not frame.sticker:
+                if not frame.content:
                     raise ValueError("Sticker frame has no sticker data")
                 
                 message = Message(
@@ -129,7 +129,7 @@ class StorageProcessor(BaseProcessor):
                     id="sticker",
                     type="sticker",
                     filename=f"sticker_{frame.set_name}.webp",
-                    data=frame.sticker
+                    data=frame.content
                 )
                 await self.coordinator.save_attachment("default", message_id, attachment)
             

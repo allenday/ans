@@ -271,7 +271,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type="image/webp",  # Stickers are typically WebP format
                 filename=f"{file_id}.webp",
-                data=frame.sticker
+                data=frame.content
             )
             logger.debug(f"PROC - Created sticker attachment: {attachment.filename}")
             
