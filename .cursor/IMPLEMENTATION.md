@@ -239,7 +239,7 @@ The status update automation system ensures consistent tracking and versioning o
 
 2. **Commit Template**
    ```
-   .cursor/commit.template
+   .cursor/COMMIT.template
    Format:
    Status Update: {emoji} {action}: {item_description}
    File: {relative_path}
@@ -295,7 +295,7 @@ The status update automation system ensures consistent tracking and versioning o
 1. **Installation**
    ```bash
    # Set up commit template
-   git config --local commit.template .cursor/commit.template
+   git config --local commit.template .cursor/COMMIT.template
 
    # Install commit hook
    mkdir -p .git/hooks

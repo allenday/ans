@@ -19,7 +19,7 @@ else
     exit 1
 fi
 
-# Create commit message
+# Create commit message using the template format
 commit_msg="Status Update: $new_status $action: $description
 File: $file
 Item: $item"
@@ -27,7 +27,7 @@ Item: $item"
 # Stage the file
 git add "$file"
 
-# Commit with the generated message
+# Commit with the generated message (following COMMIT.template format)
 echo "$commit_msg" | git commit -F -
 
 exit_code=$?
