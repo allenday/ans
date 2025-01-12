@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from pathlib import Path
 from unittest.mock import Mock, patch
 from chronicler.processors.git_processor import GitProcessor, GitProcessingError
 from chronicler.services.git_sync_service import GitSyncService
@@ -85,4 +86,34 @@ async def test_multiple_stop_calls(git_sync_service):
     await git_sync_service.start()
     await git_sync_service.stop()
     await git_sync_service.stop()  # Should log warning
-    assert git_sync_service._running is False 
+    assert git_sync_service._running is False
+
+@pytest.mark.asyncio
+async def test_commit_immediately_single_message(git_sync_service, mock_git_processor):
+    """Test immediate commit of a single message file."""
+    message_path = Path("/tmp/test-storage/messages/2024-01-11/message_123.json")
+    
+    await git_sync_service.commit_immediately(message_path)
+    
+    mock_git_processor.commit_message.assert_called_once_with(message_path)
+
+@pytest.mark.asyncio
+async def test_commit_immediately_multiple_media(git_sync_service, mock_git_processor):
+    """Test immediate commit of multiple media files."""
+    media_paths = [
+        Path("/tmp/test-storage/media/2024-01-11/photo_123.jpg"),
+        Path("/tmp/test-storage/media/2024-01-11/document_456.pdf")
+    ]
+    
+    await git_sync_service.commit_immediately(media_paths, is_media=True)
+    
+    mock_git_processor.commit_media.assert_called_once_with(media_paths)
+
+@pytest.mark.asyncio
+async def test_commit_immediately_failure(git_sync_service, mock_git_processor):
+    """Test handling of immediate commit failure."""
+    message_path = Path("/tmp/test-storage/messages/2024-01-11/message_123.json")
+    mock_git_processor.commit_message.side_effect = GitProcessingError("Git error")
+    
+    with pytest.raises(GitProcessingError):
+        await git_sync_service.commit_immediately(message_path) 
