@@ -47,6 +47,8 @@ class Message:
             self.metadata = {}
         if self.timestamp is None:
             self.timestamp = datetime.utcnow()
+        if self.attachments is None:
+            self.attachments = []
         if self.attachments:
             logger.debug(f"Message has {len(self.attachments)} attachments")
     
