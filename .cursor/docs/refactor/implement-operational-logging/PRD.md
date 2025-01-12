@@ -80,8 +80,8 @@ Systematic implementation of operational logging across the project to improve o
 7.3. Must follow security best practices for sensitive data 
 
 ## 8. Additional Scopes
-8.1. 🕔 Update .cursor/ documents to clearly indicate that all sections and items must be numbered for unambiguous referencing.
-8.2. 🕔 Update .cursor/ documents to clearly indicate that emoji are to be used in PRD.md and CHECKLIST.md derived from their respective templates, according to "status indicators" described in PROMPT.md "status tracking".
+8.1. ✅ Update .cursor/ documents to clearly indicate that all sections and items must be numbered for unambiguous referencing.
+8.2. ✅ Update .cursor/ documents to clearly indicate that emoji are to be used in PRD.md and CHECKLIST.md derived from their respective templates, according to "status indicators" described in PROMPT.md "status tracking".
 8.3. 🕔 Identify and eliminate the bug that causes implementation to begin before tests are written / failing according to red-green-refactor methodology.
 8.4. 🕔 Formulate a plan to add meetrics to BACKLOG.md to for monitoring tech debt. Metrics for:
   8.4.1. 🕔 Unit test coverage
