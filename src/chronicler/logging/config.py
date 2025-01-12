@@ -11,6 +11,7 @@ import contextvars
 import uuid
 import traceback
 from datetime import timezone
+import sys
 
 # Context variables for trace propagation
 CORRELATION_ID = contextvars.ContextVar('correlation_id', default=None)
@@ -81,28 +82,26 @@ class CrystallineFormatter(logging.Formatter):
         if hasattr(record, 'context'):
             crystal['context'] = record.context
 
-        # Set the JSON string as the message and override getMessage
-        json_str = json.dumps(crystal)
-        record.getMessage = lambda: json_str
-        return json_str
+        # Return the JSON string
+        return json.dumps(crystal)
 
-def configure_logging(level: str = 'INFO') -> None:
-    """Configure logging with crystalline structure.
+def configure_logging(level='INFO'):
+    """Configure logging with crystalline formatter."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Clear any existing handlers
+    root_logger.handlers.clear()
     
-    Args:
-        level: Logging level to set
-    """
-    root = logging.getLogger()
-    root.setLevel(level)
+    # Create handler for JSON output to stdout
+    json_handler = logging.StreamHandler(sys.stdout)
+    json_handler.setFormatter(CrystallineFormatter())
+    root_logger.addHandler(json_handler)
     
-    # Remove existing handlers
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
-    
-    # Add handler with crystalline formatter
-    handler = logging.StreamHandler()
-    handler.setFormatter(CrystallineFormatter())
-    root.addHandler(handler)
+    # Create standard handler for caplog compatibility
+    standard_handler = logging.StreamHandler(sys.stderr)
+    standard_handler.setFormatter(logging.Formatter('%(levelname)s    %(name)s:%(filename)s:%(lineno)d %(message)s'))
+    root_logger.addHandler(standard_handler)
 
 def trace_operation(component: str):
     """Decorator for operation tracing with correlation."""
