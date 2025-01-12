@@ -1,5 +1,5 @@
 """Command processor implementation."""
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 from typing import Dict, Type, Optional
 
 from chronicler.frames.base import Frame
@@ -20,10 +20,12 @@ class CommandProcessor(BaseProcessor):
         self._handlers: Dict[str, CommandHandler] = {}
         logger.debug("COMMAND - No handlers registered")
         
+    @trace_operation('commands.processor')
     async def process(self, frame: Frame) -> Optional[Frame]:
         """Process a frame, routing commands to appropriate handlers."""
         return await self.process_frame(frame)
         
+    @trace_operation('commands.processor')
     async def process_frame(self, frame: Frame) -> Optional[Frame]:
         """Process a frame, routing commands to appropriate handlers."""
         if not isinstance(frame, CommandFrame):
@@ -54,6 +56,7 @@ class CommandProcessor(BaseProcessor):
             )
             raise
             
+    @trace_operation('commands.processor')
     def register_handler(self, command: str, handler: CommandHandler) -> None:
         """Register a handler for a command."""
         if not command.startswith('/'):

@@ -1,5 +1,5 @@
 """Command handlers for Chronicler bot."""
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -19,6 +19,7 @@ class CommandHandler(ABC):
         logger.debug(f"HANDLER - Initialized {self.__class__.__name__}")
         
     @abstractmethod
+    @trace_operation('commands.handler')
     async def handle(self, frame: CommandFrame) -> TextFrame:
         """Handle a command frame."""
         pass
@@ -26,6 +27,7 @@ class CommandHandler(ABC):
 class StartCommandHandler(CommandHandler):
     """Handler for /start command."""
     
+    @trace_operation('commands.handler.start')
     async def handle(self, frame: CommandFrame) -> TextFrame:
         """Initialize bot configuration for a user."""
         user_id = frame.metadata['sender_id']
@@ -68,6 +70,7 @@ class StartCommandHandler(CommandHandler):
 class ConfigCommandHandler(CommandHandler):
     """Handler for /config command."""
     
+    @trace_operation('commands.handler.config')
     async def handle(self, frame: CommandFrame) -> TextFrame:
         """Configure Git repository settings."""
         user_id = frame.metadata['sender_id']
@@ -116,6 +119,7 @@ class ConfigCommandHandler(CommandHandler):
 class StatusCommandHandler(CommandHandler):
     """Handler for /status command."""
     
+    @trace_operation('commands.handler.status')
     async def handle(self, frame: CommandFrame) -> TextFrame:
         """Show current settings and state."""
         user_id = frame.metadata['sender_id']

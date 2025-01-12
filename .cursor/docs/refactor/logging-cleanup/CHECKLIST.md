@@ -36,7 +36,7 @@
 3.1.3. 🕔 Implement trace_operation
   3.1.3.1. ✅ Add to storage coordinator
   3.1.3.2. ✅ Add to transport layer
-  3.1.3.3. 🕔 Add to command chain
+  3.1.3.3. ✅ Add to command chain
   3.1.3.4. 🕔 Verify correlation flow
 
 ### 3.2. Code Cleanup
@@ -112,4 +112,7 @@
 - Standardized logger acquisition with get_logger function
 - Added trace_operation to all storage components
 - Added trace_operation to transport layer components
-- Next focus: Adding trace_operation to command chain 
+- Added trace_operation to command chain:
+  - CommandProcessor: frame processing, handler registration
+  - Command Handlers: start, config, status commands
+- Next focus: Verifying correlation flow across components 
