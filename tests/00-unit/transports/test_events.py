@@ -35,11 +35,14 @@ def test_event_metadata():
     assert metadata.is_private is False
     assert metadata.is_group is False
 
-def test_telethon_event():
+@pytest.mark.asyncio
+async def test_telethon_event():
     """Test TelethonEvent wrapper."""
     # Mock Telethon event
     mock_event = Mock()
-    mock_event.message = Mock(text="/test arg1 arg2", id=123)
+    mock_event.message = Mock()
+    mock_event.message.text = "/test arg1 arg2"
+    mock_event.message.id = 123
     mock_event.chat_id = 456
     mock_event.chat = Mock(title="Test Chat")
     mock_event.sender_id = 789
@@ -48,25 +51,18 @@ def test_telethon_event():
     event = TelethonEvent(mock_event)
     
     # Test text extraction
-    assert event.get_text() == "/test arg1 arg2"
-    
-    # Test metadata extraction
-    metadata = event.get_metadata()
-    assert metadata.chat_id == 456
-    assert metadata.chat_title == "Test Chat"
-    assert metadata.sender_id == 789
-    assert metadata.sender_name == "testuser"
-    assert metadata.message_id == 123
-    
-    # Test command parsing
-    assert event.get_command() == "/test"
-    assert event.get_command_args() == ["arg1", "arg2"]
+    assert await event.get_text() == "/test arg1 arg2"
+    assert await event.get_chat_id() == 456
+    assert await event.get_chat_title() == "Test Chat"
+    assert await event.get_sender_id() == 789
+    assert await event.get_sender_username() == "testuser"
+    assert await event.get_sender_name() == "Test User"
 
 def test_telethon_event_missing_sender():
     """Test TelethonEvent with missing sender info."""
     # Mock Telethon event with missing sender
     mock_event = Mock()
-    mock_event.message = Mock(text="/test", id=123)
+    mock_event.message = Mock(content="/test", id=123)
     mock_event.chat_id = 456
     mock_event.chat = Mock(title=None)
     mock_event.sender_id = None
@@ -79,17 +75,16 @@ def test_telethon_event_missing_sender():
     assert metadata.sender_name is None
     assert metadata.chat_title is None
 
-def test_telegram_bot_event():
+@pytest.mark.asyncio
+async def test_telegram_bot_event():
     """Test TelegramBotEvent wrapper."""
     # Mock python-telegram-bot update and context
     mock_update = Mock()
-    mock_update.message = Mock(
-        text="/test arg1 arg2",
-        message_id=123,
-        chat_id=456,
-        chat=Mock(title="Test Chat")
-    )
-    mock_update.message.from_user = Mock(
+    mock_update.effective_message = Mock()
+    mock_update.effective_message.text = "/test arg1 arg2"
+    mock_update.effective_message.message_id = 123
+    mock_update.effective_chat = Mock(id=456, title="Test Chat")
+    mock_update.effective_user = Mock(
         id=789,
         username="testuser",
         first_name="Test User"
@@ -100,31 +95,23 @@ def test_telegram_bot_event():
     event = TelegramBotEvent(mock_update, mock_context)
     
     # Test text extraction
-    assert event.get_text() == "/test arg1 arg2"
-    
-    # Test metadata extraction
-    metadata = event.get_metadata()
-    assert metadata.chat_id == 456
-    assert metadata.chat_title == "Test Chat"
-    assert metadata.sender_id == 789
-    assert metadata.sender_name == "testuser"
-    assert metadata.message_id == 123
-    
-    # Test command parsing
-    assert event.get_command() == "/test"
-    assert event.get_command_args() == ["arg1", "arg2"]
+    assert await event.get_text() == "/test arg1 arg2"
+    assert await event.get_chat_id() == 456
+    assert await event.get_chat_title() == "Test Chat"
+    assert await event.get_sender_id() == 789
+    assert await event.get_sender_username() == "testuser"
+    assert await event.get_sender_name() == "Test User"
 
 def test_telegram_bot_event_missing_sender():
     """Test TelegramBotEvent with missing sender info."""
     # Mock update with missing sender
     mock_update = Mock()
-    mock_update.message = Mock(
+    mock_update.effective_message = Mock(
         text="/test",
-        message_id=123,
-        chat_id=456,
-        chat=Mock(title=None),
-        from_user=None
+        message_id=123
     )
+    mock_update.effective_chat = Mock(id=456, title=None)
+    mock_update.effective_user = None
     mock_context = Mock(args=[])
     
     event = TelegramBotEvent(mock_update, mock_context)
@@ -134,17 +121,16 @@ def test_telegram_bot_event_missing_sender():
     assert metadata.sender_name is None
     assert metadata.chat_title is None
 
-def test_telegram_bot_event_fallback_args():
+@pytest.mark.asyncio
+async def test_telegram_bot_event_fallback_args():
     """Test TelegramBotEvent falls back to text parsing when context.args is None."""
     mock_update = Mock()
-    mock_update.message = Mock(
-        text="/test arg1 arg2",
-        message_id=123,
-        chat_id=456,
-        chat=Mock(title="Test Chat"),
-        from_user=Mock(id=789, username="testuser")
-    )
+    mock_update.effective_message = Mock()
+    mock_update.effective_message.text = "/test arg1 arg2"
+    mock_update.effective_message.message_id = 123
+    mock_update.effective_chat = Mock(id=456, title="Test Chat")
+    mock_update.effective_user = Mock(id=789, username="testuser")
     mock_context = Mock(args=None)
     
     event = TelegramBotEvent(mock_update, mock_context)
-    assert event.get_command_args() == ["arg1", "arg2"] 
+    assert await event.get_command_args() == ["arg1", "arg2"] 

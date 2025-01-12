@@ -3,23 +3,40 @@
 ## Current Sprint  
   
 ### In Progress  
-- None  
+- Implement asynchronous git operations  
+   - Requirements:  
+     - 🚧 Synchronous local commits on message receipt
+     - 🚧 Asynchronous remote pushes on configurable interval
+     - 🚧 Environment-based git configuration
+     - 🚧 Basic retry mechanism for push failures
+   - Components:  
+     - 🚧 GitProcessor for local commits
+     - 🚧 GitSyncService for async pushes
+     - 🚧 Configurable sync interval (.env)
+   - Constraints:  
+     - 🚧 Local commits must be fast and reliable
+     - 🚧 Push failures shouldn't affect message processing
+     - 🚧 Git operations must preserve message order
+     - 🚧 Must handle concurrent operations safely
+   - Configuration (.env):
+     - 🚧 GIT_REPO_URL=https://github.com/user/repo
+     - 🚧 GIT_BRANCH=main
+     - 🚧 GIT_USERNAME=username
+     - 🚧 GIT_ACCESS_TOKEN=token
+     - 🚧 GIT_SYNC_INTERVAL=300  # seconds
   
 ### Next Up  
-1. Implement core slash commands  
-   - Priority commands:  
-     - ✅ /start - Initialize bot configuration  
-     - ✅ /config - Set git repository URL and credentials  
-     - ✅ /status - Show current settings and state  
+1. Add per-user multi-tenancy  
    - Requirements:  
-     - ✅ Command handler framework  
-     - ✅ Configuration persistence  
-     - ✅ Secure credential management  
-     - ✅ Clear user feedback  
-   - Testing needs:  
-     - ✅ Unit tests for command parsing  
-     - ✅ Mock tests for configuration storage  
-     - ✅ Live tests for command handling  
+     - Per-user chat configuration  
+     - Independent git repository credentials for each user  
+   - Components:  
+     - UserConfigurationManager  
+     - CommandHandler updates  
+   - Constraints:  
+     - Secure credential handling  
+     - Configuration persistence  
+     - Clear feedback for user errors  
   
 2. Complete test coverage for existing features  
    - Message types to test:  
@@ -31,6 +48,10 @@
      - ✅ Stickers  
    - Test levels needed:  
      - ✅ Unit: Frame creation and validation  
+       - ✅ Fixed TelegramBotEvent tests
+         - Updated to use effective_message and effective_user
+         - Fixed string handling in fallback args test
+         - Improved mock object structure
      - ✅ Mock: Storage operations  
      - ✅ Live: End-to-end message flow  
    - Test infrastructure:  
@@ -49,41 +70,7 @@
      - ✅ Response validation  
      - ✅ State verification  
   
-4. Implement asynchronous git operations  
-   - Requirements:  
-     - Synchronous local commits on message receipt
-     - Asynchronous remote pushes on configurable interval
-     - Environment-based git configuration
-     - Basic retry mechanism for push failures
-   - Components:  
-     - GitProcessor for local commits
-     - GitSyncService for async pushes
-     - Configurable sync interval (.env)
-   - Constraints:  
-     - Local commits must be fast and reliable
-     - Push failures shouldn't affect message processing
-     - Git operations must preserve message order
-     - Must handle concurrent operations safely
-   - Configuration (.env):
-     - GIT_REPO_URL=https://github.com/user/repo
-     - GIT_BRANCH=main
-     - GIT_USERNAME=username
-     - GIT_ACCESS_TOKEN=token
-     - GIT_SYNC_INTERVAL=300  # seconds
-  
-5. Add per-user multi-tenancy  
-   - Requirements:  
-     - Per-user chat configuration  
-     - Independent git repository credentials for each user  
-   - Components:  
-     - UserConfigurationManager  
-     - CommandHandler updates  
-   - Constraints:  
-     - Secure credential handling  
-     - Configuration persistence  
-     - Clear feedback for user errors  
-  
-6. Add Twitter Transport for bookmark archival  
+4. Add Twitter Transport for bookmark archival  
    - Requirements:  
      - Authenticate with Twitter API  
      - Poll for new bookmarks periodically  
