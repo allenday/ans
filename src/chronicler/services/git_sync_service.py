@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, List
 from chronicler.processors.git_processor import GitProcessor, GitProcessingError
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,44 @@ class GitSyncService:
             except asyncio.CancelledError:
                 pass
         logger.info("Stopped GitSyncService")
+    
+    async def commit_immediately(self, path: Union[Path, List[Path]], is_media: bool = False) -> None:
+        """Immediately commit a file or list of files locally.
+        
+        Args:
+            path: Single Path or list of Paths to commit
+            is_media: Whether the files are media files (affects commit message)
+        """
+        try:
+            # Convert single path to list for uniform handling
+            paths = [path] if isinstance(path, Path) else path
+            
+            # Run git commit in executor to avoid blocking
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                self._commit_files,
+                paths,
+                is_media
+            )
+            logger.info("Successfully committed %d files locally", len(paths))
+            
+        except GitProcessingError as e:
+            logger.error("Failed to commit files locally", exc_info=True)
+            raise
+    
+    def _commit_files(self, paths: List[Path], is_media: bool) -> None:
+        """Helper method to commit files using the git processor.
+        
+        Args:
+            paths: List of paths to commit
+            is_media: Whether the files are media files
+        """
+        if is_media:
+            self.git_processor.commit_media(paths)
+        else:
+            # For now, treat all non-media as messages
+            # We only get one path for messages currently
+            self.git_processor.commit_message(paths[0])
     
     async def _sync_loop(self) -> None:
         """Main sync loop."""
