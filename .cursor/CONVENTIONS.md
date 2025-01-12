@@ -1,5 +1,13 @@
 # Development Conventions
 
+## Process Documentation
+
+### PRD Format
+1. All requirements MUST use numbered lists for referencing
+2. Each section's numbering restarts at 1
+3. Reference format: "section.number" (e.g., "2.1" for first item in New Features)
+4. Checkbox format: `1. 🕔 Requirement description`
+
 ## Code Style
 
 1. **Python Standards**
