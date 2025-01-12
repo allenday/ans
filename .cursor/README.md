@@ -4,12 +4,12 @@ This directory contains development documentation for the Chronicler project.
 
 ## Key Documentation Files
 
-- `ARCHITECTURE.md`: Overview of the pipeline-based architecture
-- `BACKLOG.md`: Development roadmap and known issues
-- `CHECKLIST.template.md`: Template for development checklist (must follow for all changes)
-- `CONVENTIONS.md`: Code style, workflow, and development conventions
-- `IMPLEMENTATION.md`: Detailed documentation of components and APIs
-- `PRD.template.md`: Template for Product Requirements Document
+1. `ARCHITECTURE.md`: Overview of the pipeline-based architecture
+2. `BACKLOG.md`: Development roadmap and known issues
+3. `CHECKLIST.template.md`: Template for development checklist (must follow for all changes)
+4. `CONVENTIONS.md`: Code style, workflow, and development conventions
+5. `IMPLEMENTATION.md`: Detailed documentation of components and APIs
+6. `PRD.template.md`: Template for Product Requirements Document
 
 ## Quick Start
 
@@ -59,13 +59,21 @@ This directory contains development documentation for the Chronicler project.
    ```
 3. Write tests first (TDD)
 4. Implement changes following [CONVENTIONS.md](CONVENTIONS.md) with:
-   - Comprehensive logging
-   - Exception handling
-   - Type hints
-   - Docstrings
+   1. Comprehensive logging
+   2. Exception handling
+   3. Type hints
+   4. Docstrings
 5. Run all tests
 6. Review checklist items
-7. Submit PR to develop branch
+7. When completing an item:
+   1. Update status in PRD.md or CHECKLIST.md (🕔 -> ✅)
+   2. Run the status update script:
+      ```bash
+      .cursor/scripts/status-update.sh <file> <item> <old_status> <new_status> <description>
+      # Example:
+      .cursor/scripts/status-update.sh .cursor/docs/feature/your-feature/PRD.md "4.3.2" "🕔" "✅" "Add logging to core components"
+      ```
+8. Submit PR to develop branch
 
 ## Scope-Based Development
 
@@ -135,10 +143,10 @@ To start a new development session:
 ## Core Components
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
 
-- `pipeline/`: Core pipeline architecture
-- `processors/`: Message processors
-- `storage/`: Storage implementation
-- `transports/`: I/O handlers
+1. `pipeline/`: Core pipeline architecture
+2. `processors/`: Message processors
+3. `storage/`: Storage implementation
+4. `transports/`: I/O handlers
 
 ## Testing Strategy
 See [CONVENTIONS.md](CONVENTIONS.md) for detailed testing guidelines.

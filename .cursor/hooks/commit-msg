@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Get the commit message (first argument is the path to the temporary file containing the message)
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# Check if this is a status update commit
+if [[ "$commit_msg" =~ ^"Status Update: "* ]]; then
+    # Validate format
+    if ! [[ "$commit_msg" =~ ^"Status Update: "(✅|🕔)" "(Complete|Reopen)": ".+ ]]; then
+        echo "Error: Invalid status update commit message format"
+        echo "Expected format:"
+        echo "Status Update: {emoji} {action}: {item_description}"
+        echo "File: {relative_path}"
+        echo "Item: {section}.{subsection}"
+        echo ""
+        echo "Where:"
+        echo "- {emoji} is either ✅ or 🕔"
+        echo "- {action} is either Complete or Reopen"
+        echo "- {item_description} is the item being updated"
+        exit 1
+    fi
+
+    # Validate file path
+    if ! grep -q "^File: .cursor/" "$commit_msg_file"; then
+        echo "Error: Missing or invalid file path"
+        echo "File path must start with .cursor/"
+        exit 1
+    fi
+
+    # Validate item reference
+    if ! grep -q "^Item: [0-9.]\+" "$commit_msg_file"; then
+        echo "Error: Missing or invalid item reference"
+        echo "Item must be in format: section.subsection"
+        exit 1
+    fi
+fi
+
+# If we get here, the commit message is valid
+exit 0 

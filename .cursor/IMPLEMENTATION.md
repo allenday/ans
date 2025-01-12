@@ -215,3 +215,98 @@ storage_root/
    - Rate limiting
    - Error recovery
    - Connection stability 
+
+## Status Update Automation
+
+### Overview
+The status update automation system ensures consistent tracking and versioning of item completion status in PRD.md and CHECKLIST.md files.
+
+### Components
+
+1. **Status Update Script**
+   ```
+   .cursor/scripts/status-update.sh
+   Usage: status-update.sh <file> <item> <old_status> <new_status> <description>
+   ```
+   1. Purpose:
+      1. Automate git operations for status changes
+      2. Ensure consistent commit messages
+      3. Maintain atomic commits per status change
+   2. Features:
+      1. Validates status transitions (🕔 -> ✅ or ✅ -> 🕔)
+      2. Generates standardized commit messages
+      3. Handles git staging and commits
+
+2. **Commit Template**
+   ```
+   .cursor/commit.template
+   Format:
+   Status Update: {emoji} {action}: {item_description}
+   File: {relative_path}
+   Item: {section}.{subsection}
+   ```
+   1. Purpose:
+      1. Define standard format for status updates
+      2. Ensure consistent tracking
+      3. Enable automated processing
+
+3. **Commit Message Hook**
+   ```
+   .cursor/hooks/commit-msg
+   Validates:
+   1. Message format
+   2. File path (.cursor/*)
+   3. Item reference format
+   ```
+   1. Purpose:
+      1. Enforce commit message standards
+      2. Validate status update metadata
+      3. Prevent malformed commits
+
+### Usage
+
+1. **Manual Status Updates**
+   ```bash
+   # Example: Completing an item
+   .cursor/scripts/status-update.sh \
+     .cursor/docs/feature/your-feature/PRD.md \
+     "4.3.2" "🕔" "✅" "Add logging to core components"
+   ```
+
+2. **Validation Rules**
+   1. Status changes:
+      1. 🕔 -> ✅: Marking item as complete
+      2. ✅ -> 🕔: Reopening item
+   2. File paths:
+      1. Must be under .cursor/
+      2. Must exist in repository
+   3. Item references:
+      1. Must use dot notation (e.g., 4.3.2)
+      2. Must exist in referenced file
+
+3. **Error Handling**
+   1. Invalid status transitions
+   2. Malformed commit messages
+   3. Missing or invalid files
+   4. Invalid item references
+
+### Integration
+
+1. **Installation**
+   ```bash
+   # Set up commit template
+   git config --local commit.template .cursor/commit.template
+
+   # Install commit hook
+   mkdir -p .git/hooks
+   ln -sf ../../.cursor/hooks/commit-msg .git/hooks/commit-msg
+   ```
+
+2. **Maintenance**
+   1. Keep scripts executable:
+      ```bash
+      chmod +x .cursor/scripts/status-update.sh
+      chmod +x .cursor/hooks/commit-msg
+      ```
+   2. Update templates as needed
+   3. Monitor hook performance 
