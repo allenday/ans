@@ -1,25 +1,13 @@
 """Tests for storage processor."""
 import pytest
-from unittest.mock import Mock, AsyncMock, create_autospec
+from unittest.mock import Mock
 from datetime import datetime
 
 from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, AudioFrame, VoiceFrame, StickerFrame
 from chronicler.processors.storage import StorageProcessor
-from chronicler.storage import StorageAdapter
 from chronicler.storage.interface import Message, Attachment
 
-@pytest.fixture
-def storage_mock():
-    """Create a mock storage adapter."""
-    storage = create_autospec(StorageAdapter)
-    storage.init_storage.return_value = storage
-    storage.create_topic.return_value = None
-    storage.save_message = AsyncMock(return_value="msg_123")
-    storage.save_attachment = AsyncMock(return_value=None)
-    storage.sync = AsyncMock(return_value=None)
-    storage.set_github_config = AsyncMock(return_value=None)
-    storage.is_initialized.return_value = True
-    return storage
+from tests.mocks.storage import storage_mock
 
 @pytest.mark.asyncio
 async def test_process_text_frame(storage_mock):
