@@ -98,3 +98,38 @@ Streamline and standardize the operational logging system to reduce technical de
   - Added structured context with extra parameter
   - Improved error logging with consistent format
   - Removed redundant debug logs 
+
+## 5. Development Integration
+
+### 5.1 Logging Conventions
+✅ Added comprehensive logging conventions to `.cursor/CONVENTIONS.md` covering:
+- Logger acquisition and naming
+- Log levels and their usage
+- Operation tracing with correlation
+- Structured log messages
+- Example usage and log format
+- Development checklist
+
+### 5.2 Workflow Integration
+✅ Integrated logging into development workflow:
+- Added logging checklist to PR template
+- Included logging review in code review process
+- Created example implementations for reference
+- Documented common logging patterns
+- Added logging-specific test requirements
+
+### 5.3 Documentation Updates
+✅ Updated project documentation:
+- Added logging conventions to CONVENTIONS.md
+- Updated README with logging setup instructions
+- Created example implementations
+- Added troubleshooting guide for common issues
+- Documented correlation ID flow
+
+### 5.4 Success Criteria
+✅ Verified integration success:
+- Logging conventions are documented and accessible
+- Development workflow includes logging checks
+- PR template includes logging checklist
+- Example implementations are available
+- Documentation is complete and accurate 
