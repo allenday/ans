@@ -26,7 +26,7 @@ class StorageProcessor(BaseProcessor):
             if isinstance(frame, TextFrame):
                 logger.debug("PROC - Processing text frame")
                 message = Message(
-                    content=frame.text,
+                    content=frame.content,
                     source="telegram",
                     timestamp=datetime.utcnow(),
                     metadata=frame.metadata

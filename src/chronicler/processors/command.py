@@ -43,7 +43,7 @@ class CommandProcessor(BaseProcessor):
             if not handler:
                 logger.warning(f"PROC - No handler for command: {frame.command}")
                 return TextFrame(
-                    text=f"Unknown command: {frame.command}",
+                    content=f"Unknown command: {frame.command}",
                     metadata=frame.metadata
                 )
             
