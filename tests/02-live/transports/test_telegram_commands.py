@@ -8,11 +8,7 @@ from typing import AsyncGenerator
 
 from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
-from chronicler.transports.telegram_factory import (
-    TelegramTransportFactory,
-    TelegramUserTransport,
-    TelegramBotTransport
-)
+from chronicler.transports.telegram import TelegramTransportFactory
 from chronicler.transports.events import EventMetadata
 
 # Configure logging
@@ -62,7 +58,7 @@ async def test_user_sends_command_to_bot(user_transport: TelegramUserTransport, 
     
     # Send initial message to create chat
     init_frame = TextFrame(
-        text="Hello bot!",
+        content="Hello bot!",
         metadata=EventMetadata(
             chat_id=f"@{bot_username}",
             chat_title=None,
@@ -82,7 +78,7 @@ async def test_user_sends_command_to_bot(user_transport: TelegramUserTransport, 
         received_commands.append(frame)
         # Send response back
         response = TextFrame(
-            text=f"Command {frame.command} received with args: {frame.args}",
+            content=f"Command {frame.command} received with args: {frame.args}",
             metadata=EventMetadata(
                 chat_id=frame.metadata.chat_id,
                 chat_title=frame.metadata.chat_title,
@@ -109,7 +105,7 @@ async def test_user_sends_command_to_bot(user_transport: TelegramUserTransport, 
         # Send command with slash
         logger.info(f"[USER] Sending command: /{command} with args: {args}")
         await user_transport.send(TextFrame(
-            text=f"/{command} {' '.join(args)}".strip(),
+            content=f"/{command} {' '.join(args)}".strip(),
             metadata=EventMetadata(
                 chat_id=bot_chat_id,
                 chat_title=None,
@@ -160,7 +156,7 @@ async def test_bot_sends_command_to_user(user_transport: TelegramUserTransport, 
 
     # Send initial message to create chat
     init_frame = TextFrame(
-        text="Hello bot!",
+        content="Hello bot!",
         metadata=EventMetadata(
             chat_id=f"@{bot_username}",
             chat_title=None,
@@ -191,9 +187,9 @@ async def test_bot_sends_command_to_user(user_transport: TelegramUserTransport, 
     commands = ["start", "status", "config"]
     for cmd in commands:
         frame = TextFrame(
-            text=f"/{cmd}",
+            content=f"/{cmd}",
             metadata=EventMetadata(
-                chat_id=str(user_chat_id),
+                chat_id=user_chat_id,
                 chat_title=None,
                 sender_id=None,
                 sender_name=None,

@@ -6,10 +6,11 @@ import logging
 import tempfile
 import shutil
 import asyncio
+import uuid
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
 from chronicler.storage.interface import User
-from chronicler.transports.telegram_factory import TelegramTransportFactory
+from chronicler.transports.telegram import TelegramTransportFactory
 
 # Add the src directory to the Python path
 src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -169,39 +170,90 @@ def mock_python_telegram_bot():
 # Live test fixtures
 
 @pytest_asyncio.fixture
-async def user_transport():
+async def user_transport(mock_session_path):
     """Create a real user transport."""
+    # Check required environment variables
+    api_id = os.environ.get("TELEGRAM_API_ID")
+    api_hash = os.environ.get("TELEGRAM_API_HASH")
+    phone_number = os.environ.get("TELEGRAM_PHONE_NUMBER")
+    
+    if not all([api_id, api_hash, phone_number]):
+        pytest.skip("Missing required environment variables for user transport")
+    
+    # Create unique session name for this test
+    session_name = f"test_session_{uuid.uuid4().hex}"
+    session_path = os.path.join(mock_session_path, session_name)
+    
     factory = TelegramTransportFactory()
     transport = factory.create_transport(
-        api_id=os.environ["TELEGRAM_API_ID"],
-        api_hash=os.environ["TELEGRAM_API_HASH"],
-        phone_number=os.environ["TELEGRAM_PHONE_NUMBER"]
+        api_id=api_id,
+        api_hash=api_hash,
+        phone_number=phone_number,
+        session_name=session_name
     )
     await transport.start()
     yield transport
     await transport.stop()
+    
+    # Cleanup session file
+    try:
+        os.remove(f"{session_path}.session")
+    except Exception:
+        pass
 
 @pytest_asyncio.fixture
-async def bot_transport():
+async def bot_transport(mock_session_path):
     """Create a real bot transport."""
+    # Check required environment variables
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        pytest.skip("TELEGRAM_BOT_TOKEN not set")
+    
+    # Create unique session name for this test
+    session_name = f"test_bot_{uuid.uuid4().hex}"
+    session_path = os.path.join(mock_session_path, session_name)
+    
     factory = TelegramTransportFactory()
     transport = factory.create_transport(
-        bot_token=os.environ["TELEGRAM_BOT_TOKEN"]
+        bot_token=bot_token,
+        session_name=session_name
     )
     await transport.start()
     yield transport
     await transport.stop()
+    
+    # Cleanup session file
+    try:
+        os.remove(f"{session_path}.session")
+    except Exception:
+        pass
 
 @pytest_asyncio.fixture
-async def test_bot_transport():
+async def test_bot_transport(mock_session_path):
     """Create a real test bot transport."""
+    # Check required environment variables
+    test_bot_token = os.environ.get("TELEGRAM_TEST_BOT_TOKEN")
+    if not test_bot_token:
+        pytest.skip("TELEGRAM_TEST_BOT_TOKEN not set")
+    
+    # Create unique session name for this test
+    session_name = f"test_bot2_{uuid.uuid4().hex}"
+    session_path = os.path.join(mock_session_path, session_name)
+    
     factory = TelegramTransportFactory()
     transport = factory.create_transport(
-        bot_token=os.environ["TELEGRAM_TEST_BOT_TOKEN"]
+        bot_token=test_bot_token,
+        session_name=session_name
     )
     await transport.start()
     yield transport
     await transport.stop()
+    
+    # Cleanup session file
+    try:
+        os.remove(f"{session_path}.session")
+    except Exception:
+        pass
 
 @pytest_asyncio.fixture(autouse=True)
 async def test_cleanup():

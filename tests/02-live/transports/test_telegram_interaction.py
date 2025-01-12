@@ -11,18 +11,18 @@ from telegram.error import TimedOut
 
 from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
-from chronicler.transports.telegram_factory import (
-    TelegramTransportFactory,
-    TelegramUserTransport,
-    TelegramBotTransport
-)
+from chronicler.transports.telegram import TelegramTransportFactory
 from chronicler.transports.events import EventMetadata
 
 logger = logging.getLogger(__name__)
 
-@pytest.mark.asyncio(loop_scope="function")
-async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, test_bot_transport: TelegramBotTransport, caplog):
+@pytest.mark.asyncio
+async def test_user_to_bot_interaction(user_transport, bot_transport, caplog):
     """Test sending commands from user to bot."""
+    # Get transport instances from async generators
+    user = await anext(user_transport)
+    bot = await anext(bot_transport)
+    
     test_group_id = int(os.environ["TELEGRAM_TEST_GROUP_ID"])
     test_group_name = os.environ["TELEGRAM_TEST_GROUP_NAME"]
     
@@ -31,7 +31,7 @@ async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, 
         logger.info(f"[BOT] Received command: {frame.command} with args: {frame.args}")
         received_commands.append(frame)
         response = TextFrame(
-            text=f"Command {frame.command} received with args: {frame.args}",
+            content=f"Command {frame.command} received with args: {frame.args}",
             metadata=EventMetadata(
                 chat_id=test_group_id,
                 chat_title=test_group_name,
@@ -41,16 +41,16 @@ async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, 
             )
         )
         try:
-            await test_bot_transport.send(response)
+            await bot.send(response)
             logger.info(f"[BOT] Response sent for command: {frame.command}")
         except TimedOut:
             logger.warning(f"[BOT] Timeout sending response for command: {frame.command}")
         except Exception as e:
             logger.error(f"[BOT] Error sending response for {frame.command}: {type(e).__name__}: {str(e)}")
     
-    await test_bot_transport.register_command("start", handle_command)
-    await test_bot_transport.register_command("status", handle_command)
-    await test_bot_transport.register_command("config", handle_command)
+    await bot.register_command("start", handle_command)
+    await bot.register_command("status", handle_command)
+    await bot.register_command("config", handle_command)
     
     commands = [
         ("/start", []),
@@ -61,8 +61,8 @@ async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, 
     for command, args in commands:
         logger.info(f"[USER] Sending command: {command} with args: {args}")
         try:
-            await user_transport.send(TextFrame(
-                text=f"{command} {' '.join(args)}".strip(),
+            await user.send(TextFrame(
+                content=f"{command} {' '.join(args)}".strip(),
                 metadata=EventMetadata(
                     chat_id=test_group_id,
                     chat_title=test_group_name,
@@ -96,3 +96,66 @@ async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, 
     assert any("[BOT] Received command: /start" in record.message for record in caplog.records)
     assert any("[BOT] Received command: /status" in record.message for record in caplog.records)
     assert any("[BOT] Received command: /config" in record.message for record in caplog.records)
+
+@pytest.mark.asyncio
+async def test_transport_error_propagation(user_transport, bot_transport):
+    """Test that transport errors are properly propagated."""
+    # Get transport instances from async generators
+    user = await anext(user_transport)
+    bot = await anext(bot_transport)
+    
+    # Test sending to invalid chat ID
+    with pytest.raises(Exception):
+        await user.send(TextFrame(
+            content="test message",
+            metadata=EventMetadata(
+                chat_id=-1,  # Invalid chat ID
+                chat_title="Invalid Chat",
+                sender_id=None,
+                sender_name=None,
+                message_id=0
+            )
+        ))
+
+@pytest.mark.asyncio
+async def test_transport_metadata_validation(user_transport, bot_transport):
+    """Test metadata validation in transports."""
+    # Get transport instances from async generators
+    user = await anext(user_transport)
+    bot = await anext(bot_transport)
+    
+    # Test sending without required metadata
+    with pytest.raises(ValueError):
+        await user.send(TextFrame(
+            content="test message",
+            metadata={}  # Missing required fields
+        ))
+
+@pytest.mark.asyncio
+async def test_transport_lifecycle(user_transport, bot_transport):
+    """Test transport lifecycle management."""
+    # Get transport instances from async generators
+    user = await anext(user_transport)
+    bot = await anext(bot_transport)
+    
+    # Test stopping and restarting
+    await user.stop()
+    await bot.stop()
+    
+    await user.start()
+    await bot.start()
+    
+    # Verify transports are working after restart
+    test_group_id = int(os.environ["TELEGRAM_TEST_GROUP_ID"])
+    test_group_name = os.environ["TELEGRAM_TEST_GROUP_NAME"]
+    
+    await user.send(TextFrame(
+        content="test message after restart",
+        metadata=EventMetadata(
+            chat_id=test_group_id,
+            chat_title=test_group_name,
+            sender_id=None,
+            sender_name=None,
+            message_id=0
+        )
+    ))
