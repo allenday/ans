@@ -1,12 +1,11 @@
 """Tests for command processor."""
 import pytest
-from unittest.mock import Mock, AsyncMock, create_autospec
+from unittest.mock import AsyncMock
 from chronicler.commands.processor import CommandProcessor
 from chronicler.commands.frames import CommandFrame
 from chronicler.frames.media import TextFrame
-from chronicler.commands.handlers import CommandHandler
 
-from tests.mocks.storage import storage_mock
+from tests.mocks import command_handler_mock
 
 @pytest.mark.asyncio
 async def test_command_processor_init(storage_mock):
@@ -15,27 +14,26 @@ async def test_command_processor_init(storage_mock):
     assert len(processor._handlers) == 0  # No default handlers
 
 @pytest.mark.asyncio
-async def test_register_handler(storage_mock):
+async def test_register_handler(command_handler_mock):
     """Test handler registration."""
     processor = CommandProcessor()
-    handler = AsyncMock(spec=CommandHandler)
     
-    processor.register_handler("/test", handler)
-    assert processor._handlers["/test"] == handler
+    processor.register_handler("/test", command_handler_mock)
+    assert processor._handlers["/test"] == command_handler_mock
 
 @pytest.mark.asyncio
-async def test_register_handler_duplicate(storage_mock):
+async def test_register_handler_duplicate(command_handler_mock):
     """Test registering duplicate handler."""
     processor = CommandProcessor()
-    handler1 = AsyncMock(spec=CommandHandler)
-    handler2 = AsyncMock(spec=CommandHandler)
+    handler1 = command_handler_mock
+    handler2 = command_handler_mock
     
     processor.register_handler("/test", handler1)
     processor.register_handler("/test", handler2)
     assert processor._handlers["/test"] == handler2
 
 @pytest.mark.asyncio
-async def test_register_handler_validation(storage_mock):
+async def test_register_handler_validation():
     """Test handler registration validation."""
     processor = CommandProcessor()
     handler = AsyncMock()  # Not a CommandHandler
@@ -44,7 +42,7 @@ async def test_register_handler_validation(storage_mock):
         processor.register_handler("/test", handler)
 
 @pytest.mark.asyncio
-async def test_process_non_command_frame(storage_mock):
+async def test_process_non_command_frame():
     """Test processing non-command frame."""
     processor = CommandProcessor()
     frame = TextFrame(text="test", metadata={})
@@ -53,7 +51,7 @@ async def test_process_non_command_frame(storage_mock):
     assert result is None
 
 @pytest.mark.asyncio
-async def test_process_unknown_command(storage_mock):
+async def test_process_unknown_command():
     """Test processing unknown command."""
     processor = CommandProcessor()
     frame = CommandFrame(command="/unknown", metadata={})
@@ -63,12 +61,11 @@ async def test_process_unknown_command(storage_mock):
     assert "Unknown command" in result.text
 
 @pytest.mark.asyncio
-async def test_handler_error(storage_mock):
+async def test_handler_error(command_handler_mock):
     """Test handler error handling."""
     processor = CommandProcessor()
-    handler = AsyncMock(spec=CommandHandler)
-    handler.handle.side_effect = RuntimeError("Test error")
-    processor.register_handler("/test", handler)
+    command_handler_mock.handle.side_effect = RuntimeError("Test error")
+    processor.register_handler("/test", command_handler_mock)
     frame = CommandFrame(command="/test", metadata={})
     
     with pytest.raises(RuntimeError):
