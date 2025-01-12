@@ -57,4 +57,41 @@
   
 ## Known Issues  
 1. Voice messages saved with incorrect extension  
-2. Large files cause memory pressure
+2. Large files cause memory pressure  
+  
+## Test Coverage Metrics  
+  
+### 1. Unit Test Coverage  
+1.1. Configuration:  
+    1.1.1. Tool: pytest-cov  
+    1.1.2. Minimum coverage: 80%  
+    1.1.3. Branch coverage: enabled  
+    1.1.4. Configuration files:  
+       - .coveragerc: Coverage tool configuration  
+       - pytest.ini: Test runner configuration  
+  
+1.2. Metrics Tracked:  
+    1.2.1. Statement coverage  
+    1.2.2. Branch coverage  
+    1.2.3. Missing lines  
+    1.2.4. Excluded patterns  
+  
+1.3. Reports:  
+    1.3.1. Terminal output (--cov-report=term-missing)  
+    1.3.2. HTML report (--cov-report=html)  
+    1.3.3. Location: coverage_html/  
+  
+1.4. Usage:  
+    1.4.1. Run tests with coverage:  
+       ```bash  
+       pytest  
+       ```  
+    1.4.2. View HTML report:  
+       ```bash  
+       open coverage_html/index.html  
+       ```  
+  
+1.5. Maintenance:  
+    1.5.1. Update minimum coverage in pytest.ini  
+    1.5.2. Adjust exclusions in .coveragerc  
+    1.5.3. Review coverage reports in CI/CD
