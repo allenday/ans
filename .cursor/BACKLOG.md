@@ -10,6 +10,7 @@
 1. None  
   
 ### Next Up  
+0. 🕔 deduplicate mock implementations
 1. Implement asynchronous git operations  
    1. Requirements:  
       1. Commit messages on branch-specific schedule  
