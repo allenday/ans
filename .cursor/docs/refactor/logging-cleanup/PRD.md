@@ -6,8 +6,8 @@ Streamline and standardize the operational logging system to reduce technical de
 ## 2. Current State
 2.1. ✅ Multiple logging initialization points with inconsistent configuration - Fixed by centralizing in chronicler.logging
 2.2. ✅ Direct logger instantiation without using the crystalline logging system - Standardized with get_logger
-2.3. 🕔 Inconsistent use of trace_operation decorator
-2.4. 🕔 Missing performance metrics in key components
+2.3. 🕔 Inconsistent use of trace_operation decorator - In progress, storage and transport layers complete
+2.4. ✅ Missing performance metrics in key components - Added via trace_operation decorator
 2.5. 🕔 Redundant and non-standardized log messages
 
 ## 3. Prerequisites
@@ -29,16 +29,16 @@ Streamline and standardize the operational logging system to reduce technical de
     4.1.2.3. ✅ Add component context to all loggers
 
 ### 4.2. Component Updates
-4.2.1. 🕔 Update storage components
-    4.2.1.1. 🕔 Add trace_operation to public methods
-    4.2.1.2. 🕔 Track performance metrics
-    4.2.1.3. 🕔 Standardize error handling
+4.2.1. ✅ Update storage components
+    4.2.1.1. ✅ Add trace_operation to public methods
+    4.2.1.2. ✅ Track performance metrics
+    4.2.1.3. ✅ Standardize error handling
 
-4.2.2. 🕔 Update transport layer
-    4.2.2.1. 🕔 Add correlation ID to all transport operations
-    4.2.2.2. 🕔 Enhance command logging
-    4.2.2.3. 🕔 Track message processing metrics
-    4.2.2.4. 🕔 Standardize error handling
+4.2.2. ✅ Update transport layer
+    4.2.2.1. ✅ Add correlation ID to all transport operations
+    4.2.2.2. ✅ Enhance command logging
+    4.2.2.3. ✅ Track message processing metrics
+    4.2.2.4. ✅ Standardize error handling
 
 4.2.3. 🕔 Update pipeline components
     4.2.3.1. 🕔 Add tracing to Pipeline class
@@ -48,11 +48,11 @@ Streamline and standardize the operational logging system to reduce technical de
 
 ## 5. Success Criteria
 5.1. ✅ All logging initialization flows through chronicler.logging
-5.2. 🕔 All components use trace_operation for public methods
+5.2. 🕔 All components use trace_operation for public methods - Storage and transport complete, pipeline pending
 5.3. ✅ Performance metrics available for all key operations
 5.4. ✅ Consistent log levels and formats across codebase
 5.5. 🕔 No redundant or low-value log messages
-5.6. 🕔 Complete correlation ID coverage for all operations
+5.6. 🕔 Complete correlation ID coverage for all operations - Storage and transport complete, pipeline pending
 
 ## 6. Example Log Format
 ```json
@@ -81,4 +81,10 @@ Streamline and standardize the operational logging system to reduce technical de
 - Added comprehensive test coverage for logging module
 - Implemented error handling in CrystallineFormatter
 - Added performance metrics tracking in trace_operation decorator
-- Fixed component context propagation and log level inheritance 
+- Fixed component context propagation and log level inheritance
+- Added trace_operation to all storage components
+- Added trace_operation to transport layer:
+  - TelegramTransport: message handling, command processing
+  - TelegramUserTransport: frame processing, command handling
+  - Event wrappers: metadata extraction, command parsing
+- Next focus: Adding trace_operation to pipeline components 
