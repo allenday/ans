@@ -43,7 +43,7 @@ class CommandProcessor(BaseProcessor):
             else:
                 logger.warning(f"COMMAND - Unknown command received: {frame.command}")
                 return TextFrame(
-                    text="Unknown command. Available commands: /start, /config, /status",
+                    content="Unknown command. Available commands: /start, /config, /status",
                     metadata=frame.metadata
                 )
             
