@@ -11,6 +11,7 @@ import contextvars
 import uuid
 import traceback
 from datetime import timezone
+import sys
 
 # Context variables for trace propagation
 CORRELATION_ID = contextvars.ContextVar('correlation_id', default=None)
@@ -84,24 +85,18 @@ class CrystallineFormatter(logging.Formatter):
         # Return the JSON string
         return json.dumps(crystal)
 
-def configure_logging(level: str = 'INFO', use_stream_handler: bool = True) -> None:
-    """Configure logging with crystalline structure.
+def configure_logging(level='INFO'):
+    """Configure logging with crystalline formatter."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Clear any existing handlers
+    root_logger.handlers.clear()
     
-    Args:
-        level: Logging level to set
-        use_stream_handler: Whether to add a StreamHandler. Set to False in tests.
-    """
-    root = logging.getLogger()
-    root.setLevel(level)
-    
-    # Remove existing handlers
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
-    
-    # Always use StreamHandler with crystalline formatter
-    handler = logging.StreamHandler()
+    # Create handler that writes to stdout for pytest compatibility
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(CrystallineFormatter())
-    root.addHandler(handler)
+    root_logger.addHandler(handler)
 
 def trace_operation(component: str):
     """Decorator for operation tracing with correlation."""
