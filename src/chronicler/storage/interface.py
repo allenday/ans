@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import json
+import uuid
 from chronicler.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,17 +44,21 @@ class Message:
     """Message data"""
     content: str
     source: str
+    id: str = None
     timestamp: datetime = None
     metadata: Dict[str, Any] = None
     attachments: List['Attachment'] = None
     
     def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4())
         if self.metadata is None:
             self.metadata = {}
         if self.timestamp is None:
             self.timestamp = datetime.utcnow()
         if self.attachments:
             logger.debug("Created message", extra={
+                'message_id': self.id,
                 'source': self.source,
                 'content_length': len(self.content),
                 'attachment_count': len(self.attachments)
