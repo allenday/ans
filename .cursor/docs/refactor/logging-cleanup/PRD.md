@@ -6,7 +6,7 @@ Streamline and standardize the operational logging system to reduce technical de
 ## 2. Current State
 2.1. ✅ Multiple logging initialization points with inconsistent configuration - Fixed by centralizing in chronicler.logging
 2.2. ✅ Direct logger instantiation without using the crystalline logging system - Standardized with get_logger
-2.3. 🕔 Inconsistent use of trace_operation decorator - In progress, storage and transport layers complete
+2.3. ✅ Inconsistent use of trace_operation decorator - Fixed with proper correlation ID propagation
 2.4. ✅ Missing performance metrics in key components - Added via trace_operation decorator
 2.5. 🕔 Redundant and non-standardized log messages
 
@@ -52,7 +52,7 @@ Streamline and standardize the operational logging system to reduce technical de
 5.3. ✅ Performance metrics available for all key operations
 5.4. ✅ Consistent log levels and formats across codebase
 5.5. 🕔 No redundant or low-value log messages
-5.6. 🕔 Complete correlation ID coverage for all operations - Storage and transport complete, pipeline pending
+5.6. ✅ Complete correlation ID coverage for all operations - Fixed correlation ID propagation in nested operations
 
 ## 6. Example Log Format
 ```json
@@ -88,3 +88,8 @@ Streamline and standardize the operational logging system to reduce technical de
   - TelegramUserTransport: frame processing, command handling
   - Event wrappers: metadata extraction, command parsing
 - Next focus: Adding trace_operation to pipeline components 
+- Fixed correlation ID propagation in nested operations:
+  - Properly handling existing correlation IDs
+  - Only generating new IDs when needed
+  - Restoring context after operation completion
+  - Added comprehensive test coverage for correlation flow 

@@ -12,11 +12,15 @@ import uuid
 import traceback
 from datetime import timezone
 import sys
+import time
+import functools
 
 # Context variables for trace propagation
 CORRELATION_ID = contextvars.ContextVar('correlation_id', default=None)
 COMPONENT_ID = contextvars.ContextVar('component_id', default=None)
 OPERATION_ID = contextvars.ContextVar('operation_id', default=None)
+OPERATION_START_TIME = contextvars.ContextVar('operation_start_time', default=None)
+OPERATION_START_MEMORY = contextvars.ContextVar('operation_start_memory', default=None)
 
 def get_logger(name: str, component: Optional[str] = None) -> logging.Logger:
     """Get a logger with crystalline configuration.
@@ -44,55 +48,11 @@ def get_logger(name: str, component: Optional[str] = None) -> logging.Logger:
     return logger
 
 class CrystallineFormatter(logging.Formatter):
-    """Crystalline log formatter that enforces a structured log output."""
+    """A formatter that outputs logs in a crystalline JSON format."""
 
     def format(self, record):
-        """Format the log record into a crystalline structure."""
-        # Format message with args if present
-        try:
-            if record.args:
-                message = record.msg % record.args
-            else:
-                message = record.msg
-        except TypeError:
-            message = record.msg
-
-        # Build base performance metrics
-        performance = {
-            'memory_rss_kb': psutil.Process().memory_info().rss / 1024,
-            'memory_vms_kb': psutil.Process().memory_info().vms / 1024,
-            'cpu_percent': psutil.Process().cpu_percent()
-        }
-
-        # Merge additional performance metrics from extra if present
-        if hasattr(record, 'performance'):
-            performance.update(record.performance)
-
-        # Build crystalline structure
-        crystal = {
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'level': record.levelname,
-            'correlation_id': CORRELATION_ID.get(),
-            'component': COMPONENT_ID.get() or record.name,
-            'operation': OPERATION_ID.get(),
-            'message': message,
-            'location': f"{record.pathname}:{record.lineno}",
-            'performance': performance
-        }
-
-        # Add error details if present
-        if record.exc_info:
-            crystal['error'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
-                'traceback': ''.join(traceback.format_exception(*record.exc_info))
-            }
-
-        # Add additional context if provided
-        if hasattr(record, 'context'):
-            crystal['context'] = record.context
-
-        # Return the JSON string
+        """Format the log record into crystalline JSON."""
+        crystal = _get_crystal_log(record)
         return json.dumps(crystal)
 
 def configure_logging(level='INFO'):
@@ -114,93 +74,153 @@ def configure_logging(level='INFO'):
     root_logger.addHandler(standard_handler)
 
 def trace_operation(component: str):
-    """Decorator for operation tracing with correlation."""
+    """Decorator that traces an operation, propagating correlation ID and component."""
     def decorator(func):
-        @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            correlation_id = CORRELATION_ID.get() or str(uuid.uuid4())
-            operation_id = f"{func.__name__}"
-            
-            CORRELATION_ID.set(correlation_id)
-            COMPONENT_ID.set(component)
-            OPERATION_ID.set(operation_id)
-            
-            logger = logging.getLogger(component)
-            start_time = datetime.utcnow()
-            start_memory = psutil.Process().memory_info().rss
-            
-            try:
-                logger.debug("Operation started", extra={
-                    'context': {'args': args, 'kwargs': kwargs}
-                })
-                result = await func(*args, **kwargs)
-                duration = (datetime.utcnow() - start_time).total_seconds() * 1000
-                memory_delta = (psutil.Process().memory_info().rss - start_memory) / 1024
-                
-                logger.debug("Operation completed", extra={
-                    'context': {
-                        'result': str(result) if result else None,
-                        'memory_delta_kb': memory_delta
-                    },
-                    'performance': {
-                        'duration_ms': duration
-                    }
-                })
-                return result
-                
-            except Exception as e:
-                duration = (datetime.utcnow() - start_time).total_seconds() * 1000
-                memory_delta = (psutil.Process().memory_info().rss - start_memory) / 1024
-                logger.error(f"Operation failed: {str(e)}", 
-                           exc_info=True,
-                           extra={
-                               'context': {'memory_delta_kb': memory_delta},
-                               'performance': {'duration_ms': duration}
-                           })
-                raise
-        
-        @wraps(func)
+        logger = get_logger(func.__module__, component)
+
+        @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
-            correlation_id = CORRELATION_ID.get() or str(uuid.uuid4())
-            operation_id = f"{func.__name__}"
+            # Get the existing correlation ID before we start
+            existing_correlation_id = CORRELATION_ID.get()
             
+            # Only generate a new correlation ID if there isn't one
+            correlation_id = existing_correlation_id or str(uuid.uuid4())
             CORRELATION_ID.set(correlation_id)
+            
+            # Save existing context
+            existing_component = COMPONENT_ID.get()
+            existing_operation = OPERATION_ID.get()
+            
+            # Set new context
             COMPONENT_ID.set(component)
-            OPERATION_ID.set(operation_id)
+            OPERATION_ID.set(func.__name__)
             
-            logger = logging.getLogger(component)
-            start_time = datetime.utcnow()
-            start_memory = psutil.Process().memory_info().rss
-            
+            # Capture start metrics
+            OPERATION_START_TIME.set(time.time())
+            process = psutil.Process()
+            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)
+
             try:
                 logger.debug("Operation started", extra={
-                    'context': {'args': args, 'kwargs': kwargs}
+                    'call_args': str(args),
+                    'call_kwargs': str(kwargs)
                 })
                 result = func(*args, **kwargs)
-                duration = (datetime.utcnow() - start_time).total_seconds() * 1000
-                memory_delta = (psutil.Process().memory_info().rss - start_memory) / 1024
-                
-                logger.debug("Operation completed", extra={
-                    'context': {
-                        'result': str(result) if result else None,
-                        'memory_delta_kb': memory_delta
-                    },
-                    'performance': {
-                        'duration_ms': duration
-                    }
-                })
+                logger.debug("Operation completed")
                 return result
+            finally:
+                # Only clear correlation ID if we generated it
+                if not existing_correlation_id:
+                    CORRELATION_ID.set(None)
+                else:
+                    # Restore the existing correlation ID
+                    CORRELATION_ID.set(existing_correlation_id)
                 
-            except Exception as e:
-                duration = (datetime.utcnow() - start_time).total_seconds() * 1000
-                memory_delta = (psutil.Process().memory_info().rss - start_memory) / 1024
-                logger.error(f"Operation failed: {str(e)}", 
-                           exc_info=True,
-                           extra={
-                               'context': {'memory_delta_kb': memory_delta},
-                               'performance': {'duration_ms': duration}
-                           })
-                raise
-        
+                # Restore previous context
+                COMPONENT_ID.set(existing_component)
+                OPERATION_ID.set(existing_operation)
+                OPERATION_START_TIME.set(None)
+                OPERATION_START_MEMORY.set(None)
+
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            # Get the existing correlation ID before we start
+            existing_correlation_id = CORRELATION_ID.get()
+            
+            # Only generate a new correlation ID if there isn't one
+            correlation_id = existing_correlation_id or str(uuid.uuid4())
+            CORRELATION_ID.set(correlation_id)
+            
+            # Save existing context
+            existing_component = COMPONENT_ID.get()
+            existing_operation = OPERATION_ID.get()
+            
+            # Set new context
+            COMPONENT_ID.set(component)
+            OPERATION_ID.set(func.__name__)
+            
+            # Capture start metrics
+            OPERATION_START_TIME.set(time.time())
+            process = psutil.Process()
+            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)
+
+            try:
+                logger.debug("Operation started", extra={
+                    'call_args': str(args),
+                    'call_kwargs': str(kwargs)
+                })
+                result = await func(*args, **kwargs)
+                logger.debug("Operation completed")
+                return result
+            finally:
+                # Only clear correlation ID if we generated it
+                if not existing_correlation_id:
+                    CORRELATION_ID.set(None)
+                else:
+                    # Restore the existing correlation ID
+                    CORRELATION_ID.set(existing_correlation_id)
+                
+                # Restore previous context
+                COMPONENT_ID.set(existing_component)
+                OPERATION_ID.set(existing_operation)
+                OPERATION_START_TIME.set(None)
+                OPERATION_START_MEMORY.set(None)
+
         return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
-    return decorator 
+
+    return decorator
+
+def _get_performance_metrics():
+    """Get performance metrics from the current context."""
+    start_time = OPERATION_START_TIME.get()
+    start_memory = OPERATION_START_MEMORY.get()
+    if start_time is None or start_memory is None:
+        return {}
+    
+    # Get duration
+    duration = time.time() - start_time
+    
+    # Get memory delta
+    process = psutil.Process()
+    current_memory = process.memory_info().rss / 1024  # Convert to KB
+    memory_delta = current_memory - start_memory
+    
+    metrics = {
+        'duration_ms': int(duration * 1000),
+        'memory_delta_kb': int(memory_delta)
+    }
+    
+    return metrics
+
+def _get_crystal_log(record):
+    """Convert a log record into a crystalline format."""
+    crystal = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'level': record.levelname,
+        'message': record.getMessage(),
+        'location': f"{record.module}:{record.filename}:{record.lineno}",
+        'performance': _get_performance_metrics()
+    }
+
+    # Add correlation ID if present
+    correlation_id = CORRELATION_ID.get()
+    if correlation_id:
+        crystal['correlation_id'] = correlation_id
+
+    # Add component if present
+    component = COMPONENT_ID.get()
+    if component:
+        crystal['component'] = component
+
+    # Add operation if present
+    operation = OPERATION_ID.get()
+    if operation:
+        crystal['operation'] = operation
+
+    # Add extra context if present
+    if hasattr(record, 'call_args'):
+        crystal['call_args'] = record.call_args
+    if hasattr(record, 'call_kwargs'):
+        crystal['call_kwargs'] = record.call_kwargs
+
+    return crystal  # Return dict instead of JSON string 
