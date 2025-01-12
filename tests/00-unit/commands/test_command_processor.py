@@ -8,7 +8,7 @@ from chronicler.frames.media import TextFrame
 from tests.mocks import command_handler_mock
 
 @pytest.mark.asyncio
-async def test_command_processor_init(storage_mock):
+async def test_command_processor_init():
     """Test command processor initialization."""
     processor = CommandProcessor()
     assert len(processor._handlers) == 0  # No default handlers
@@ -47,7 +47,7 @@ async def test_process_non_command_frame():
     processor = CommandProcessor()
     frame = TextFrame(text="test", metadata={})
     
-    result = await processor.process_frame(frame)
+    result = await processor.process(frame)
     assert result is None
 
 @pytest.mark.asyncio

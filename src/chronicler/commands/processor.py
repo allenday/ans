@@ -24,15 +24,15 @@ class CommandProcessor(BaseProcessor):
     @trace_operation('commands.processor')
     async def process(self, frame: Frame) -> Optional[Frame]:
         """Process a frame, routing commands to appropriate handlers."""
-        return await self.process_frame(frame)
-        
-    @trace_operation('commands.processor')
-    async def process_frame(self, frame: Frame) -> Optional[Frame]:
-        """Process a command frame."""
         if not isinstance(frame, CommandFrame):
             self.logger.debug(f"COMMAND - Ignoring non-command frame: {type(frame)}")
             return None
-
+            
+        return await self.process_frame(frame)
+        
+    @trace_operation('commands.processor')
+    async def process_frame(self, frame: CommandFrame) -> Frame:
+        """Process a command frame."""
         command = frame.command
         args = frame.args
         metadata = frame.metadata
@@ -43,17 +43,14 @@ class CommandProcessor(BaseProcessor):
 
         if command not in self._handlers:
             self.logger.error(f"COMMAND - No handler registered for command: {command}")
-            return None
+            return TextFrame(text=f"Unknown command: {command}", metadata=metadata)
 
         handler = self._handlers[command]
         self.logger.debug(f"COMMAND - Using handler {handler.__class__.__name__} for {command}")
 
-        try:
-            result = await handler.handle(frame)
-            return result
-        except Exception as e:
-            self.logger.error(f"COMMAND - Error processing command {command} from user {metadata.get('sender_id', 'unknown')}: {str(e)}")
-            raise
+        # Let exceptions propagate
+        result = await handler.handle(frame)
+        return result
             
     @trace_operation('commands.processor')
     def register_handler(self, command: str, handler: CommandHandler) -> None:
