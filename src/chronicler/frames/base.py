@@ -1,10 +1,10 @@
 """Base frame class for the pipeline."""
-import logging
+from chronicler.logging import get_logger
 from dataclasses import dataclass, field, KW_ONLY
 from typing import Optional, Dict, Any
 from abc import ABC
 
-logger = logging.getLogger(__name__)
+logger = get_logger("chronicler.frames.base")
 
 @dataclass
 class Frame(ABC):

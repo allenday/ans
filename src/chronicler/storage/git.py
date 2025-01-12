@@ -6,16 +6,16 @@ import frontmatter
 from datetime import datetime
 import uuid
 from typing import Generator, Any
-import logging
 import json
 import shutil
+from chronicler.logging import get_logger, trace_operation
 
 from chronicler.storage.interface import (
     StorageAdapter, User, Topic, Message, 
     Attachment
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger("storage.git")
 
 class GitStorageAdapter(StorageAdapter):
     """Git-based storage implementation"""
@@ -23,7 +23,9 @@ class GitStorageAdapter(StorageAdapter):
     MESSAGES_FILE = "messages.jsonl"  # Changed from messages.md
     
     def __init__(self, base_path: Path):
-        logger.info(f"Initializing GitStorageAdapter with base path: {base_path}")
+        logger.info("INIT - GitStorageAdapter", extra={
+            'context': {'base_path': str(base_path)}
+        })
         self.base_path = Path(base_path)
         self._repo = None
         self._user = None
@@ -38,6 +40,7 @@ class GitStorageAdapter(StorageAdapter):
         yield
         return self
     
+    @trace_operation('storage.git')
     async def init_storage(self, user: User) -> 'GitStorageAdapter':
         """Initialize a git repository for the user"""
         logger.info(f"Initializing storage for user {user.id}")
@@ -76,6 +79,7 @@ class GitStorageAdapter(StorageAdapter):
         logger.info(f"Storage initialization complete for user {user.id}")
         return self
     
+    @trace_operation('storage.git')
     async def create_topic(self, topic: Topic, ignore_exists: bool = False) -> None:
         """Create a new topic directory with basic structure"""
         logger.info(f"Creating topic {topic.id} with name '{topic.name}'")
@@ -205,6 +209,7 @@ class GitStorageAdapter(StorageAdapter):
             logger.error(f"Failed to create topic {topic.id}: {e}", exc_info=True)
             raise
     
+    @trace_operation('storage.git')
     async def save_message(self, topic_id: str, message: Message) -> None:
         """Save a message to a topic's messages.jsonl file"""
         logger.info(f"Saving message to topic {topic_id}")
@@ -326,6 +331,7 @@ class GitStorageAdapter(StorageAdapter):
             logger.error(f"Failed to save message to topic {topic_id}: {e}", exc_info=True)
             raise
     
+    @trace_operation('storage.git')
     async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None:
         """Save an attachment to the topic's attachments directory"""
         logger.info(f"Saving attachment {attachment.filename} to topic {topic_id}")
@@ -412,6 +418,7 @@ class GitStorageAdapter(StorageAdapter):
         else:
             logger.debug(f"No data to write for attachment {attachment.id}")
     
+    @trace_operation('storage.git')
     async def sync(self) -> None:
         """Synchronize with remote"""
         logger.info("Syncing with remote repository")
@@ -427,6 +434,7 @@ class GitStorageAdapter(StorageAdapter):
                 logger.error(f"Git sync failed: {e}")
                 raise
     
+    @trace_operation('storage.git')
     def add_remote(self, name: str, url: str) -> None:
         """Add a remote repository"""
         logger.info(f"Adding remote '{name}' with URL: {url}")
@@ -434,6 +442,7 @@ class GitStorageAdapter(StorageAdapter):
             self._repo = Repo(self.repo_path)
         self._repo.create_remote(name, url)
 
+    @trace_operation('storage.git')
     async def set_github_config(self, token: str, repo: str) -> None:
         """Set GitHub configuration"""
         logger.info("Setting GitHub configuration")
