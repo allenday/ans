@@ -25,27 +25,33 @@ Implement a branch-specific development workflow with clear state tracking in Ch
 2.1. ✅ Implement branch-specific workflow initialization
   ```
   .cursor/scratch/{type}/{branch-name}/
-  ├── CHECKLIST.md  # All items start as 🕔
-  └── PRD.md        # From template
+  ├── CHECKLIST.md  # Created from CHECKLIST.template.md, starts as 🕔
+  └── PRD.md        # Created from PRD.template.md
   ```
 2.2. ✅ Add state tracking system (🕔 -> ✅)
-2.3. ✅ Create PRD template at .cursor/PRD.md
+2.3. ✅ Create templates at .cursor/PRD.template.md and .cursor/CHECKLIST.template.md
 2.4. ✅ Add workflow initialization commands
 2.5. ✅ Implement scope-to-PRD conversion
 2.6. ✅ Add branch state persistence
 
 ### Integration Points
 3.1. ✅ Update .cursor/README.md to document new workflow
-3.2. 🕔 Update root README.md to reference .cursor documentation
+3.2. ✅ Update root README.md to reference .cursor documentation
 3.3. ✅ Align with existing git-workflow.md conventions
 3.4. ✅ Ensure compatibility with current development process
 3.5. ✅ Integrate with existing test procedures
-3.6. 🕔 Update related .cursor documentation
-3.7. 🕔 Perform MECE review of all .cursor documentation:
-     - Audit all docs for completeness and overlap
-     - Ensure clear boundaries between docs
-     - Verify consistent cross-referencing
-     - Validate naming conventions
+3.6. ✅ Update related .cursor documentation
+3.7. ✅ Perform MECE review of all .cursor documentation
+   - Audited all documents for completeness and overlap
+   - Ensured clear boundaries between documents
+   - Verified cross-references and naming consistency
+   - Removed redundant docs.md file
+   - Updated all emoji-based patterns for consistency
+3.8. ✅ Rename .cursor/PRD.md to .cursor/PRD.template.md
+3.9. ✅ Rename .cursor/CHECKLIST.md to .cursor/CHECKLIST.template.md
+3.10. ✅ Update docs to reflect te renames in 3.8 and 3.9
+3.11. ✅ Add SESSION.md template for tracking current task and progress between sessions
+3.12. ✅ Update all docs to indicate that `git {mv,rm}` is to be used over `{mv,rm}` for maintaining proper git history
 
 ## Success Criteria
 4.1. AI automatically initializes branch-specific scratch directory

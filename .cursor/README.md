@@ -2,14 +2,14 @@
 
 This directory contains development documentation for the Chronicler project.
 
-## Key Files
+## Key Documentation Files
 
-- `architecture.md`: Overview of the pipeline-based architecture
-- `backlog.md`: Development roadmap and known issues
-- `checklist.md`: **Mandatory** development checklist (must follow for all changes)
-- `conventions.md`: Code style and development conventions
-- `docs.md`: Detailed documentation of components and APIs
-- `git-workflow.md`: Git workflow and branching strategy
+- `ARCHITECTURE.md`: Overview of the pipeline-based architecture
+- `BACKLOG.md`: Development roadmap and known issues
+- `CHECKLIST.template.md`: Template for development checklist (must follow for all changes)
+- `CONVENTIONS.md`: Code style, workflow, and development conventions
+- `IMPLEMENTATION.md`: Detailed documentation of components and APIs
+- `PRD.template.md`: Template for Product Requirements Document
 
 ## Quick Start
 
@@ -38,20 +38,34 @@ This directory contains development documentation for the Chronicler project.
    python -m chronicler.pipeline.pipecat_runner --token YOUR_BOT_TOKEN --storage /path/to/storage
    ```
 
-## Development Flow
+## Branch-Specific Development Flow
 
-**Important**: Follow the [Development Checklist](checklist.md) for ALL changes.
+**Important**: Create a checklist from [CHECKLIST.template.md](.cursor/CHECKLIST.template.md) for ALL changes.
 
-1. Create feature branch
-2. Write tests first (TDD)
-3. Implement changes with:
+1. Create feature branch from develop:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/your-feature-name
+   ```
+2. Initialize branch documentation:
+   ```bash
+   mkdir -p .cursor/scratch/feature/your-feature-name
+   # Use git commands to maintain history
+   git mv .cursor/PRD.template.md .cursor/scratch/feature/your-feature-name/PRD.md
+   git mv .cursor/CHECKLIST.template.md .cursor/scratch/feature/your-feature-name/CHECKLIST.md
+   # Restore the templates
+   git checkout HEAD .cursor/PRD.template.md .cursor/CHECKLIST.template.md
+   ```
+3. Write tests first (TDD)
+4. Implement changes following [CONVENTIONS.md](CONVENTIONS.md) with:
    - Comprehensive logging
    - Exception handling
    - Type hints
    - Docstrings
-4. Run all tests
-5. Review checklist items
-6. Submit PR
+5. Run all tests
+6. Review checklist items
+7. Submit PR to develop branch
 
 ## Scope-Based Development
 
@@ -59,7 +73,7 @@ To start a new development session:
 
 1. Define scope using the following template:
    ```
-   <SCOPE>
+   📋 SCOPE DEFINITION
    GOAL: Clear one-sentence description of the goal
    CONTEXT: Any relevant context or background
    REQUIREMENTS:
@@ -70,7 +84,6 @@ To start a new development session:
    ACCEPTANCE:
    - Acceptance criteria 1
    - Acceptance criteria 2
-   </SCOPE>
    ```
 
 2. The AI will:
@@ -85,27 +98,25 @@ To start a new development session:
    - New requirements MUST go to backlog.md
    - AI will respond to scope creep with:
      ```
-     <SCOPE_CREEP>
-     ORIGINAL_SCOPE: [Brief reminder of original scope]
-     NEW_REQUEST: [What was just requested]
-     RECOMMENDATION: Add to backlog and complete current scope first
-     RATIONALE: [Why this should wait]
-     ACTION: Adding to backlog.md under Future Work
-     </SCOPE_CREEP>
+     🛑 STOP: Scope deviation detected
+     While implementing requirement X.Y (Description)
+     Found: [What was discovered]
+     Recommendation: Add to BACKLOG.md - [Reason]
      ```
    - Scope changes require explicit approval:
      ```
-     <SCOPE_CHANGE>
-     IMPACT: [What would change]
-     RISKS: [What could go wrong]
-     TIMELINE: [How it affects delivery]
-     APPROVE?: [y/n]
-     </SCOPE_CHANGE>
+     🚨 SCOPE CHANGE REQUESTED
+     Current: Requirement X.Y (Description)
+     Change: [What needs to change]
+     Impact: [What would change]
+     Risks: [What could go wrong]
+     Timeline: [How it affects delivery]
+     Proceed? [y/n]
      ```
 
 4. Example scope:
    ```
-   <SCOPE>
+   📋 SCOPE DEFINITION
    GOAL: Add support for video note messages in Telegram
    CONTEXT: Video notes are circular, short video messages
    REQUIREMENTS:
@@ -119,10 +130,10 @@ To start a new development session:
    - Video notes saved with correct format
    - Thumbnails saved separately
    - Duration preserved in metadata
-   </SCOPE>
    ```
 
-## Key Components
+## Core Components
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
 
 - `pipeline/`: Core pipeline architecture
 - `processors/`: Message processors
@@ -130,7 +141,8 @@ To start a new development session:
 - `transports/`: I/O handlers
 
 ## Testing Strategy
+See [CONVENTIONS.md](CONVENTIONS.md) for detailed testing guidelines.
 
 - Unit tests: Test components in isolation
 - Mock tests: Test integration with mocked services
-- Live tests: Test with real external services 
+- Live tests: Test with real external services
