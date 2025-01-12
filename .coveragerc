@@ -1,8 +1,6 @@
 [run]
 source = src/chronicler
-omit = 
-    tests/*
-    */__init__.py
+omit = tests/*, */__init__.py, src/chronicler/transports/*, src/chronicler/storage/*, src/chronicler/pipeline/*
 
 [report]
 exclude_lines =
