@@ -92,7 +92,7 @@ Systematic implementation of operational logging across the project to improve o
    8.4.6. 🕔 Operational logging coverage (TBD how to measure)
    8.4.7. 🕔 Cyclomatic complexity metrics
 8.5. ✅ Identify and eliminate the .cursor/ documentation bug that is preventing agent from automatically:
-   8.5.1. ✅ Updating PRD.md or CHECKLIST.md when completing an item.
+   8.5.1. 🕔 Updating PRD.md or CHECKLIST.md when completing an item.
    8.5.2. ✅ Creating git add/commit for each bullet being completed from CHECKLIST.md and/or PRD.md
 8.6. ✅ I propose that all documents in .cursor/ use numbered sections and items and refrain from using bullets. Lead by example how we want all docs to be formatted.
 8.7. 🕔 find and excise bug allowing "rm" to be used instead of "git rm", likewise for "mv" instead of "git mv".
