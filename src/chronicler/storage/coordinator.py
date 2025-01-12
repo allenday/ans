@@ -2,6 +2,7 @@
 from pathlib import Path
 import logging
 from typing import Dict, Any, List, Optional
+from datetime import datetime
 
 from chronicler.storage.interface import User, Topic, Message, Attachment, StorageAdapter
 from chronicler.storage.git import GitStorageAdapter
@@ -21,7 +22,20 @@ class StorageCoordinator(StorageAdapter):
         self.fs = FileSystemStorage(repo_path)
         self.serializer = MessageSerializer()
         self.telegram = TelegramAttachmentHandler()
+        self._initialized = False
+        self._metadata = None
         logger.debug("COORD - All components initialized")
+        
+    @property
+    def metadata(self) -> dict:
+        """Get the current metadata."""
+        if self._metadata is None:
+            metadata_path = self.repo_path / "metadata.yaml"
+            if metadata_path.exists():
+                self._metadata = self.serializer.read_metadata(metadata_path)
+            else:
+                self._metadata = {}
+        return self._metadata
         
     async def init_storage(self, user: User) -> None:
         """Initialize storage system."""
@@ -30,7 +44,7 @@ class StorageCoordinator(StorageAdapter):
             
             # Initialize Git repository
             logger.debug("COORD - Initializing Git repository")
-            await self.git.init_repo()
+            await self.git.init_storage(user)
             
             # Create and commit initial metadata
             logger.debug("COORD - Creating initial metadata")
@@ -49,55 +63,62 @@ class StorageCoordinator(StorageAdapter):
             await self.git.stage_files(['metadata.yaml'])
             await self.git.commit_changes("Initial commit")
             
+            self._initialized = True
             logger.info("COORD - Storage initialization completed successfully")
         except Exception as e:
             logger.error(f"COORD - Failed to initialize storage: {e}", exc_info=True)
             raise
         
-    async def create_topic(self, topic: Topic) -> str:
+    async def create_topic(self, topic_id: str, title: str) -> None:
         """Create a new topic."""
         try:
-            logger.info(f"COORD - Creating topic: {topic.name} (ID: {topic.id})")
+            logger.info(f"COORD - Creating topic: {title} (ID: {topic_id})")
             
             # Read and update metadata
             logger.debug("COORD - Updating metadata")
             metadata_path = self.repo_path / "metadata.yaml"
-            metadata = self.serializer.read_metadata(metadata_path)
+            metadata = self.metadata
             
             # Update metadata with topic info
-            metadata = self.serializer.update_topic_metadata(
-                metadata=metadata,
-                topic_name=topic.name,
-                topic_id=topic.id,
-                source=topic.metadata['source'],
-                group_id=topic.metadata['chat_id'],
-                topic_metadata=topic.metadata
-            )
+            if 'topics' not in metadata:
+                metadata['topics'] = {}
+            
+            metadata['topics'][topic_id] = {
+                'name': title,
+                'created_at': datetime.utcnow().isoformat()
+            }
             
             # Write updated metadata
             self.serializer.write_metadata(metadata_path, metadata)
+            self._metadata = metadata
             
             # Create topic directory
             logger.debug("COORD - Creating topic directory")
-            topic_path = self.fs.get_topic_path(
-                source=topic.metadata['source'],
-                group_id=topic.metadata['chat_id'],
-                topic_id=topic.id
-            )
+            topic_path = self.repo_path / "topics" / str(topic_id)
+            topic_path.mkdir(parents=True, exist_ok=True)
+            
+            # Create messages file
+            messages_file = topic_path / "messages.jsonl"
+            messages_file.touch()
             
             # Stage and commit changes
             logger.debug("COORD - Committing topic creation")
-            await self.git.stage_files(['metadata.yaml'])
-            await self.git.commit_changes(f"Created topic: {topic.name}")
+            await self.git.stage_files(['metadata.yaml', str(messages_file.relative_to(self.repo_path))])
+            await self.git.commit_changes(f"Created topic: {title}")
             
-            logger.info(f"COORD - Successfully created topic: {topic.id}")
-            return topic.id
+            logger.info(f"COORD - Successfully created topic: {topic_id}")
         except Exception as e:
             logger.error(f"COORD - Failed to create topic: {e}", exc_info=True)
             raise
         
-    async def save_message(self, topic_id: str, message: Message) -> None:
-        """Save a message and its attachments."""
+    async def save_message(self, topic_id: str, message: Message) -> tuple[str, list[str]]:
+        """Save a message and its attachments.
+        
+        Returns:
+            tuple[str, list[str]]: A tuple containing:
+                - The path to the saved message file
+                - A list of paths to saved attachments
+        """
         try:
             logger.info(f"COORD - Saving message to topic {topic_id}")
             
@@ -147,7 +168,8 @@ class StorageCoordinator(StorageAdapter):
             
             # Stage and commit all changes
             logger.debug("COORD - Committing changes")
-            files_to_commit = [str(messages_file.relative_to(self.repo_path))] + attachment_paths
+            message_path = str(messages_file.relative_to(self.repo_path))
+            files_to_commit = [message_path] + attachment_paths
             await self.git.stage_files(files_to_commit)
             
             commit_msg = f"Added message to topic {topic_id}"
@@ -156,10 +178,11 @@ class StorageCoordinator(StorageAdapter):
             await self.git.commit_changes(commit_msg)
             
             logger.info(f"COORD - Successfully saved message to topic {topic_id}")
+            return message_path, attachment_paths
         except Exception as e:
             logger.error(f"COORD - Failed to save message: {e}", exc_info=True)
-            raise 
-
+            raise
+        
     async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None:
         """Save an attachment for a message."""
         try:
@@ -206,3 +229,12 @@ class StorageCoordinator(StorageAdapter):
         except Exception as e:
             logger.error(f"COORD - Failed to set GitHub config: {e}", exc_info=True)
             raise 
+
+    def is_initialized(self) -> bool:
+        """Check if storage is initialized."""
+        return self._initialized and self.repo_path.exists() and (self.repo_path / "metadata.yaml").exists() 
+
+    async def has_topic(self, topic_id: str) -> bool:
+        """Check if a topic exists."""
+        logger.debug(f"COORD - Checking if topic {topic_id} exists")
+        return topic_id in self.metadata.get('topics', {}) 
