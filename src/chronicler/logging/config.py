@@ -93,10 +93,15 @@ def configure_logging(level='INFO'):
     # Clear any existing handlers
     root_logger.handlers.clear()
     
-    # Create handler that writes to stdout for pytest compatibility
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(CrystallineFormatter())
-    root_logger.addHandler(handler)
+    # Create handler for JSON output to stdout
+    json_handler = logging.StreamHandler(sys.stdout)
+    json_handler.setFormatter(CrystallineFormatter())
+    root_logger.addHandler(json_handler)
+    
+    # Create standard handler for caplog compatibility
+    standard_handler = logging.StreamHandler(sys.stderr)
+    standard_handler.setFormatter(logging.Formatter('%(levelname)s    %(name)s:%(filename)s:%(lineno)d %(message)s'))
+    root_logger.addHandler(standard_handler)
 
 def trace_operation(component: str):
     """Decorator for operation tracing with correlation."""
