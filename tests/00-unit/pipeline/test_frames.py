@@ -13,14 +13,14 @@ from chronicler.frames import (
 
 def test_text_frame_creation():
     """Test text frame creation."""
-    frame = TextFrame(text="test message", metadata={})
+    frame = TextFrame(content="test message", metadata={})
     assert isinstance(frame, Frame)
-    assert frame.text == "test message"
+    assert frame.content == "test message"
 
 def test_text_frame_validation():
     """Test text frame validation."""
     with pytest.raises(TypeError):
-        TextFrame(text=123, metadata={})
+        TextFrame(content=123, metadata={})
 
 def test_image_frame_creation():
     """Test image frame creation."""
@@ -143,13 +143,13 @@ def test_sticker_frame_validation():
 def test_frame_metadata():
     """Test frame metadata handling."""
     metadata = {"user_id": 123, "chat_id": 456}
-    frame = TextFrame(text="test", metadata=metadata)
+    frame = TextFrame(content="test", metadata=metadata)
     assert frame.metadata == metadata
 
 def test_frame_inheritance():
     """Test frame inheritance hierarchy."""
     frames = [
-        TextFrame(text="test", metadata={}),
+        TextFrame(content="test", metadata={}),
         ImageFrame(content=b"test", size=(100, 100), format="jpeg", metadata={}),
         DocumentFrame(content=b"test", filename="test.txt", mime_type="text/plain", metadata={}),
         AudioFrame(content=b"test", duration=60, mime_type="audio/mp3", metadata={}),
