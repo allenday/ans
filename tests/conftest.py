@@ -65,6 +65,8 @@ def test_user():
 def setup_logging():
     """Configure logging for all tests."""
     configure_logging(level='DEBUG')
+    # Set root logger level to ensure all logs are captured
+    logging.getLogger().setLevel(logging.DEBUG)
     yield
 
 # Mock fixtures

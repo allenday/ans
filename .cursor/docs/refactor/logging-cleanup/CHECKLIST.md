@@ -35,7 +35,7 @@
 
 3.1.3. 🕔 Implement trace_operation
   3.1.3.1. ✅ Add to storage coordinator
-  3.1.3.2. 🕔 Add to transport layer
+  3.1.3.2. ✅ Add to transport layer
   3.1.3.3. 🕔 Add to command chain
   3.1.3.4. 🕔 Verify correlation flow
 
@@ -65,11 +65,11 @@
   3.3.1.3. ✅ MessageSerializer
   3.3.1.4. ✅ AttachmentHandler
 
-3.3.2. 🕔 Transport Layer
-  3.3.2.1. 🕔 Add correlation IDs
-  3.3.2.2. 🕔 Enhance command logs
-  3.3.2.3. 🕔 Add performance tracking
-  3.3.2.4. 🕔 Standardize errors
+3.3.2. ✅ Transport Layer
+  3.3.2.1. ✅ Add correlation IDs
+  3.3.2.2. ✅ Enhance command logs
+  3.3.2.3. ✅ Add performance tracking
+  3.3.2.4. ✅ Standardize errors
 
 3.3.3. 🕔 Pipeline Components
   3.3.3.1. 🕔 Update Pipeline class
@@ -111,4 +111,5 @@
 - Fixed component context propagation and log level inheritance
 - Standardized logger acquisition with get_logger function
 - Added trace_operation to all storage components
-- Next focus: Adding trace_operation to transport layer 
+- Added trace_operation to transport layer components
+- Next focus: Adding trace_operation to command chain 

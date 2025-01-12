@@ -15,7 +15,7 @@ from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame
 from chronicler.frames.command import CommandFrame
 from chronicler.transports.base import BaseTransport
 from chronicler.transports.events import TelethonEvent, TelegramBotEvent, EventMetadata
-from chronicler.logging import configure_logging, get_logger
+from chronicler.logging import get_logger, trace_operation
 
 logger = get_logger("chronicler.transports.telegram")
 
@@ -30,28 +30,33 @@ class TelegramTransportBase(BaseTransport, ABC):
         self._error_count = 0
     
     @abstractmethod
+    @trace_operation('transport.telegram.base')
     async def start(self):
         """Start the transport."""
         self._start_time = time.time()
         logger.info("Starting transport")
     
     @abstractmethod
+    @trace_operation('transport.telegram.base')
     async def stop(self):
         """Stop the transport."""
         uptime = time.time() - (self._start_time or time.time())
         logger.info(f"Stopping transport. Stats: uptime={uptime:.2f}s, messages={self._message_count}, commands={self._command_count}, errors={self._error_count}")
     
     @abstractmethod
+    @trace_operation('transport.telegram.base')
     async def process_frame(self, frame: Frame):
         """Process a frame."""
         pass
     
     @abstractmethod
+    @trace_operation('transport.telegram.base')
     async def send(self, frame: Frame) -> Optional[Frame]:
         """Send a frame."""
         pass
     
     @abstractmethod
+    @trace_operation('transport.telegram.base')
     async def register_command(self, command: str, handler: callable):
         """Register a command handler.
         
@@ -101,6 +106,7 @@ class TelegramUserTransport(TelegramTransportBase):
         self._event_handler = None  # Store the event handler
         logger.debug("[USER] Telethon client initialized with session_name=%s", session_name)
     
+    @trace_operation('transport.telegram.user')
     async def start(self):
         """Start the Telethon client."""
         await super().start()
@@ -155,6 +161,7 @@ class TelegramUserTransport(TelegramTransportBase):
             logger.error(f"[USER] Error starting TelegramUserTransport: {str(e)}", exc_info=True)
             raise
     
+    @trace_operation('transport.telegram.user')
     async def stop(self):
         """Stop the Telethon client."""
         await super().stop()
@@ -162,6 +169,7 @@ class TelegramUserTransport(TelegramTransportBase):
         await self.client.disconnect()
         logger.info("[USER] TelegramUserTransport stopped")
     
+    @trace_operation('transport.telegram.user')
     async def process_frame(self, frame: Frame):
         """Process a frame using Telethon client."""
         logger.debug(f"[USER] Processing frame of type {type(frame).__name__}")
@@ -211,6 +219,7 @@ class TelegramUserTransport(TelegramTransportBase):
             logger.error(f"[USER] Error processing frame: {str(e)}", exc_info=True)
             raise
     
+    @trace_operation('transport.telegram.user')
     async def send(self, frame: Frame) -> Optional[Frame]:
         """Send a frame using Telethon client and return updated frame with message ID."""
         logger.debug(f"[USER] Sending frame of type {type(frame).__name__}")
@@ -284,6 +293,7 @@ class TelegramUserTransport(TelegramTransportBase):
             logger.error(f"[USER] Error sending frame: {str(e)}", exc_info=True)
             raise
     
+    @trace_operation('transport.telegram.user')
     async def register_command(self, command: str, handler: callable):
         """Register a command handler.
         

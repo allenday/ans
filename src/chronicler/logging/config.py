@@ -29,8 +29,18 @@ def get_logger(name: str, component: Optional[str] = None) -> logging.Logger:
         Configured logger instance
     """
     logger = logging.getLogger(name)
+    
+    # Set component context only if explicitly provided
     if component:
         COMPONENT_ID.set(component)
+    else:
+        # Reset any existing component context
+        COMPONENT_ID.set(None)
+    
+    # Ensure logger inherits level from root if not explicitly set
+    if logger.level == logging.NOTSET:
+        logger.setLevel(logging.getLogger().level)
+    
     return logger
 
 class CrystallineFormatter(logging.Formatter):

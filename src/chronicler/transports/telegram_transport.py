@@ -7,7 +7,7 @@ from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, StickerFrame, AudioFrame, VoiceFrame
 from chronicler.transports.base import BaseTransport
 from chronicler.commands.frames import CommandFrame
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 
 logger = get_logger(__name__, component="telegram_transport")
 
@@ -34,6 +34,7 @@ class TelegramTransport(BaseTransport):
         ))
         logger.debug("Added message handler for all message types")
     
+    @trace_operation('transport.telegram')
     async def start(self):
         """Start the Telegram bot and message handling."""
         logger.info("Starting Telegram transport")
@@ -49,6 +50,7 @@ class TelegramTransport(BaseTransport):
         await self.app.updater.start_polling(drop_pending_updates=False, allowed_updates=['message'])
         logger.info("Polling started - bot is ready to receive messages")
     
+    @trace_operation('transport.telegram')
     async def stop(self):
         """Stop the Telegram bot."""
         logger.info("Stopping Telegram transport")
@@ -95,6 +97,7 @@ class TelegramTransport(BaseTransport):
             'date': reply_message.date.isoformat() if reply_message.date else None
         }
 
+    @trace_operation('transport.telegram')
     async def _handle_message(self, update: Update, context):
         """Log and convert Telegram messages to frames."""
         # Determine all possible message types present
@@ -553,15 +556,18 @@ class TelegramTransport(BaseTransport):
         else:
             logger.info(f"{chat_info} Received unsupported message types: {message_types}")
             
+    @trace_operation('transport.telegram')
     async def process_frame(self, frame: Frame):
         """Process frames (not used in this transport as it's input-only)."""
         logger.debug(f"Ignoring incoming frame of type {type(frame)}")
 
+    @trace_operation('transport.telegram')
     async def send(self, frame: Frame) -> Optional[Frame]:
         """Send a frame through the transport (not implemented as this is input-only)."""
         logger.debug(f"Send not implemented for frame type {type(frame)}")
         return None
 
+    @trace_operation('transport.telegram')
     async def _handle_command(self, update: Update, context) -> None:
         """Handle bot commands."""
         logger.info(f"Received command: {update.message.text}")
