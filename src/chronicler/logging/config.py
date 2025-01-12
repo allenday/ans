@@ -98,16 +98,10 @@ def configure_logging(level: str = 'INFO', use_stream_handler: bool = True) -> N
     for handler in root.handlers[:]:
         root.removeHandler(handler)
     
-    # Add handler with crystalline formatter
-    if use_stream_handler:
-        handler = logging.StreamHandler()
-        handler.setFormatter(CrystallineFormatter())
-        root.addHandler(handler)
-    else:
-        # In test environment, use NullHandler to allow caplog to work
-        handler = logging.NullHandler()
-        handler.setFormatter(CrystallineFormatter())
-        root.addHandler(handler)
+    # Always use StreamHandler with crystalline formatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(CrystallineFormatter())
+    root.addHandler(handler)
 
 def trace_operation(component: str):
     """Decorator for operation tracing with correlation."""

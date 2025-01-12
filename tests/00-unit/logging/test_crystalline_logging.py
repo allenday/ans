@@ -17,7 +17,7 @@ from chronicler.logging import (
 def test_logging_configuration(caplog):
     """Test basic logging configuration."""
     caplog.set_level(logging.DEBUG)
-    configure_logging(level='DEBUG', use_stream_handler=False)
+    configure_logging(level='DEBUG')
     logger = get_logger('test')
     
     test_message = "Test log message"
@@ -40,7 +40,7 @@ def test_logging_configuration(caplog):
 def test_error_logging(caplog):
     """Test error logging with exception details."""
     caplog.set_level(logging.DEBUG)
-    configure_logging(level='DEBUG', use_stream_handler=False)
+    configure_logging(level='DEBUG')
     logger = get_logger('test')
     
     try:
@@ -83,7 +83,7 @@ async def test_operation_tracing():
 def test_context_enrichment(caplog):
     """Test log enrichment with context data."""
     caplog.set_level(logging.DEBUG)
-    configure_logging(level='DEBUG', use_stream_handler=False)
+    configure_logging(level='DEBUG')
     logger = get_logger('test')
     
     context_data = {"user": "test_user", "action": "test_action"}
@@ -100,7 +100,7 @@ def test_context_enrichment(caplog):
 def test_performance_metrics(caplog):
     """Test performance metrics in logs."""
     caplog.set_level(logging.DEBUG)
-    configure_logging(level='DEBUG', use_stream_handler=False)
+    configure_logging(level='DEBUG')
     logger = get_logger('test')
     
     custom_metrics = {
