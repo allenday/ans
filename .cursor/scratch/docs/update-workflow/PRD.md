@@ -26,7 +26,7 @@ Implement a branch-specific development workflow with clear state tracking in Ch
   ```
   .cursor/scratch/{type}/{branch-name}/
   ├── CHECKLIST.md  # All items start as 🕔
-  └── PRD.md        # Generated from <SCOPE>
+  └── PRD.md        # From template
   ```
 2.2. ✅ Add state tracking system (🕔 -> ✅)
 2.3. ✅ Create PRD template at .cursor/PRD.md
