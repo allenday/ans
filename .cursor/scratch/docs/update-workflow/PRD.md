@@ -35,12 +35,17 @@ Implement a branch-specific development workflow with clear state tracking in Ch
 2.6. ✅ Add branch state persistence
 
 ### Integration Points
-3.1. 🕔 Update .cursor/README.md to document new workflow
+3.1. ✅ Update .cursor/README.md to document new workflow
 3.2. 🕔 Update root README.md to reference .cursor documentation
 3.3. 🕔 Align with existing git-workflow.md conventions
 3.4. 🕔 Ensure compatibility with current development process
 3.5. 🕔 Integrate with existing test procedures
 3.6. 🕔 Update related .cursor documentation
+3.7. 🕔 Perform MECE review of all .cursor documentation:
+     - Audit all docs for completeness and overlap
+     - Ensure clear boundaries between docs
+     - Verify consistent cross-referencing
+     - Validate naming conventions
 
 ## Success Criteria
 4.1. AI automatically initializes branch-specific scratch directory
