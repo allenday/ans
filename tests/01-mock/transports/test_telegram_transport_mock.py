@@ -1,8 +1,6 @@
 """Mock tests for Telegram transports."""
 import pytest
-from unittest.mock import AsyncMock, Mock, patch, call
-from telegram.ext import CommandHandler, Application
-from telethon import events
+from unittest.mock import Mock, patch
 
 from chronicler.frames import TextFrame, ImageFrame, DocumentFrame, CommandFrame
 from chronicler.transports.telegram_factory import (
@@ -10,92 +8,27 @@ from chronicler.transports.telegram_factory import (
     TelegramBotTransport
 )
 from chronicler.transports.events import TelegramBotEvent, EventMetadata
+from tests.mocks.transports import create_mock_telethon, create_mock_telegram_bot
 
 @pytest.fixture
 def mock_telethon():
     """Mock Telethon client."""
     with patch('chronicler.transports.telegram_factory.TelegramClient') as mock:
-        client = AsyncMock()
-        client.connect = AsyncMock()
-        client.is_user_authorized = AsyncMock(return_value=True)
-        client.start = AsyncMock()
-        client.disconnect = AsyncMock()
-        client.send_message = AsyncMock()
-        client.send_file = AsyncMock()
-        
-        # Mock event registration
-        event_handler = None
-        def on_mock(event_type):
-            nonlocal event_handler
-            def register_handler(handler):
-                nonlocal event_handler
-                event_handler = handler
-                # Create a simple async mock that stores the handler
-                mock_handler = AsyncMock()
-                mock_handler.__real_handler__ = handler
-                return mock_handler
-            return register_handler
-        client.on = Mock(side_effect=on_mock)
+        client = create_mock_telethon()
         mock.return_value = client
-        
-        # Store event handler for testing
-        mock.event_handler = lambda: event_handler
         yield mock
 
 @pytest.fixture
 def mock_telegram_bot():
-    """Mock python-telegram-bot with async methods."""
+    """Mock python-telegram-bot Application."""
     with patch('chronicler.transports.telegram_factory.Application') as mock:
-        app = AsyncMock()
-        app.initialize = AsyncMock()
-        app.start = AsyncMock()
-        app.stop = AsyncMock()
-        app.updater = AsyncMock()
-        app.updater.start_polling = AsyncMock()
-        app.updater.stop = AsyncMock()
-        app.bot = AsyncMock()
-        app.bot.send_message = AsyncMock()
-        app.bot.send_photo = AsyncMock()
-        app.bot.send_document = AsyncMock()
-        app.running = True
-        
-        # Mock command handler registration
-        command_handler = None
-        def add_handler_mock(handler):
-            nonlocal command_handler
-            command_handler = handler
-            # Get the command name from the handler's arguments
-            command_name = next(iter(handler.commands))
-            # Create a wrapper function that will be called by the test
-            async def wrapper(update, context):
-                wrapped_event = TelegramBotEvent(update, context)
-                command = wrapped_event.get_command()
-                metadata = wrapped_event.get_metadata()
-                frame = CommandFrame(
-                    command=command,
-                    args=wrapped_event.get_command_args(),
-                    metadata=metadata
-                )
-                # Get the transport's command handler
-                transport = mock.get_transport()
-                if transport and command in transport._command_handlers:
-                    await transport._command_handlers[command](frame)
-            # Create a simple async mock that stores the wrapper
-            mock_callback = AsyncMock()
-            mock_callback.__real_handler__ = wrapper
-            command_handler.callback = mock_callback
-        app.add_handler = Mock(side_effect=add_handler_mock)
+        app = create_mock_telegram_bot()
         
         # Mock application builder
-        builder = AsyncMock()
+        builder = Mock()
         builder.token = Mock(return_value=Mock(build=Mock(return_value=app)))
         mock.builder = Mock(return_value=builder)
         
-        # Store command handler for testing
-        mock.command_handler = lambda: command_handler
-        # Store transport instance
-        mock.set_transport = lambda t: setattr(mock, '_transport', t)
-        mock.get_transport = lambda: getattr(mock, '_transport', None)
         yield mock
 
 @pytest.mark.asyncio
