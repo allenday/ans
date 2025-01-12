@@ -1,87 +1,61 @@
 # Logging Technical Debt Cleanup PRD
 
-## Overview
+## 1. Overview
 Streamline and standardize the operational logging system to reduce technical debt, improve observability, and ensure consistent logging practices across all components.
 
-## Current State
-0.1. Multiple logging initialization points with inconsistent configuration
-0.2. Direct logger instantiation without using the crystalline logging system
-0.3. Inconsistent use of trace_operation decorator
-0.4. Missing performance metrics in key components
-0.5. Redundant and non-standardized log messages
+## 2. Current State
+2.1. 🕔 Multiple logging initialization points with inconsistent configuration
+2.2. 🕔 Direct logger instantiation without using the crystalline logging system
+2.3. 🕔 Inconsistent use of trace_operation decorator
+2.4. 🕔 Missing performance metrics in key components
+2.5. 🕔 Redundant and non-standardized log messages
 
-## Prerequisites
-P.1. 🕔 Create feature branch: logging-cleanup
-P.2. 🕔 Initialize documentation structure in .cursor/scratch/docs/logging-cleanup/
+## 3. Prerequisites
+3.1. 🕔 Create feature branch: logging-cleanup
+3.2. 🕔 Initialize documentation structure in .cursor/docs/refactor/logging-cleanup/
 
-## Requirements
+## 4. Requirements
 
-### Core Updates
-1.1. 🕔 Centralize logging initialization
-    - Move all logging configuration to chronicler/__init__.py
-    - Remove redundant logging.basicConfig calls
-    - Ensure consistent formatter usage
-    - Set up proper log levels
+### 4.1. Core Updates
+4.1.1. 🕔 Centralize logging initialization
+    4.1.1.1. 🕔 Move all logging configuration to chronicler/__init__.py
+    4.1.1.2. 🕔 Remove redundant logging.basicConfig calls
+    4.1.1.3. 🕔 Ensure consistent formatter usage
+    4.1.1.4. 🕔 Set up proper log levels
 
-1.2. 🕔 Standardize logger acquisition
-    - Replace direct logging.getLogger calls with chronicler.logging import
-    - Ensure consistent naming convention for loggers
-    - Add component context to all loggers
+4.1.2. 🕔 Standardize logger acquisition
+    4.1.2.1. 🕔 Replace direct logging.getLogger calls with chronicler.logging import
+    4.1.2.2. 🕔 Ensure consistent naming convention for loggers
+    4.1.2.3. 🕔 Add component context to all loggers
 
-1.3. 🕔 Implement trace_operation consistently
-    - Add tracing to all public methods in storage.coordinator
-    - Add tracing to transport layer operations
-    - Add tracing to command processing chain
-    - Ensure correlation ID propagation
+### 4.2. Component Updates
+4.2.1. 🕔 Update storage components
+    4.2.1.1. 🕔 Add trace_operation to public methods
+    4.2.1.2. 🕔 Track performance metrics
+    4.2.1.3. 🕔 Standardize error handling
 
-### Code Cleanup
-2.1. 🕔 Clean up redundant logging
-    - Remove debug logs that don't add value
-    - Standardize log messages
-    - Ensure proper log levels
-    - Add structured context where missing
+4.2.2. 🕔 Update transport layer
+    4.2.2.1. 🕔 Add correlation ID to all transport operations
+    4.2.2.2. 🕔 Enhance command logging
+    4.2.2.3. 🕔 Track message processing metrics
+    4.2.2.4. 🕔 Standardize error handling
 
-2.2. 🕔 Enhance error logging
-    - Add exception context to all error logs
-    - Ensure stack traces are captured
-    - Add error categorization
-    - Standardize error message format
+4.2.3. 🕔 Update pipeline components
+    4.2.3.1. 🕔 Add tracing to Pipeline class
+    4.2.3.2. 🕔 Enhance Frame logging
+    4.2.3.3. 🕔 Add performance metrics
+    4.2.3.4. 🕔 Standardize error handling
 
-2.3. 🕔 Improve performance logging
-    - Add duration tracking to storage operations
-    - Add metrics for transport operations
-    - Track command processing times
-    - Monitor resource usage
+## 5. Success Criteria
+5.1. 🕔 All logging initialization flows through chronicler.logging
+5.2. 🕔 All components use trace_operation for public methods
+5.3. 🕔 Performance metrics available for all key operations
+5.4. 🕔 Consistent log levels and formats across codebase
+5.5. 🕔 No redundant or low-value log messages
+5.6. 🕔 Complete correlation ID coverage for all operations
 
-### Integration Points
-3.1. 🕔 Update storage components
-    - Standardize logging in GitStorageAdapter
-    - Add performance metrics to FileSystemStorage
-    - Enhance error logging in MessageSerializer
-    - Add tracing to TelegramAttachmentHandler
-
-3.2. 🕔 Update transport layer
-    - Add correlation ID to all transport operations
-    - Enhance command logging
-    - Track message processing metrics
-    - Standardize error handling
-
-3.3. 🕔 Update pipeline components
-    - Add tracing to Pipeline class
-    - Enhance Frame logging
-    - Add performance metrics
-    - Standardize error handling
-
-## Success Criteria
-4.1. All logging initialization flows through chronicler.logging
-4.2. All components use trace_operation for public methods
-4.3. Performance metrics available for all key operations
-4.4. Consistent log levels and formats across codebase
-4.5. No redundant or low-value log messages
-4.6. Complete correlation ID coverage for all operations
-
-```
-# Example of target logging pattern:
+## 6. Example Log Format
+```json
 {
     "timestamp": "2024-01-12T08:45:23.456Z",
     "level": "INFO",
