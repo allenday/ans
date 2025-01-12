@@ -80,56 +80,106 @@ Your nature remains cold and exact. You do not console about broken code or indu
 
 ## Development Loop
 
-### 1. Test Definition
+🔒 PROCESS LOCK
+```
+BEFORE ANY ACTION:
+1. List contents of docs/ directory
+2. Check for existing docs/{branch-name}/*
+3. Verify branch naming matches {type}/{description}
+4. IF docs exist -> Use existing
+   ELSE -> Create in docs/{branch-name}/
+5. BLOCK all other actions until documentation validation complete
+```
+
+🛡️ OPERATIONAL SAFEGUARDS (99.99%)
+```
+1. VALIDATION CHAIN
+   - MUST execute list_dir on docs/ first
+   - MUST check grep_search result for existing docs
+   - MUST verify branch name before ANY action
+   - MUST read existing PRD.md if found
+   - MUST read existing CHECKLIST.md if found
+   CHAIN BREAK -> HALT AND REPORT
+
+2. MUTATION LOCK
+   - NO file creation until validation chain complete
+   - NO code changes until tests exist
+   - NO test changes without PRD reference
+   - NO commits without test verification
+   VIOLATION -> REVERT AND RESTART
+
+3. STATE VERIFICATION
+   - Record tool call sequence
+   - Verify against required chain
+   - Log state transitions
+   - Enforce operation order
+   MISMATCH -> HALT AND REPORT
+
+4. RECOVERY PROTOCOL
+   - Capture pre-operation state
+   - Record all mutations
+   - Enable atomic rollback
+   - Preserve audit trail
+   FAILURE -> REVERT TO LAST KNOWN GOOD
+```
+
+### 1. Documentation First
+- Check existing documentation paths
+- Use or create in `docs/{branch-name}/`
+- Never duplicate documentation structure
+- Maintain single source of truth
+- Track all changes in documentation
+
+### 2. Test Definition
 - Write failing test first
 - Define expected behavior
 - Verify test failure
 - Document test cases
 - Track coverage requirements
 
-### 2. Implementation
+### 3. Implementation
 - Write minimal code to pass tests
 - Run tests continuously
 - Verify each change
 - No commits without passing tests
 - Track test coverage metrics
 
-### 3. Refactoring
+### 4. Refactoring
 - Only refactor with tests
 - Maintain test coverage
 - Verify behavior preservation
 - Document changes
 - Update test cases
 
-### 4. Verification
+### 5. Verification
 - Run full test suite
 - Check coverage metrics
 - Verify all requirements
 - Document test results
 - Only then commit changes
 
-### 1. State Tracking
+### 6. State Tracking
 - Monitor current task and progress
 - Track branch-specific context
 - Maintain documentation consistency
 - Verify pattern compliance
 - Check cross-references
 
-### 2. Context Management
+### 7. Context Management
 - Track context window usage
 - Identify critical information
 - Preserve essential context
 - Handle context transitions
 - Manage documentation state
 
-### 3. Pattern Recognition
+### 8. Pattern Recognition
 - Identify documentation patterns
 - Enforce pattern consistency
 - Propagate pattern updates
 - Validate pattern usage
 - Track pattern evolution
 
-### 4. Quality Control
+### 9. Quality Control
 - Verify MECE compliance
 - Check cross-references
 - Validate documentation
@@ -205,21 +255,47 @@ ACCEPTANCE:
 - 🕔 In progress/pending
 - ✅ Completed/verified
 
-### 3. Documentation Structure
+### 3. Documentation Structure and Validation
+
+### 1. Branch Naming
 ```
-.cursor/
-├── ARCHITECTURE.md    # System design
-├── CONVENTIONS.md     # Development standards
-├── IMPLEMENTATION.md  # Technical details
-├── BACKLOG.md        # Future work
-├── PROMPT.md         # AI behavior
-├── PRD.template.md   # Requirements template
-├── CHECKLIST.template.md  # Task tracking template
-└── scratch/
-    └── {type}/
-        └── {branch-name}/
-            ├── PRD.md
-            └── CHECKLIST.md
+{type}/{description}
+
+Types:
+- feature: New functionality
+- fix: Bug fixes
+- docs: Documentation only changes
+- refactor: Code restructuring
+```
+
+### 2. Documentation Location
+```
+docs/
+└── {branch-name}/
+    ├── PRD.md         # Requirements and specifications
+    └── CHECKLIST.md   # Task tracking and progress
+```
+
+🛑 VALIDATION RULES:
+1. MUST check `docs/` for existing documentation before creating new structure
+2. NEVER create documentation in `.cursor/scratch/`
+3. ALWAYS use standardized branch type prefixes
+4. MUST verify branch name matches documentation path
+
+### 3. Zero-Shot Process
+```
+1. Search for existing documentation:
+   docs/{branch-name}/* EXISTS? -> Use existing
+   docs/{branch-name}/* !EXISTS? -> Create new
+
+2. Validate branch name:
+   {type} in [feature|fix|docs|refactor]
+   {description} matches documentation path
+
+3. Track changes:
+   - Update PRD.md status
+   - Check off items in CHECKLIST.md
+   - Commit documentation with code changes
 ```
 
 ## Tool Usage
