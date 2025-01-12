@@ -72,8 +72,8 @@ class GitStorageAdapter(StorageAdapter):
         if not (self.repo_path / ".git").exists():
             logger.info("Initializing new git repository")
             self._repo = Repo.init(self.repo_path, initial_branch='main')
-            self._repo.index.add(['topics', 'metadata.yaml'])
-            self._repo.index.commit("Initial repository structure")
+            await self._repo.index.add(['topics', 'metadata.yaml'])
+            await self._repo.index.commit("Initial repository structure")
             logger.debug("Created initial commit with repository structure")
         else:
             logger.info("Using existing git repository")
@@ -192,21 +192,21 @@ class GitStorageAdapter(StorageAdapter):
                     group_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Stage each path separately
-                self._repo.index.add([source])
-                self._repo.index.add([f'{source}/{group_id}'])
-                self._repo.index.add([str(topic_path.relative_to(self.repo_path))])
-                self._repo.index.add(['metadata.yaml'])
+                await self._repo.index.add([source])
+                await self._repo.index.add([f'{source}/{group_id}'])
+                await self._repo.index.add([str(topic_path.relative_to(self.repo_path))])
+                await self._repo.index.add(['metadata.yaml'])
                 logger.debug("Staged all files")
             else:
                 # For non-sourced topics, add everything at once
-                self._repo.index.add([
+                await self._repo.index.add([
                     str(topic_path.relative_to(self.repo_path)),
                     'metadata.yaml'
                 ])
                 logger.debug("Staged topic files and metadata")
             
             # Commit changes
-            self._repo.index.commit(f"Created topic: {topic.name}")
+            await self._repo.index.commit(f"Created topic: {topic.name}")
             logger.info(f"Successfully created topic {topic.id} at {topic_path}")
             
         except Exception as e:
@@ -275,20 +275,24 @@ class GitStorageAdapter(StorageAdapter):
                     elif media_type == 'mpeg': media_type = 'mp3'
                     elif media_type == 'markdown': media_type = 'txt'
                     elif media_type == 'plain': media_type = 'txt'
+                    elif media_type == 'octet-stream':
+                        # For binary files, use extension from filename or 'bin' as default
+                        ext = Path(attachment.filename).suffix.lstrip('.')
+                        media_type = ext if ext else 'bin'
                     
                     logger.debug(f"Processing attachment of type {media_type}")
                     
                     # Create type-specific directory under attachments
                     media_dir_name = "attachments" if topic_info.get('metadata', {}).get('source') else "media"
-                    attachments_dir = topic_path / media_dir_name / media_type
-                    attachments_dir.mkdir(parents=True, exist_ok=True)
-                    logger.debug(f"Created media directory at {attachments_dir}")
+                    media_dir = topic_path / media_dir_name / media_type
+                    media_dir.mkdir(parents=True, exist_ok=True)
+                    logger.debug(f"Created media directory at {media_dir}")
                     
                     # Use file_id as filename with appropriate extension
                     extension = Path(attachment.filename).suffix
                     if not extension:
                         extension = f".{media_type}"
-                    file_path = attachments_dir / f"{attachment.id}{extension}"
+                    file_path = media_dir / f"{attachment.id}{extension}"
                     logger.debug(f"Saving attachment to {file_path}")
                     
                     # Save attachment data
@@ -319,16 +323,16 @@ class GitStorageAdapter(StorageAdapter):
             
             # Stage changes
             messages_path = str(messages_file.relative_to(self.repo_path))
-            self._repo.index.add([messages_path])
+            await self._repo.index.add([messages_path])
             logger.debug(f"Staged messages file: {messages_path}")
 
             if attachment_paths:
                 for attachment_path in attachment_paths:
-                    self._repo.index.add([attachment_path])
+                    await self._repo.index.add([attachment_path])
                     logger.debug(f"Staged attachment: {attachment_path}")
 
             # Commit changes
-            self._repo.index.commit(f"Added message to topic: {topic_info['name']}")
+            await self._repo.index.commit(f"Added message to topic: {topic_info['name']}")
             logger.info(f"Successfully saved message to topic {topic_id}")
             
         except Exception as e:
@@ -413,11 +417,11 @@ class GitStorageAdapter(StorageAdapter):
                 
             # Stage changes
             attachment_path = str(file_path.relative_to(self.repo_path))
-            self._repo.index.add([attachment_path])
+            await self._repo.index.add([attachment_path])
             logger.debug(f"Staged attachment: {attachment_path}")
 
             # Commit changes
-            self._repo.index.commit(f"Added attachment to topic: {topic_info['name']}")
+            await self._repo.index.commit(f"Added attachment to topic: {topic_info['name']}")
             logger.info(f"Successfully saved attachment {attachment.id} to topic {topic_id}")
         else:
             logger.debug(f"No data to write for attachment {attachment.id}")
@@ -433,11 +437,12 @@ class GitStorageAdapter(StorageAdapter):
         if 'origin' in self._repo.remotes:
             try:
                 logger.debug("Pushing changes to remote")
-                self._repo.git.push('-f', 'origin', 'main')
+                await self._repo.git.push('-f', 'origin', 'main')
+                logger.debug("Successfully pushed changes")
             except Exception as e:
-                logger.error(f"Git sync failed: {e}")
-                raise
-    
+                logger.error(f"Failed to sync with remote: {e}")
+                raise  # Re-raise the original exception
+
     @trace_operation('storage.git')
     def add_remote(self, name: str, url: str) -> None:
         """Add a remote repository"""
@@ -450,15 +455,18 @@ class GitStorageAdapter(StorageAdapter):
     async def set_github_config(self, token: str, repo: str) -> None:
         """Set GitHub configuration"""
         logger.info("Setting GitHub configuration")
-        if not self._repo:
+        if not self._repo or not self._initialized:
             logger.error("Repository not initialized")
             raise RuntimeError("Must initialize repository first")
 
-        # Update remote URL with token
-        remote_url = f"https://{token}@github.com/{repo}.git"
+        # Delete existing remote if it exists
         if 'origin' in self._repo.remotes:
             self._repo.delete_remote('origin')
-        self._repo.create_remote('origin', remote_url)
+
+        # Update remote URL with token
+        remote_url = f"https://{token}@github.com/{repo}.git"
+        await self._repo.create_remote('origin', remote_url)
+        logger.debug("Created remote with token")
         
         # Save config in metadata
         metadata_path = self.repo_path / "metadata.yaml"
@@ -473,8 +481,8 @@ class GitStorageAdapter(StorageAdapter):
         with open(metadata_path, 'w') as f:
             yaml.dump(metadata, f)
             
-        self._repo.index.add(['metadata.yaml'])
-        self._repo.index.commit("Updated GitHub configuration") 
+        await self._repo.index.add(['metadata.yaml'])
+        await self._repo.index.commit("Updated GitHub configuration")
 
     async def _update_metadata(self, topic: Topic) -> None:
         """Update metadata.yaml with topic information"""
@@ -509,4 +517,4 @@ class GitStorageAdapter(StorageAdapter):
             yaml.dump(metadata, f)
         
         # Stage metadata file
-        self._repo.index.add(['metadata.yaml']) 
+        await self._repo.index.add(['metadata.yaml']) 

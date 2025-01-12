@@ -4,8 +4,7 @@ import signal
 from pathlib import Path
 
 from chronicler.logging import get_logger
-
-from .frames import Frame
+from chronicler.frames.base import Frame
 from .pipeline import Pipeline
 
 logger = get_logger(__name__, component="pipeline.runner")

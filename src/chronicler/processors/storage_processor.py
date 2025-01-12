@@ -2,12 +2,14 @@
 from chronicler.logging import get_logger
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
-from chronicler.pipeline import (
-    Frame, TextFrame, ImageFrame, DocumentFrame,
-    AudioFrame, VoiceFrame, StickerFrame,
-    BaseProcessor
+from chronicler.frames.base import Frame
+from chronicler.frames.media import (
+    TextFrame, ImageFrame, DocumentFrame,
+    AudioFrame, VoiceFrame, StickerFrame
 )
+from chronicler.processors.base import BaseProcessor
 from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
 
@@ -17,9 +19,15 @@ class StorageProcessor(BaseProcessor):
     """Processor that saves messages to storage."""
     
     def __init__(self, storage_path: Path):
+        super().__init__()
         logger.info("Initializing storage processor", extra={"storage_path": str(storage_path)})
         self.storage = StorageCoordinator(storage_path)
         self._initialized = False
+        
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a frame by saving it to storage."""
+        await self.process_frame(frame)
+        return None
         
     async def _ensure_initialized(self) -> None:
         """Ensure storage is initialized."""
@@ -136,7 +144,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=f"image/{frame.format}",
                 filename=f"{file_id}.{frame.format}",
-                data=frame.image
+                data=frame.content
             )
             logger.debug(f"Created image attachment: {attachment.filename}")
             
@@ -197,7 +205,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=frame.mime_type,
                 filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
-                data=frame.audio
+                data=frame.content
             )
             logger.debug(f"Created audio attachment: {attachment.filename}")
             
@@ -228,7 +236,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=frame.mime_type,
                 filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
-                data=frame.audio
+                data=frame.content
             )
             logger.debug(f"Created voice attachment: {attachment.filename}")
             
@@ -268,7 +276,7 @@ class StorageProcessor(BaseProcessor):
             logger.debug(f"Created sticker attachment: {attachment.filename}")
             
             message = Message(
-                content=frame.emoji,  # Use emoji as content
+                content='',  # Empty string by default for stickers
                 source='telegram',
                 metadata=metadata,
                 attachments=[attachment]

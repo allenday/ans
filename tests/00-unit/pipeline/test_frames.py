@@ -1,8 +1,8 @@
 """Unit tests for frame classes."""
 import pytest
 
-from chronicler.frames import (
-    Frame,
+from chronicler.frames.base import Frame
+from chronicler.frames.media import (
     TextFrame,
     ImageFrame,
     DocumentFrame,
