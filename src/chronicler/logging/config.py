@@ -80,25 +80,23 @@ def trace_operation(component: str):
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
-            # Get the existing correlation ID before we start
-            existing_correlation_id = CORRELATION_ID.get()
-            
-            # Only generate a new correlation ID if there isn't one
-            correlation_id = existing_correlation_id or str(uuid.uuid4())
-            CORRELATION_ID.set(correlation_id)
-            
             # Save existing context
+            existing_correlation_id = CORRELATION_ID.get()
             existing_component = COMPONENT_ID.get()
             existing_operation = OPERATION_ID.get()
-            
-            # Set new context
+
+            # Only generate new correlation ID if one doesn't exist
+            if not existing_correlation_id:
+                CORRELATION_ID.set(str(uuid.uuid4()))
+
+            # Set component and operation IDs
             COMPONENT_ID.set(component)
-            OPERATION_ID.set(func.__name__)
-            
-            # Capture start metrics
+            OPERATION_ID.set(str(uuid.uuid4()))
+
+            # Initialize performance tracking
             OPERATION_START_TIME.set(time.time())
             process = psutil.Process()
-            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)
+            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)  # Convert to KB
 
             try:
                 logger.debug("Operation started", extra={
@@ -106,8 +104,13 @@ def trace_operation(component: str):
                     'call_kwargs': str(kwargs)
                 })
                 result = func(*args, **kwargs)
-                logger.debug("Operation completed")
+                metrics = _get_performance_metrics()
+                logger.debug("Operation completed", extra={'performance': metrics})
                 return result
+            except Exception as e:
+                metrics = _get_performance_metrics()
+                logger.error(f"Operation failed: {str(e)}", exc_info=True, extra={'performance': metrics})
+                raise
             finally:
                 # Only clear correlation ID if we generated it
                 if not existing_correlation_id:
@@ -124,25 +127,23 @@ def trace_operation(component: str):
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            # Get the existing correlation ID before we start
-            existing_correlation_id = CORRELATION_ID.get()
-            
-            # Only generate a new correlation ID if there isn't one
-            correlation_id = existing_correlation_id or str(uuid.uuid4())
-            CORRELATION_ID.set(correlation_id)
-            
             # Save existing context
+            existing_correlation_id = CORRELATION_ID.get()
             existing_component = COMPONENT_ID.get()
             existing_operation = OPERATION_ID.get()
-            
-            # Set new context
+
+            # Only generate new correlation ID if one doesn't exist
+            if not existing_correlation_id:
+                CORRELATION_ID.set(str(uuid.uuid4()))
+
+            # Set component and operation IDs
             COMPONENT_ID.set(component)
-            OPERATION_ID.set(func.__name__)
-            
-            # Capture start metrics
+            OPERATION_ID.set(str(uuid.uuid4()))
+
+            # Initialize performance tracking
             OPERATION_START_TIME.set(time.time())
             process = psutil.Process()
-            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)
+            OPERATION_START_MEMORY.set(process.memory_info().rss / 1024)  # Convert to KB
 
             try:
                 logger.debug("Operation started", extra={
@@ -150,8 +151,13 @@ def trace_operation(component: str):
                     'call_kwargs': str(kwargs)
                 })
                 result = await func(*args, **kwargs)
-                logger.debug("Operation completed")
+                metrics = _get_performance_metrics()
+                logger.debug("Operation completed", extra={'performance': metrics})
                 return result
+            except Exception as e:
+                metrics = _get_performance_metrics()
+                logger.error(f"Operation failed: {str(e)}", exc_info=True, extra={'performance': metrics})
+                raise
             finally:
                 # Only clear correlation ID if we generated it
                 if not existing_correlation_id:
@@ -192,35 +198,62 @@ def _get_performance_metrics():
     
     return metrics
 
-def _get_crystal_log(record):
-    """Convert a log record into a crystalline format."""
+def _get_crystal_log(record: logging.LogRecord) -> dict:
+    """Get the log record in Crystal format."""
+    try:
+        message = record.getMessage()
+    except (TypeError, ValueError) as e:
+        message = str(record.msg)  # Use raw message if formatting fails
+
+    # Get correlation ID and operation ID
+    correlation_id = CORRELATION_ID.get()
+    operation_id = OPERATION_ID.get()
+
+    # Initialize base structure
     crystal = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'level': record.levelname,
-        'message': record.getMessage(),
-        'location': f"{record.module}:{record.filename}:{record.lineno}",
-        'performance': _get_performance_metrics()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": record.levelname,
+        "message": message,
+        "location": f"{record.name}:{record.filename}:{record.lineno}",
+        "component": COMPONENT_ID.get() or record.name,
+        "context": {},
+        "performance": {}
     }
 
-    # Add correlation ID if present
-    correlation_id = CORRELATION_ID.get()
+    # Add correlation ID at root level and in context
     if correlation_id:
-        crystal['correlation_id'] = correlation_id
+        crystal["correlation_id"] = correlation_id
+        crystal["context"]["correlation_id"] = correlation_id
 
-    # Add component if present
-    component = COMPONENT_ID.get()
-    if component:
-        crystal['component'] = component
+    # Add operation ID to context
+    if operation_id:
+        crystal["context"]["operation_id"] = operation_id
 
-    # Add operation if present
-    operation = OPERATION_ID.get()
-    if operation:
-        crystal['operation'] = operation
+    # Add error information if present
+    if record.exc_info:
+        exc_type, exc_value, exc_tb = record.exc_info
+        crystal["error"] = {
+            "type": exc_type.__name__,
+            "message": str(exc_value),
+            "traceback": traceback.format_exception(exc_type, exc_value, exc_tb)
+        }
 
-    # Add extra context if present
-    if hasattr(record, 'call_args'):
-        crystal['call_args'] = record.call_args
-    if hasattr(record, 'call_kwargs'):
-        crystal['call_kwargs'] = record.call_kwargs
+    # Get performance metrics from context
+    metrics = _get_performance_metrics()
+    if metrics:
+        crystal["performance"].update(metrics)
+        # Also add memory_delta_kb to context
+        if 'memory_delta_kb' in metrics:
+            crystal["context"]["memory_delta_kb"] = metrics['memory_delta_kb']
 
-    return crystal  # Return dict instead of JSON string 
+    # Update context and performance from record.__dict__
+    if hasattr(record, "context") and isinstance(record.context, dict):
+        crystal["context"].update(record.context)
+    
+    if hasattr(record, "performance") and isinstance(record.performance, dict):
+        crystal["performance"].update(record.performance)
+        # Also add memory_delta_kb to context if present
+        if 'memory_delta_kb' in record.performance:
+            crystal["context"]["memory_delta_kb"] = record.performance['memory_delta_kb']
+
+    return crystal 
