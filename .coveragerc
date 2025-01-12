@@ -1,0 +1,18 @@
+[run]
+source = src/chronicler
+omit = 
+    tests/*
+    */__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise AssertionError
+    raise NotImplementedError
+
+[html]
+directory = coverage_html 
