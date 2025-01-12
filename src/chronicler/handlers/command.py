@@ -41,7 +41,7 @@ class StartCommandHandler(CommandHandler):
             )
             await self.coordinator.create_topic(topic)
             return TextFrame(
-                text="Welcome to Chronicler! I'll help you archive your chat messages.",
+                content="Welcome to Chronicler! I'll help you archive your chat messages.",
                 metadata=frame.metadata
             )
         except Exception as e:
@@ -57,7 +57,7 @@ class ConfigCommandHandler(CommandHandler):
             logger.debug("HANDLER - Processing /config command")
             if len(frame.args) != 3:
                 return TextFrame(
-                    text="Usage: /config <repository> <branch> <token>\nExample: /config owner/repo main ghp_token123",
+                    content="Usage: /config <repository> <branch> <token>\nExample: /config owner/repo main ghp_token123",
                     metadata=frame.metadata
                 )
             
@@ -66,7 +66,7 @@ class ConfigCommandHandler(CommandHandler):
                 repo=frame.args[0]    # repository
             )
             return TextFrame(
-                text="GitHub configuration updated successfully.",
+                content="GitHub configuration updated successfully.",
                 metadata=frame.metadata
             )
         except Exception as e:
@@ -82,7 +82,7 @@ class StatusCommandHandler(CommandHandler):
             logger.debug("HANDLER - Processing /status command")
             await self.coordinator.sync()
             return TextFrame(
-                text="Chronicler Status:\n- Storage: Initialized\n- GitHub: Connected\n- Last sync: Success",
+                content="Chronicler Status:\n- Storage: Initialized\n- GitHub: Connected\n- Last sync: Success",
                 metadata=frame.metadata
             )
         except Exception as e:
