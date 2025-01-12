@@ -50,7 +50,7 @@ async def test_start_command(processor, storage_mock):
     
     # Verify
     assert isinstance(result, TextFrame)
-    assert "Welcome to Chronicler!" in result.text
+    assert "Welcome to Chronicler!" in result.content
     storage_mock.init_storage.assert_called_once()
     storage_mock.create_topic.assert_called_once()
     
@@ -76,7 +76,7 @@ async def test_config_command_no_args(processor, storage_mock):
     
     # Verify
     assert isinstance(result, TextFrame)
-    assert "Usage: /config" in result.text
+    assert "Usage: /config" in result.content
     storage_mock.set_github_config.assert_not_called()
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_config_command_with_args(processor, storage_mock):
     
     # Verify
     assert isinstance(result, TextFrame)
-    assert "GitHub configuration updated" in result.text
+    assert "GitHub configuration updated" in result.content
     storage_mock.set_github_config.assert_called_once_with(
         token="token123",
         repo="owner/repo"
@@ -111,7 +111,7 @@ async def test_status_command(processor, storage_mock):
     
     # Verify
     assert isinstance(result, TextFrame)
-    assert "Chronicler Status" in result.text
+    assert "Chronicler Status" in result.content
     storage_mock.sync.assert_called_once()
 
 @pytest.mark.asyncio
@@ -125,14 +125,14 @@ async def test_unknown_command(processor, storage_mock):
     
     # Verify
     assert isinstance(result, TextFrame)
-    assert "Unknown command" in result.text
+    assert "Unknown command" in result.content
     storage_mock.save_message.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_process_non_command_frame(processor, storage_mock):
     """Test processing a non-command frame."""
     # Setup
-    frame = TextFrame(text="Hello", metadata={"chat_id": 123})
+    frame = TextFrame(content="Hello", metadata={"chat_id": 123})
     
     # Execute
     result = await processor.process(frame)

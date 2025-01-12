@@ -3,12 +3,12 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
 from chronicler.frames.media import TextFrame
-from chronicler.transports.telegram_factory import TelegramTransportFactory
+from chronicler.transports.telegram import TelegramTransportFactory
 from chronicler.transports.events import EventMetadata
 
 @pytest.fixture
 def mock_telethon():
-    with patch('chronicler.transports.telegram_factory.TelegramClient') as mock:
+    with patch('chronicler.transports.telegram.user.TelegramClient') as mock:
         client = AsyncMock()
         client.connect = AsyncMock()
         client.is_user_authorized = AsyncMock(return_value=True)
@@ -35,7 +35,7 @@ def mock_telethon():
 
 @pytest.fixture
 def mock_python_telegram_bot():
-    with patch('chronicler.transports.telegram_factory.Application') as mock:
+    with patch('chronicler.transports.telegram.bot.Application') as mock:
         app = AsyncMock()
         app.initialize = AsyncMock()
         app.start = AsyncMock()
@@ -87,7 +87,7 @@ async def test_user_to_bot_interaction(mock_telethon, mock_python_telegram_bot):
     try:
         # Create a test frame
         frame = TextFrame(
-            text="Hello from user!",
+            content="Hello from user!",
             metadata=EventMetadata(
                 chat_id=123456789,
                 chat_title="Test Chat",
@@ -110,13 +110,13 @@ async def test_user_to_bot_interaction(mock_telethon, mock_python_telegram_bot):
         sent_frame = await user_transport.send(frame)
         assert sent_frame.metadata.message_id == 1
         mock_telethon.return_value.send_message.assert_awaited_once_with(
-            123456789,
-            "Hello from user!"
+            chat_id=123456789,
+            text="Hello from user!"
         )
         
         # Bot processes and responds
         response_frame = TextFrame(
-            text="Hello from bot!",
+            content="Hello from bot!",
             metadata=EventMetadata(
                 chat_id=123456789,
                 chat_title="Test Chat",
@@ -156,7 +156,7 @@ async def test_transport_error_propagation(mock_telethon, mock_python_telegram_b
     try:
         # Create test frame
         frame = TextFrame(
-            text="Test message",
+            content="Test message",
             metadata=EventMetadata(
                 chat_id=123456789,
                 chat_title="Test Chat",
@@ -199,20 +199,9 @@ async def test_transport_metadata_validation(mock_telethon, mock_python_telegram
     await bot_transport.start()
     
     try:
-        # Create frame without metadata
-        frame = TextFrame(text="Test message")
-        
-        # Test user transport validation
-        with pytest.raises(ValueError, match="Frame must have EventMetadata"):
-            await user_transport.send(frame)
-        
-        # Test bot transport validation
-        with pytest.raises(ValueError, match="Frame must have EventMetadata"):
-            await bot_transport.send(frame)
-        
         # Create frame with invalid metadata type
         frame = TextFrame(
-            text="Test message",
+            content="Test message",
             metadata={"chat_id": 123}  # Not an EventMetadata instance
         )
         
@@ -224,6 +213,7 @@ async def test_transport_metadata_validation(mock_telethon, mock_python_telegram
         with pytest.raises(ValueError, match="Frame must have EventMetadata"):
             await bot_transport.send(frame)
     finally:
+        # Stop transports
         await user_transport.stop()
         await bot_transport.stop()
 

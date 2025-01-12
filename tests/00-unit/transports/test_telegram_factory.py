@@ -1,10 +1,5 @@
 import pytest
-from chronicler.transports.telegram_factory import (
-    TelegramTransportFactory,
-    TelegramTransportBase,
-    TelegramUserTransport,
-    TelegramBotTransport
-)
+from chronicler.transports.telegram import TelegramTransportFactory, TelegramBotTransport, TelegramUserTransport
 
 def test_factory_creates_user_transport():
     """Test factory creates TelegramUserTransport when api_id and api_hash are provided."""

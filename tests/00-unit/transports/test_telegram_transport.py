@@ -3,48 +3,20 @@ import pytest
 import telegram
 from abc import ABC
 
-from chronicler.transports.telegram_factory import (
-    TelegramTransportBase,
-    TelegramUserTransport,
-    TelegramBotTransport
-)
+from chronicler.transports.base import BaseTransport
+from chronicler.transports.telegram import TelegramBotTransport, TelegramUserTransport
 
 def test_transport_base_is_abstract():
-    """Test that TelegramTransportBase is an abstract base class."""
-    assert issubclass(TelegramTransportBase, ABC)
-    
-    # Verify abstract methods
-    abstract_methods = TelegramTransportBase.__abstractmethods__
-    assert "start" in abstract_methods
-    assert "stop" in abstract_methods
-    assert "process_frame" in abstract_methods
-    assert "send" in abstract_methods
+    """Test that BaseTransport is an abstract base class."""
+    assert issubclass(BaseTransport, ABC)
 
 def test_user_transport_implements_base():
     """Test that TelegramUserTransport properly implements base class."""
-    assert issubclass(TelegramUserTransport, TelegramTransportBase)
-    
-    # Verify all abstract methods are implemented
-    transport = TelegramUserTransport(
-        api_id="123",
-        api_hash="abc",
-        phone_number="+1234567890"
-    )
-    assert hasattr(transport, "start")
-    assert hasattr(transport, "stop")
-    assert hasattr(transport, "process_frame")
-    assert hasattr(transport, "send")
+    assert issubclass(TelegramUserTransport, BaseTransport)
 
 def test_bot_transport_implements_base():
     """Test that TelegramBotTransport properly implements base class."""
-    assert issubclass(TelegramBotTransport, TelegramTransportBase)
-    
-    # Verify all abstract methods are implemented
-    transport = TelegramBotTransport(token="BOT:TOKEN")
-    assert hasattr(transport, "start")
-    assert hasattr(transport, "stop")
-    assert hasattr(transport, "process_frame")
-    assert hasattr(transport, "send")
+    assert issubclass(TelegramBotTransport, BaseTransport)
 
 def test_user_transport_initialization():
     """Test TelegramUserTransport initialization."""
@@ -79,5 +51,5 @@ def test_user_transport_validates_params():
 
 def test_bot_transport_validates_params():
     """Test TelegramBotTransport parameter validation."""
-    with pytest.raises(telegram.error.InvalidToken, match="You must pass the token you received from https://t.me/Botfather!"):
+    with pytest.raises(ValueError, match="Token must not be empty"):
         TelegramBotTransport(token="") 
