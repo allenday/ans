@@ -125,6 +125,10 @@ class TelegramBotTransport(BaseTransport):
         
         async def wrapped_handler(update: Update, context):
             """Wrap the handler to convert Update to CommandFrame."""
+            # Check if this is the right command
+            if not update.effective_message.text.startswith(f"/{command}"):
+                return
+                
             wrapped_event = TelegramBotEvent(update, context)
             metadata = EventMetadata(
                 chat_id=update.effective_chat.id,
