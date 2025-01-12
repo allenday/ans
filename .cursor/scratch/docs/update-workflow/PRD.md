@@ -30,9 +30,9 @@ Implement a branch-specific development workflow with clear state tracking in Ch
   ```
 2.2. ✅ Add state tracking system (🕔 -> ✅)
 2.3. ✅ Create PRD template at .cursor/PRD.md
-2.4. 🕔 Add workflow initialization commands
-2.5. 🕔 Implement scope-to-PRD conversion
-2.6. 🕔 Add branch state persistence
+2.4. ✅ Add workflow initialization commands
+2.5. ✅ Implement scope-to-PRD conversion
+2.6. ✅ Add branch state persistence
 
 ### Integration Points
 3.1. 🕔 Update README.md to document new workflow
