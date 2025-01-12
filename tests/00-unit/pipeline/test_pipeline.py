@@ -1,9 +1,9 @@
 """Tests for pipeline."""
 import pytest
-from unittest.mock import Mock, AsyncMock
 from chronicler.pipeline.pipeline import Pipeline
-from chronicler.processors.base import BaseProcessor
 from chronicler.frames.media import TextFrame
+
+from tests.mocks import processor_mock
 
 def test_pipeline_creation():
     """Test pipeline creation."""
@@ -12,15 +12,15 @@ def test_pipeline_creation():
     assert len(pipeline.processors) == 0
 
 @pytest.mark.asyncio
-async def test_pipeline_processing():
+async def test_pipeline_processing(processor_mock):
     """Test frame processing through pipeline."""
     pipeline = Pipeline()
     
-    # Create mock processors
-    processor1 = AsyncMock(spec=BaseProcessor)
+    # Configure mock processors
+    processor1 = processor_mock
     processor1.process.return_value = TextFrame(text="modified1", metadata={})
     
-    processor2 = AsyncMock(spec=BaseProcessor)
+    processor2 = processor_mock
     processor2.process.return_value = TextFrame(text="modified2", metadata={})
     
     # Add processors to pipeline
