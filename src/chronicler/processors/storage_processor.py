@@ -5,62 +5,81 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from chronicler.pipeline import (
+from chronicler.frames import (
     Frame, TextFrame, ImageFrame, DocumentFrame,
-    AudioFrame, VoiceFrame, StickerFrame,
-    BaseProcessor
+    AudioFrame, VoiceFrame, StickerFrame, MediaFrame
 )
 from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
+from chronicler.processors.base import BaseProcessor
 from chronicler.processors.git_processor import GitProcessor
+from chronicler.services.git_sync_service import GitSyncService
+from chronicler.exceptions import StorageProcessingError
 
 logger = logging.getLogger(__name__)
 
 class StorageProcessor(BaseProcessor):
-    """Processor that saves messages to storage."""
+    """Processor for storing messages and media."""
     
     def __init__(self, storage_path: Path):
-        logger.info(f"PROC - Initializing storage processor with path: {storage_path}")
+        """Initialize storage processor.
+        
+        Args:
+            storage_path: Path to storage directory
+        """
+        super().__init__()
+        self.storage_path = Path(storage_path)
         self.storage = StorageCoordinator(storage_path)
+        self.git_processor = None
+        self.git_sync_service = None
         self._initialized = False
         
-        # Initialize git processor if configured
-        self.git_processor = self._init_git_processor(storage_path)
-        if self.git_processor:
-            logger.info("PROC - Git processor initialized")
-        else:
-            logger.info("PROC - Git processor not configured")
-    
-    def _init_git_processor(self, storage_path: Path) -> Optional[GitProcessor]:
-        """Initialize GitProcessor if environment variables are set."""
-        repo_url = os.getenv('GIT_REPO_URL')
-        branch = os.getenv('GIT_BRANCH', 'main')
-        username = os.getenv('GIT_USERNAME')
-        access_token = os.getenv('GIT_ACCESS_TOKEN')
-        
-        if not all([repo_url, username, access_token]):
-            logger.info("PROC - Git configuration not found in environment")
-            return None
-        
-        try:
-            return GitProcessor(
-                repo_url=repo_url,
-                branch=branch,
-                username=username,
-                access_token=access_token,
+        # Configure git if environment variables are set
+        if all(os.getenv(var) for var in ['GIT_REPO_URL', 'GIT_USERNAME', 'GIT_ACCESS_TOKEN']):
+            self.git_processor = GitProcessor(
+                repo_url=os.getenv('GIT_REPO_URL'),
+                branch=os.getenv('GIT_BRANCH', 'main'),
+                username=os.getenv('GIT_USERNAME'),
+                access_token=os.getenv('GIT_ACCESS_TOKEN'),
                 storage_path=storage_path
             )
-        except Exception as e:
-            logger.error("PROC - Failed to initialize git processor", exc_info=True)
-            return None
+            
+            sync_interval = int(os.getenv('GIT_SYNC_INTERVAL', '300').split('#')[0].strip())
+            self.git_sync_service = GitSyncService(
+                git_processor=self.git_processor,
+                sync_interval=sync_interval
+            )
+            logger.info("PROC - Configured git integration")
+        else:
+            logger.info("PROC - Git integration not configured")
+    
+    async def start(self) -> None:
+        """Start the storage processor and git sync service."""
+        if not self._initialized:
+            logger.info("PROC - Initializing storage with default user")
+            user = User(id="default", name="Default User")
+            logger.debug(f"PROC - Creating user {user.id} with name {user.name}")
+            await self.storage.init_storage(user)
+            self._initialized = True
+            logger.info("PROC - Storage initialization completed successfully")
+        
+        if self.git_sync_service:
+            await self.git_sync_service.start()
+            logger.info("PROC - Started git sync service")
+    
+    async def stop(self) -> None:
+        """Stop the storage processor and git sync service."""
+        if self.git_sync_service:
+            await self.git_sync_service.stop()
+            logger.info("PROC - Stopped git sync service")
     
     async def _commit_message(self, message_path: Path) -> None:
         """Commit a message file if git is configured."""
-        if not self.git_processor:
+        if not self.git_sync_service:
             return
         
         try:
-            self.git_processor.commit_message(message_path)
+            await self.git_sync_service.commit_immediately(message_path)
             logger.info("PROC - Committed message file: %s", message_path)
         except Exception as e:
             logger.error("PROC - Failed to commit message", exc_info=True)
@@ -68,123 +87,72 @@ class StorageProcessor(BaseProcessor):
     
     async def _commit_media(self, media_paths: list[Path]) -> None:
         """Commit media files if git is configured."""
-        if not self.git_processor or not media_paths:
+        if not self.git_sync_service or not media_paths:
             return
         
         try:
-            self.git_processor.commit_media(media_paths)
+            await self.git_sync_service.commit_immediately(media_paths, is_media=True)
             logger.info("PROC - Committed %d media files", len(media_paths))
         except Exception as e:
             logger.error("PROC - Failed to commit media files", exc_info=True)
             # Don't re-raise - git failures shouldn't break message processing
     
     async def _ensure_initialized(self) -> None:
-        """Ensure storage is initialized."""
+        """Ensure the storage is initialized."""
         if not self._initialized:
-            logger.info("PROC - Initializing storage with default user")
-            user = User(id='default', name='Default User')
-            logger.debug("PROC - Creating user default with name Default User")
-            try:
-                await self.storage.init_storage(user)
-                self._initialized = True
-                logger.info("PROC - Storage initialization completed successfully")
-            except Exception as e:
-                logger.error(f"PROC - Failed to initialize storage: {e}", exc_info=True)
-                raise
-        
+            await self.start()
+    
     async def process_frame(self, frame: Frame) -> None:
         """Process a frame by saving it to storage."""
         try:
             logger.info(f"PROC - Processing frame of type: {type(frame).__name__}")
             await self._ensure_initialized()
             
-            # Extract common metadata
-            metadata = {
-                'type': frame.__class__.__name__.lower(),
-                'source': 'telegram'
-            }
+            # Extract metadata
+            chat_id = frame.metadata.get('chat_id')
+            thread_id = frame.metadata.get('thread_id')
+            chat_title = frame.metadata.get('chat_title')
             
-            # Add chat info if available
-            if hasattr(frame, 'metadata'):
-                metadata.update(frame.metadata)
-                logger.debug(f"PROC - Frame metadata - chat_id: {metadata.get('chat_id')}, title: {metadata.get('chat_title')}, thread_id: {metadata.get('thread_id')}")
+            if not all([chat_id, thread_id]):
+                raise StorageProcessingError("Missing required metadata: chat_id and thread_id")
             
-            # Generate topic key
-            topic_key = f"{metadata['chat_id']}:{metadata['thread_id']}"
-            logger.debug(f"PROC - Generated topic key: {topic_key}")
+            # Create topic if it doesn't exist
+            if not await self.storage.has_topic(thread_id):
+                logger.info(f"PROC - Creating new topic with ID: {thread_id}")
+                await self.storage.create_topic(
+                    topic_id=thread_id,
+                    title=chat_title or f"Topic {thread_id}"
+                )
             
-            # Ensure topic exists
-            logger.info(f"PROC - Ensuring topic exists for key: {topic_key}")
-            topic_id = await self._ensure_topic_exists(metadata)
-            logger.info(f"PROC - Using topic ID: {topic_id}")
-            
-            # Process frame based on type
+            # Process based on frame type
             if isinstance(frame, TextFrame):
-                logger.info("PROC - Processing text frame")
-                await self._process_text_frame(topic_id, frame, metadata)
-            elif isinstance(frame, ImageFrame):
-                logger.info("PROC - Processing image frame")
-                await self._process_image_frame(topic_id, frame, metadata)
-            elif isinstance(frame, DocumentFrame):
-                logger.info("PROC - Processing document frame")
-                await self._process_document_frame(topic_id, frame, metadata)
-            elif isinstance(frame, AudioFrame):
-                logger.info("PROC - Processing audio frame")
-                await self._process_audio_frame(topic_id, frame, metadata)
-            elif isinstance(frame, VoiceFrame):
-                logger.info("PROC - Processing voice frame")
-                await self._process_voice_frame(topic_id, frame, metadata)
-            elif isinstance(frame, StickerFrame):
-                logger.info("PROC - Processing sticker frame")
-                await self._process_sticker_frame(topic_id, frame, metadata)
+                await self._process_text_frame(frame, chat_id, thread_id)
+            elif isinstance(frame, MediaFrame):
+                await self._process_media_frame(frame, chat_id, thread_id)
             else:
-                logger.warning(f"PROC - Unsupported frame type: {type(frame)}")
+                raise StorageProcessingError(f"Unsupported frame type: {type(frame)}")
                 
         except Exception as e:
-            logger.error(f"PROC - Failed to process frame: {e}", exc_info=True)
-            raise
+            logger.error(f"PROC - Failed to process frame: {str(e)}", exc_info=True)
+            raise StorageProcessingError(f"Failed to process frame: {str(e)}") from e
             
-    async def _ensure_topic_exists(self, metadata: dict) -> str:
-        """Ensure topic exists and return its ID."""
-        try:
-            logger.info("PROC - Ensuring topic exists")
-            thread_id = metadata.get('thread_id')
-            if not thread_id:
-                logger.error("PROC - No thread_id in metadata")
-                raise ValueError("Message metadata must include thread_id")
-                
-            logger.debug(f"PROC - Using thread_id as topic_id: {thread_id}")
-            
-            # Create topic if needed
-            logger.info(f"PROC - Creating new topic: chat='{metadata.get('chat_title')}', chat_id={metadata.get('chat_id')}, thread_id={thread_id}, topic_id={thread_id}")
-            topic = Topic(
-                id=thread_id,
-                name=metadata.get('chat_title', 'Unknown'),
-                metadata={
-                    'source': metadata['source'],
-                    'chat_id': metadata['chat_id'],
-                    'thread_id': thread_id
-                }
-            )
-            topic_id = await self.storage.create_topic(topic)
-            logger.info(f"PROC - Created new topic with ID: {topic_id}")
-            return topic_id
-            
-        except Exception as e:
-            logger.error(f"PROC - Failed to ensure topic exists: {e}", exc_info=True)
-            raise
-            
-    async def _process_text_frame(self, topic_id: str, frame: TextFrame, metadata: dict) -> None:
+    async def _process_text_frame(self, frame: TextFrame, chat_id: str, thread_id: str) -> None:
         """Process a text frame."""
         try:
-            logger.info(f"PROC - Processing text frame for topic {topic_id}")
+            logger.info(f"PROC - Processing text frame for topic {thread_id}")
+            metadata = frame.metadata.copy()
+            metadata.update({
+                'chat_id': chat_id,
+                'thread_id': thread_id,
+                'source': 'telegram'
+            })
             message = Message(
-                content=frame.text,
+                content=frame.content,
                 source='telegram',
                 metadata=metadata
             )
-            message_path = await self.storage.save_message(topic_id, message)
-            logger.info(f"PROC - Saved text message to topic {topic_id}")
+            message_path = await self.storage.save_message(thread_id, message)
+            logger.info(f"PROC - Saved text message to topic {thread_id}")
             
             # Commit message
             await self._commit_message(message_path)
@@ -203,7 +171,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=f"image/{frame.format}",
                 filename=f"{file_id}.{frame.format}",
-                data=frame.image
+                data=frame.content
             )
             logger.debug(f"PROC - Created image attachment: {attachment.filename}")
             
@@ -272,7 +240,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=frame.mime_type,
                 filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
-                data=frame.audio
+                data=frame.content
             )
             logger.debug(f"PROC - Created audio attachment: {attachment.filename}")
             
@@ -307,7 +275,7 @@ class StorageProcessor(BaseProcessor):
                 id=file_id,
                 type=frame.mime_type,
                 filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
-                data=frame.audio
+                data=frame.content
             )
             logger.debug(f"PROC - Created voice attachment: {attachment.filename}")
             
@@ -367,3 +335,91 @@ class StorageProcessor(BaseProcessor):
         except Exception as e:
             logger.error(f"PROC - Failed to process sticker frame: {e}", exc_info=True)
             raise 
+
+    async def _process_media_frame(self, frame: MediaFrame, chat_id: str, thread_id: str) -> None:
+        """Process a media frame."""
+        try:
+            logger.info(f"PROC - Processing media frame for topic {thread_id}")
+            
+            # Create attachment based on frame type
+            if isinstance(frame, ImageFrame):
+                file_id = frame.metadata.get('file_id', f"image_{datetime.utcnow().isoformat()}")
+                attachment = Attachment(
+                    id=file_id,
+                    type=f"image/{frame.format}",
+                    filename=f"{file_id}.{frame.format}",
+                    data=frame.content
+                )
+            elif isinstance(frame, DocumentFrame):
+                file_id = frame.metadata.get('file_unique_id', frame.metadata.get('file_id', 'unknown'))
+                attachment = Attachment(
+                    id=file_id,
+                    type=frame.mime_type,
+                    filename=frame.filename,
+                    data=frame.content
+                )
+            elif isinstance(frame, AudioFrame):
+                file_id = frame.metadata.get('file_id', f"audio_{datetime.utcnow().isoformat()}")
+                attachment = Attachment(
+                    id=file_id,
+                    type=frame.mime_type,
+                    filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
+                    data=frame.content
+                )
+            elif isinstance(frame, VoiceFrame):
+                file_id = frame.metadata.get('file_id', f"voice_{datetime.utcnow().isoformat()}")
+                attachment = Attachment(
+                    id=file_id,
+                    type=frame.mime_type,
+                    filename=f"{file_id}.{frame.mime_type.split('/')[-1]}",
+                    data=frame.content
+                )
+            elif isinstance(frame, StickerFrame):
+                file_id = frame.metadata.get('file_id', f"sticker_{datetime.utcnow().isoformat()}")
+                attachment = Attachment(
+                    id=file_id,
+                    type="image/webp",
+                    filename=f"{file_id}_{frame.set_name}.webp",
+                    data=frame.content
+                )
+            else:
+                raise StorageProcessingError(f"Unsupported media frame type: {type(frame)}")
+            
+            logger.debug(f"PROC - Created attachment: {attachment.filename}")
+            
+            # Create message with attachment
+            message = Message(
+                content=getattr(frame, 'caption', '') or '',
+                source='telegram',
+                metadata={
+                    'chat_id': chat_id,
+                    'thread_id': thread_id,
+                    'source': 'telegram'
+                },
+                attachments=[attachment]
+            )
+            logger.debug(f"PROC - Created message with {len(message.attachments)} attachments")
+            
+            # Save message and attachments
+            message_path, media_paths = await self.storage.save_message(thread_id, message)
+            logger.info(f"PROC - Saved media message to topic {thread_id}")
+            
+            # Commit message and media
+            await self._commit_message(message_path)
+            await self._commit_media(media_paths)
+            
+        except Exception as e:
+            logger.error(f"PROC - Failed to process media frame: {e}", exc_info=True)
+            raise
+
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a frame by saving it to storage.
+        
+        Args:
+            frame: The frame to process
+            
+        Returns:
+            The processed frame or None
+        """
+        await self.process_frame(frame)
+        return frame 
