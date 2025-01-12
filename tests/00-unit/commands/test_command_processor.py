@@ -59,7 +59,7 @@ async def test_register_handler_validation(storage_mock):
 async def test_process_non_command_frame(storage_mock):
     """Test processing non-command frame."""
     processor = CommandProcessor()
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     
     result = await processor.process_frame(frame)
     assert result is None
@@ -72,7 +72,7 @@ async def test_process_unknown_command(storage_mock):
     
     result = await processor.process_frame(frame)
     assert isinstance(result, TextFrame)
-    assert "Unknown command" in result.text
+    assert "Unknown command" in result.content
 
 @pytest.mark.asyncio
 async def test_handler_error(storage_mock):
@@ -84,4 +84,5 @@ async def test_handler_error(storage_mock):
     frame = CommandFrame(command="/test", metadata={})
     
     with pytest.raises(RuntimeError):
-        await processor.process_frame(frame) 
+        await processor.process_frame(frame)
+        await handler.handle.return_value 

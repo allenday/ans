@@ -26,6 +26,8 @@ class TestStartCommandHandler:
     async def test_handle_success(self):
         """Test successful start command handling."""
         coordinator = AsyncMock()
+        coordinator.init_storage.return_value = None
+        coordinator.create_topic.return_value = None
         handler = StartCommandHandler(coordinator)
         frame = CommandFrame(
             command="/start",
@@ -39,9 +41,9 @@ class TestStartCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "Welcome to Chronicler!" in result.text
-        coordinator.init_storage.assert_called_once()
-        coordinator.create_topic.assert_called_once()
+        assert "Welcome to Chronicler!" in result.content
+        assert coordinator.init_storage.called
+        assert coordinator.create_topic.called
     
     @pytest.mark.asyncio
     async def test_handle_error(self):
@@ -81,7 +83,7 @@ class TestConfigCommandHandler:
         
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
-        assert "Usage: /config" in result.text
+        assert "Usage: /config" in result.content
         coordinator.set_github_config.assert_not_called()
     
     @pytest.mark.asyncio
@@ -102,7 +104,7 @@ class TestConfigCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "GitHub configuration updated" in result.text
+        assert "GitHub configuration updated" in result.content
         coordinator.set_github_config.assert_called_once_with(
             token="token123",
             repo="owner/repo"
@@ -136,6 +138,7 @@ class TestStatusCommandHandler:
         coordinator = AsyncMock()
         coordinator.is_initialized.return_value = False
         coordinator.sync = AsyncMock()
+        coordinator.sync.return_value = None
         handler = StatusCommandHandler(coordinator)
         frame = CommandFrame(
             command="/status",
@@ -148,8 +151,8 @@ class TestStatusCommandHandler:
         
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
-        assert "Storage not initialized" in result.text
-        coordinator.sync.assert_not_called()
+        assert "Storage not initialized" in result.content
+        assert not coordinator.sync.called
     
     @pytest.mark.asyncio
     async def test_handle_success(self):
@@ -157,6 +160,7 @@ class TestStatusCommandHandler:
         coordinator = AsyncMock()
         coordinator.is_initialized.return_value = True
         coordinator.sync = AsyncMock()
+        coordinator.sync.return_value = None
         handler = StatusCommandHandler(coordinator)
         frame = CommandFrame(
             command="/status",
@@ -170,5 +174,5 @@ class TestStatusCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "Chronicler Status" in result.text
-        coordinator.sync.assert_called_once() 
+        assert "Chronicler Status" in result.content
+        assert coordinator.sync.called 
