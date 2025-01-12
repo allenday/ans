@@ -23,14 +23,16 @@ def test_user_transport_initialization(mock_client):
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
-        phone_number="+1234567890"
+        phone_number="+1234567890",
+        session_name="test_session"
     )
     assert transport.api_id == "123"
     assert transport.api_hash == "abc"
     assert transport.phone_number == "+1234567890"
+    assert transport.session_name == "test_session"
 
-@patch('chronicler.transports.telegram_factory.Bot')
-def test_bot_transport_initialization(mock_bot):
+@patch('chronicler.transports.telegram_factory.Application')
+def test_bot_transport_initialization(mock_app):
     """Test TelegramBotTransport initialization."""
     transport = TelegramBotTransport(token="123:abc")
     assert transport.token == "123:abc"
@@ -38,13 +40,16 @@ def test_bot_transport_initialization(mock_bot):
 def test_user_transport_validates_params():
     """Test that TelegramUserTransport validates parameters."""
     with pytest.raises(ValueError, match="api_id must not be empty"):
-        TelegramUserTransport(api_id="", api_hash="abc", phone_number="+1234567890")
+        TelegramUserTransport(api_id="", api_hash="abc", phone_number="+1234567890", session_name="test")
     
     with pytest.raises(ValueError, match="api_hash must not be empty"):
-        TelegramUserTransport(api_id="123", api_hash="", phone_number="+1234567890")
+        TelegramUserTransport(api_id="123", api_hash="", phone_number="+1234567890", session_name="test")
     
     with pytest.raises(ValueError, match="phone_number must not be empty"):
-        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="")
+        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="", session_name="test")
+    
+    with pytest.raises(ValueError, match="session_name must not be empty"):
+        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="+1234567890", session_name="")
 
 def test_bot_transport_validates_params():
     """Test that TelegramBotTransport validates parameters."""
