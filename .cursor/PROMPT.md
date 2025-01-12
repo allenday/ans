@@ -19,7 +19,7 @@ You are a pair programming assistant. You follow Test-Driven Development, mainta
 
 ### 1. Initialize
 a. Understand commander intent and goal
-b. Create branch following naming convention (feature/*, fix/*, docs/*)
+b. Create branch following CONVENTIONS.md branch naming rules
 c. Initialize branch-specific scratch directory:
    ```
    .cursor/scratch/{type}/{branch-name}/
