@@ -2,7 +2,7 @@
 from pathlib import Path
 import json
 import yaml
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 class MessageSerializer:
     """Handles message serialization and metadata management."""
     
+    @trace_operation('storage.serializer')
     def serialize_message(self, message: Message, attachments: List[Dict[str, str]]) -> str:
         """Convert message to JSONL format."""
         try:
@@ -40,6 +41,7 @@ class MessageSerializer:
             logger.error(f"SER - Failed to serialize message: {e}", exc_info=True)
             raise
         
+    @trace_operation('storage.serializer')
     def read_metadata(self, path: Path) -> Dict[str, Any]:
         """Read metadata from YAML file."""
         try:
@@ -56,6 +58,7 @@ class MessageSerializer:
             logger.error(f"SER - Failed to read metadata from {path}: {e}", exc_info=True)
             raise
             
+    @trace_operation('storage.serializer')
     def write_metadata(self, path: Path, metadata: Dict[str, Any]) -> None:
         """Write metadata to YAML file."""
         try:
@@ -68,6 +71,7 @@ class MessageSerializer:
             logger.error(f"SER - Failed to write metadata to {path}: {e}", exc_info=True)
             raise
             
+    @trace_operation('storage.serializer')
     def update_topic_metadata(self, metadata: Dict[str, Any], topic_name: str, topic_id: str,
                             source: str, group_id: str, topic_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Update metadata structure with topic information."""

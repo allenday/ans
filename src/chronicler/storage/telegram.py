@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 
 from chronicler.storage.interface import Message, Attachment
 
@@ -19,6 +19,7 @@ class AttachmentInfo:
 class TelegramAttachmentHandler:
     """Handles Telegram-specific attachment logic."""
     
+    @trace_operation('storage.telegram')
     def get_attachment_info(self, message: Message, attachment: Attachment) -> AttachmentInfo:
         """Get attachment storage information."""
         try:
@@ -70,6 +71,7 @@ class TelegramAttachmentHandler:
             logger.error(f"TG - Failed to get attachment info: {e}", exc_info=True)
             raise
         
+    @trace_operation('storage.telegram')
     def update_message_content(self, message: Message) -> None:
         """Update message content based on Telegram-specific rules."""
         try:
@@ -84,6 +86,7 @@ class TelegramAttachmentHandler:
             logger.error(f"TG - Failed to update message content: {e}", exc_info=True)
             raise
             
+    @trace_operation('storage.telegram')
     def get_attachment_path_str(self, info: AttachmentInfo) -> str:
         """Get the relative path string for the attachment."""
         try:
