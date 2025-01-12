@@ -1,11 +1,13 @@
-"""Live tests for Telegram command interactions."""
-import os
+"""Test Telegram command handling."""
 import pytest
-import logging
-import asyncio
 import pytest_asyncio
+import os
+import asyncio
 from typing import AsyncGenerator
+from telegram import Update, Message, Chat, User
+from telegram.ext import CallbackContext, MessageHandler, filters
 
+from chronicler.logging import get_logger, configure_logging
 from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.transports.telegram_factory import (
@@ -15,18 +17,13 @@ from chronicler.transports.telegram_factory import (
 )
 from chronicler.transports.events import EventMetadata
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @pytest.fixture(autouse=True)
 def setup_logging(caplog):
     """Set up logging for all tests."""
-    caplog.set_level(logging.DEBUG)
+    configure_logging(level='DEBUG')
+    caplog.set_level('DEBUG')
     yield
 
 @pytest_asyncio.fixture

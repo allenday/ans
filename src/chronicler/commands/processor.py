@@ -1,5 +1,5 @@
 """Command processor implementation."""
-import logging
+from chronicler.logging import get_logger
 from typing import Dict, Type, Optional
 
 from chronicler.frames.base import Frame
@@ -8,7 +8,7 @@ from chronicler.frames.media import TextFrame
 from .frames import CommandFrame
 from .handlers import CommandHandler
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class CommandProcessor(BaseProcessor):
     """Processes command frames by routing them to appropriate handlers."""

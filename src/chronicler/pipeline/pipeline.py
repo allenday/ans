@@ -1,10 +1,10 @@
 """Pipeline implementation."""
-import logging
+from chronicler.logging import get_logger
 from typing import List, Optional
 from chronicler.frames.base import Frame
 from chronicler.processors.base import BaseProcessor
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class Pipeline:
     """A pipeline that processes frames through a series of processors."""

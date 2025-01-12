@@ -1,11 +1,11 @@
 """Media frame classes for the pipeline."""
-import logging
+from chronicler.logging import get_logger
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from .base import Frame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class TextFrame(Frame):

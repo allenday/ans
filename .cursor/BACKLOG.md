@@ -7,54 +7,54 @@
 ## Current Sprint  
   
 ### In Progress  
-- None  
+1. None  
   
 ### Next Up  
 1. Implement asynchronous git operations  
-   - Requirements:  
-     - Commit messages on branch-specific schedule  
-     - Decouple message receipt from git pushes  
-     - Provide operation status  
-   - Components:  
-     - GitOperationQueue with branch awareness  
-     - StatusReporter  
-   - Constraints:  
-     - Memory-efficient queuing  
-     - Performance optimization  
-     - Basic retry mechanism for failures  
+   1. Requirements:  
+      1. Commit messages on branch-specific schedule  
+      2. Decouple message receipt from git pushes  
+      3. Provide operation status  
+   2. Components:  
+      1. GitOperationQueue with branch awareness  
+      2. StatusReporter  
+   3. Constraints:  
+      1. Memory-efficient queuing  
+      2. Performance optimization  
+      3. Basic retry mechanism for failures  
   
 ## Future Work  
   
 ### Features  
-- [ ] Add multi-tenant support for group chats  
-  - Requirements:  
-    - Bot configuration via slash commands  
-    - Per-group chat configuration  
-    - Branch-specific git repository support  
-    - User authorization management  
+1. Add multi-tenant support for group chats  
+   1. Requirements:  
+      1. Bot configuration via slash commands  
+      2. Per-group chat configuration  
+      3. Branch-specific git repository support  
+      4. User authorization management  
   
 ### Technical Debt  
-- [ ] Clean up old implementation files  
-- [ ] Add performance metrics  
-- [ ] Add monitoring hooks  
-- [ ] Enhance operational logging  
-  - Requirements:  
-    - Add structured logging with consistent metadata  
-    - Implement correlation IDs for message tracking  
-    - Add performance metrics in logs  
-    - Standardize log levels across components  
-    - Add component tracing  
+1. Clean up old implementation files  
+2. Add performance metrics  
+3. Add monitoring hooks  
+4. Enhance operational logging  
+   1. Requirements:  
+      1. Add structured logging with consistent metadata  
+      2. Implement correlation IDs for message tracking  
+      3. Add performance metrics in logs  
+      4. Standardize log levels across components  
+      5. Add component tracing  
   
 ### Documentation  
 > See DOCUMENTATION.md for full documentation plan and status  
   
-- [ ] Update technical documentation to reflect branch-based workflow  
-- [ ] Add deployment guide with branch configuration  
-- [ ] Add troubleshooting guide  
-- [ ] Add message format specification  
-- [ ] Add storage format specification  
-- [ ] Add configuration guide  
+1. Update technical documentation to reflect branch-based workflow  
+2. Add deployment guide with branch configuration  
+3. Add troubleshooting guide  
+4. Add message format specification  
+5. Add storage format specification  
+6. Add configuration guide  
   
 ## Known Issues  
-- [ ] Voice messages saved with incorrect extension  
-- [ ] Large files cause memory pressure
+1. Voice messages saved with incorrect extension  
+2. Large files cause memory pressure
