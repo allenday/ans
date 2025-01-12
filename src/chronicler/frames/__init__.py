@@ -1,6 +1,7 @@
 """Frame package exports."""
 from .base import Frame
 from .media import (
+    MediaFrame,
     TextFrame,
     ImageFrame,
     DocumentFrame,
@@ -12,6 +13,7 @@ from .command import CommandFrame
 
 __all__ = [
     'Frame',
+    'MediaFrame',
     'TextFrame',
     'ImageFrame',
     'DocumentFrame',
