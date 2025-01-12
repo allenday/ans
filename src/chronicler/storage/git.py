@@ -32,6 +32,10 @@ class GitStorageAdapter(StorageAdapter):
         self.repo_path = None
         self._initialized = False
     
+    def is_initialized(self) -> bool:
+        """Check if storage is initialized"""
+        return self._initialized
+        
     def __await__(self) -> Generator[Any, None, 'GitStorageAdapter']:
         """Make the adapter awaitable after initialization"""
         if not self._initialized:

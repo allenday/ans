@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Optional, List
 from datetime import datetime
 
+from chronicler.logging import trace_operation
+
 @dataclass
 class EventMetadata:
     """Normalized metadata from transport events.
@@ -57,9 +59,11 @@ class TelethonEvent(EventBase):
     def __init__(self, event):
         self._event = event
     
+    @trace_operation('transport.events.telethon')
     def get_text(self) -> str:
         return self._event.message.text
     
+    @trace_operation('transport.events.telethon')
     def get_metadata(self) -> EventMetadata:
         # Handle sender info safely
         sender_id = self._event.sender_id if self._event.sender_id else None
@@ -75,12 +79,14 @@ class TelethonEvent(EventBase):
             message_id=self._event.message.id
         )
     
+    @trace_operation('transport.events.telethon')
     def get_command(self) -> Optional[str]:
         text = self.get_text()
         if text.startswith('/'):
             return text.split()[0].lower()
         return None
     
+    @trace_operation('transport.events.telethon')
     def get_command_args(self) -> List[str]:
         text = self.get_text()
         parts = text.split()
@@ -93,9 +99,11 @@ class TelegramBotEvent(EventBase):
         self._update = update
         self._context = context
     
+    @trace_operation('transport.events.telegram_bot')
     def get_text(self) -> str:
         return self._update.message.text
     
+    @trace_operation('transport.events.telegram_bot')
     def get_metadata(self) -> EventMetadata:
         return EventMetadata(
             chat_id=self._update.message.chat_id,
@@ -106,12 +114,14 @@ class TelegramBotEvent(EventBase):
             message_id=self._update.message.message_id
         )
     
+    @trace_operation('transport.events.telegram_bot')
     def get_command(self) -> Optional[str]:
         text = self.get_text()
         if text.startswith('/'):
             return text.split()[0].lower()
         return None
     
+    @trace_operation('transport.events.telegram_bot')
     def get_command_args(self) -> List[str]:
         if self._context and self._context.args:
             return self._context.args

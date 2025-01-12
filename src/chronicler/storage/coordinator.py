@@ -20,7 +20,7 @@ class StorageCoordinator(StorageAdapter):
         self.git_storage = GitStorageAdapter(storage_path)
         self.file_storage = FileSystemStorage(storage_path)
         self.serializer = MessageSerializer()
-        self.attachment_handler = TelegramAttachmentHandler(storage_path)
+        self.attachment_handler = TelegramAttachmentHandler()
         logger.debug("COORD - Initialized StorageCoordinator", extra={
             'context': {'storage_path': str(storage_path)}
         })

@@ -1,6 +1,6 @@
 """Tests for command handlers."""
 import pytest
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from chronicler.commands.frames import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.commands.handlers import (
@@ -10,23 +10,23 @@ from chronicler.commands.handlers import (
     StatusCommandHandler
 )
 
+from tests.mocks.storage import coordinator_mock
+
 class TestCommandHandler:
     """Test base command handler."""
     
-    def test_init(self):
+    def test_init(self, coordinator_mock):
         """Test handler initialization."""
-        coordinator = Mock()
-        handler = StartCommandHandler(coordinator)
-        assert handler.coordinator == coordinator
+        handler = StartCommandHandler(coordinator_mock)
+        assert handler.coordinator == coordinator_mock
 
 class TestStartCommandHandler:
     """Test start command handler."""
     
     @pytest.mark.asyncio
-    async def test_handle_success(self):
+    async def test_handle_success(self, coordinator_mock):
         """Test successful start command handling."""
-        coordinator = AsyncMock()
-        handler = StartCommandHandler(coordinator)
+        handler = StartCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/start",
             metadata={
@@ -40,15 +40,14 @@ class TestStartCommandHandler:
         
         assert isinstance(result, TextFrame)
         assert "Welcome to Chronicler!" in result.text
-        coordinator.init_storage.assert_called_once()
-        coordinator.create_topic.assert_called_once()
+        coordinator_mock.init_storage.assert_called_once()
+        coordinator_mock.create_topic.assert_called_once()
     
     @pytest.mark.asyncio
-    async def test_handle_error(self):
+    async def test_handle_error(self, coordinator_mock):
         """Test error handling in start command."""
-        coordinator = AsyncMock()
-        coordinator.init_storage.side_effect = RuntimeError("Test error")
-        handler = StartCommandHandler(coordinator)
+        coordinator_mock.init_storage.side_effect = RuntimeError("Test error")
+        handler = StartCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/start",
             metadata={
@@ -65,10 +64,9 @@ class TestConfigCommandHandler:
     """Test config command handler."""
     
     @pytest.mark.asyncio
-    async def test_handle_missing_args(self):
+    async def test_handle_missing_args(self, coordinator_mock):
         """Test config command with missing arguments."""
-        coordinator = AsyncMock()
-        handler = ConfigCommandHandler(coordinator)
+        handler = ConfigCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/config",
             args=["url"],
@@ -82,13 +80,12 @@ class TestConfigCommandHandler:
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
         assert "Usage: /config" in result.text
-        coordinator.set_github_config.assert_not_called()
+        coordinator_mock.set_github_config.assert_not_called()
     
     @pytest.mark.asyncio
-    async def test_handle_success(self):
+    async def test_handle_success(self, coordinator_mock):
         """Test successful config command handling."""
-        coordinator = AsyncMock()
-        handler = ConfigCommandHandler(coordinator)
+        handler = ConfigCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/config",
             args=["owner/repo", "token123"],
@@ -103,17 +100,16 @@ class TestConfigCommandHandler:
         
         assert isinstance(result, TextFrame)
         assert "GitHub configuration updated" in result.text
-        coordinator.set_github_config.assert_called_once_with(
+        coordinator_mock.set_github_config.assert_called_once_with(
             token="token123",
             repo="owner/repo"
         )
     
     @pytest.mark.asyncio
-    async def test_handle_config_error(self):
+    async def test_handle_config_error(self, coordinator_mock):
         """Test error handling in config command."""
-        coordinator = AsyncMock()
-        coordinator.set_github_config.side_effect = RuntimeError("Test error")
-        handler = ConfigCommandHandler(coordinator)
+        coordinator_mock.set_github_config.side_effect = RuntimeError("Test error")
+        handler = ConfigCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/config",
             args=["owner/repo", "token123"],
@@ -131,12 +127,10 @@ class TestStatusCommandHandler:
     """Test status command handler."""
     
     @pytest.mark.asyncio
-    async def test_handle_not_initialized(self):
+    async def test_handle_not_initialized(self, coordinator_mock):
         """Test status command when storage is not initialized."""
-        coordinator = AsyncMock()
-        coordinator.is_initialized.return_value = False
-        coordinator.sync = AsyncMock()
-        handler = StatusCommandHandler(coordinator)
+        coordinator_mock.is_initialized.return_value = False
+        handler = StatusCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/status",
             metadata={
@@ -149,15 +143,13 @@ class TestStatusCommandHandler:
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
         assert "Storage not initialized" in result.text
-        coordinator.sync.assert_not_called()
+        coordinator_mock.sync.assert_not_called()
     
     @pytest.mark.asyncio
-    async def test_handle_success(self):
+    async def test_handle_success(self, coordinator_mock):
         """Test successful status command handling."""
-        coordinator = AsyncMock()
-        coordinator.is_initialized.return_value = True
-        coordinator.sync = AsyncMock()
-        handler = StatusCommandHandler(coordinator)
+        coordinator_mock.is_initialized.return_value = True
+        handler = StatusCommandHandler(coordinator_mock)
         frame = CommandFrame(
             command="/status",
             metadata={
@@ -171,4 +163,4 @@ class TestStatusCommandHandler:
         
         assert isinstance(result, TextFrame)
         assert "Chronicler Status" in result.text
-        coordinator.sync.assert_called_once() 
+        coordinator_mock.sync.assert_called_once() 

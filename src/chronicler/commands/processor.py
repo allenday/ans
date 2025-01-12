@@ -1,11 +1,11 @@
 """Command processor implementation."""
-from chronicler.logging import get_logger
+from chronicler.logging import get_logger, trace_operation
 from typing import Dict, Type, Optional
 
 from chronicler.frames.base import Frame
 from chronicler.processors.base import BaseProcessor
 from chronicler.frames.media import TextFrame
-from .frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 from .handlers import CommandHandler
 
 logger = get_logger(__name__)
@@ -16,44 +16,43 @@ class CommandProcessor(BaseProcessor):
     def __init__(self):
         """Initialize the command processor."""
         super().__init__()
-        logger.info("COMMAND - Initializing command processor")
+        self.logger = get_logger(__name__)
+        self.logger.info("COMMAND - Initializing command processor")
         self._handlers: Dict[str, CommandHandler] = {}
-        logger.debug("COMMAND - No handlers registered")
+        self.logger.debug("COMMAND - No handlers registered")
         
+    @trace_operation('commands.processor')
     async def process(self, frame: Frame) -> Optional[Frame]:
         """Process a frame, routing commands to appropriate handlers."""
-        return await self.process_frame(frame)
-        
-    async def process_frame(self, frame: Frame) -> Optional[Frame]:
-        """Process a frame, routing commands to appropriate handlers."""
         if not isinstance(frame, CommandFrame):
-            logger.debug(f"COMMAND - Ignoring non-command frame: {type(frame)}")
+            self.logger.debug(f"COMMAND - Ignoring non-command frame: {type(frame)}")
             return None
             
-        logger.info(f"COMMAND - Processing command: {frame.command} from user {frame.metadata.get('sender_id', 'unknown')}")
-        logger.debug(f"COMMAND - Command args: {frame.args}")
-        logger.debug(f"COMMAND - Command metadata: {frame.metadata}")
+        return await self.process_frame(frame)
         
-        try:
-            if handler := self._handlers.get(frame.command.lower()):
-                logger.debug(f"COMMAND - Using handler {handler.__class__.__name__} for {frame.command}")
-                result = await handler.handle(frame)
-                logger.info(f"COMMAND - Successfully handled {frame.command} command")
-                return result
-            else:
-                logger.warning(f"COMMAND - Unknown command received: {frame.command}")
-                return TextFrame(
-                    text="Unknown command. Available commands: /start, /config, /status",
-                    metadata=frame.metadata
-                )
+    @trace_operation('commands.processor')
+    async def process_frame(self, frame: CommandFrame) -> Frame:
+        """Process a command frame."""
+        command = frame.command
+        args = frame.args
+        metadata = frame.metadata
+
+        self.logger.info(f"COMMAND - Processing command: {command} from user {metadata.get('sender_id', 'unknown')}")
+        self.logger.debug(f"COMMAND - Command args: {args}")
+        self.logger.debug(f"COMMAND - Command metadata: {metadata}")
+
+        if command not in self._handlers:
+            self.logger.error(f"COMMAND - No handler registered for command: {command}")
+            return TextFrame(text=f"Unknown command: {command}", metadata=metadata)
+
+        handler = self._handlers[command]
+        self.logger.debug(f"COMMAND - Using handler {handler.__class__.__name__} for {command}")
+
+        # Let exceptions propagate
+        result = await handler.handle(frame)
+        return result
             
-        except Exception as e:
-            logger.error(
-                f"COMMAND - Error processing command {frame.command} from user {frame.metadata.get('sender_id', 'unknown')}: {e}",
-                exc_info=True
-            )
-            raise
-            
+    @trace_operation('commands.processor')
     def register_handler(self, command: str, handler: CommandHandler) -> None:
         """Register a handler for a command."""
         if not command.startswith('/'):
