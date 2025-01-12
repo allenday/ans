@@ -49,6 +49,10 @@ Thank you for your interest in contributing to Chronicler! This document provide
    pytest tests/02-live
    ```
 
+   Note: A pre-push Git hook is configured to automatically run unit tests before each push.
+   If tests fail, the push will be blocked to maintain code quality. You can find the hook
+   configuration in `.git/hooks/pre-push`.
+
 7. **Submit Pull Request**
    - Push changes to your fork
    - Create PR through GitHub interface
