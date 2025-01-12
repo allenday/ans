@@ -1,31 +1,7 @@
-# Development Backlog  
-  
-## Current Sprint  
-  
-### In Progress  
-- Implement asynchronous git operations  
-   - Requirements:  
-     - ✅ Synchronous local commits on message receipt
-     - ✅ Asynchronous remote pushes on configurable interval
-     - ✅ Environment-based git configuration
-     - ✅ Basic retry mechanism for push failures
-   - Components:  
-     - ✅ GitProcessor for local commits
-     - ✅ GitSyncService for async pushes
-     - ✅ Configurable sync interval (.env)
-   - Constraints:  
-     - ✅ Local commits must be fast and reliable
-     - ✅ Push failures shouldn't affect message processing
-     - ✅ Git operations must preserve message order
-     - ✅ Must handle concurrent operations safely
-   - Configuration (.env):
-     - ✅ GIT_REPO_URL=https://github.com/user/repo
-     - ✅ GIT_BRANCH=main
-     - ✅ GIT_USERNAME=username
-     - ✅ GIT_ACCESS_TOKEN=token
-     - ✅ GIT_SYNC_INTERVAL=300  # seconds
-  
-### Next Up  
+# Development Backlog    
+
+### Future Work  
+
 1. Add per-user multi-tenancy  
    - Requirements:  
      - Per-user chat configuration  
@@ -37,40 +13,8 @@
      - Secure credential handling  
      - Configuration persistence  
      - Clear feedback for user errors  
-  
-2. Complete test coverage for existing features  
-   - Message types to test:  
-     - ✅ Text messages with replies  
-     - ✅ Images with captions  
-     - ✅ Documents with metadata  
-     - ✅ Audio files  
-     - ✅ Voice messages  
-     - ✅ Stickers  
-   - Test levels needed:  
-     - ✅ Unit: Frame creation and validation  
-       - ✅ Fixed TelegramBotEvent tests
-         - Updated to use effective_message and effective_user
-         - Fixed string handling in fallback args test
-         - Improved mock object structure
-     - ✅ Mock: Storage operations  
-     - ✅ Live: End-to-end message flow  
-   - Test infrastructure:  
-     - ✅ TestBot implementation  
-     - ✅ Mock storage backend  
-     - ✅ Test data fixtures  
-  
-3. ✅ Implement TestBot for command validation  
-   - Completed:  
-     - ✅ Command sequence validation  
-     - ✅ Error handling  
-     - ✅ Configuration persistence  
-     - ✅ Multi-user interactions  
-   - Implementation:  
-     - ✅ Command simulation  
-     - ✅ Response validation  
-     - ✅ State verification  
-  
-4. Add Twitter Transport for bookmark archival  
+
+2. Add Twitter Transport for bookmark archival  
    - Requirements:  
      - Authenticate with Twitter API  
      - Poll for new bookmarks periodically  
@@ -92,28 +36,9 @@
        - YYYY-MM-DD/  
          - tweet_id.json (metadata)  
          - media/ (attachments)  
+    
+3. Log rotation and summarization  
   
-## Future Work  
-  
-### Features  
-- [ ] Add multi-tenant support for group chats  
-  - Requirements:  
-    - Bot configuration via slash commands  
-    - Per-group chat configuration  
-    - Multiple git repository support  
-    - User authorization management  
-  - Commands:  
-    - /start - Initialize bot in group  
-    - /config - Configure git repository  
-    - /status - Show current settings  
-  - Components:  
-    - MultiTenantCoordinator  
-  - Constraints:  
-    - Secure credential handling  
-    - Clear access controls  
-    - Configuration persistence  
-  
-- [ ] Add log rotation and summarization  
    - Requirements:  
      - Daily rotation of messages.jsonl  
      - Archive old logs by date  
@@ -135,7 +60,8 @@
        - statistics.json (message counts, types)  
        - topics.json (extracted topics)  
        - participants.json (active users)  
-  
+
+4. Advanced message handling  
 - [ ] Add support for topic branching (by forwarding a message)  
 - [ ] Add support for message editing  
 - [ ] Add support for message deletion  
@@ -145,7 +71,8 @@
 - [ ] Add support for message reactions  
 - [ ] Add support for message threads (supergroups)  
 - [ ] Add support for message search  
-  
+
+5. Async post processing as github actions  
 - [ ] Add link expansion and archival  
    - Requirements:  
      - Detect URLs in messages  
@@ -172,188 +99,113 @@
              - content.pdf  
              - complete/  
   
-### Improvements  
-- [ ] Optimize media file storage  
-- [ ] Add compression for large files  
-- [ ] Improve error recovery  
-- [ ] Add rate limiting  
-- [ ] Add message batching  
-- [ ] Add periodic storage cleanup  
-- [ ] Add storage statistics  
+
   
-### Technical Debt  
-- [ ] Clean up old implementation files  
-- ✅ Reorganize test structure  
-  - Completed:
-    - Added proper test markers (unit, mock, live)
-    - Improved test directory organization
-    - Added norecursedirs and import mode settings
-    - Split tests by functionality and type
-    - Added unique session handling for Telegram tests
-    - Improved test cleanup and isolation
-    - Added comprehensive test coverage for all message types
-- ✅ Add comprehensive logging  
-- [ ] Add performance metrics  
-- [ ] Add monitoring hooks  
-- ✅ Clean up and refactor transport code
-  - Completed:
-    - Split telegram transport into bot.py and user.py
-    - Moved telegram code to dedicated telegram/ package
-    - Made event methods async for better flow control
-    - Added proper type checking in event handlers
-    - Improved error handling in transport layer
-    - Fixed command parsing and registration
-    - Added comprehensive test coverage
-    - Improved session management
-    - Added proper cleanup for test sessions
-  - Components added:
-    - TelegramBotTransport and TelegramUserTransport
-    - TelegramTransportFactory
-    - EventHandler base class
-    - Comprehensive test suite
-    - Session management utilities
-  - Benefits achieved:
-    - Reduced code duplication
-    - More reliable tests
-    - Cleaner logging
-    - Better error handling
-    - Easier maintenance
-    - Proper async/await usage
-    - Improved test isolation
-- [ ] Enhance operational logging
-  - Requirements:
-    - Add structured logging with consistent metadata
-    - Implement correlation IDs for message tracking
-    - Add performance metrics in logs
-    - Standardize log levels across components
-    - Add component tracing
-  - Components:
-    - LoggingMiddleware for correlation
-    - MetricsLogger for performance
-    - StructuredLogFormatter
-    - TraceContext manager
-  - Benefits:
-    - Better debugging capabilities
-    - Performance tracking
-    - Cross-component tracing
-    - Easier log aggregation
-- [ ] Move MessageReceiver from tests to library
-  - Requirements:
-    - Extract from test_telegram_interaction.py
-    - Generalize for production use
-    - Add proper error handling
-    - Add configuration options
-  - Components:
-    - MessageReceiver base class
-    - Transport-specific implementations
-    - Message validation framework
-  - Benefits:
-    - Reusable message verification
-    - Consistent handling across transports
-    - Better testing infrastructure
-    - Simplified test code
-- ✅ Standardize test synchronization
-  - Completed:
-    - Made all event methods async
-    - Added proper async/await usage in tests
-    - Improved session isolation
-    - Added unique session handling
-    - Fixed command parsing and registration
-    - Added comprehensive test coverage
-    - Improved error handling
-    - Added proper cleanup for test sessions
-  - Benefits achieved:
-    - More reliable tests
-    - Better error handling
-    - Improved test isolation
-    - Cleaner async flow
-    - Proper resource cleanup
-- [ ] Implement proper dependency injection
-  - Requirements:
-    - Extract interface definitions
-    - Create DI container
-    - Configure component lifecycle
-    - Add factory methods
-  - Components:
-    - ServiceContainer
-    - ComponentFactory
-    - LifecycleManager
-    - ConfigurationProvider
-  - Benefits:
-    - Better testability
-    - Cleaner component boundaries
-    - Easier configuration
-    - More flexible architecture
-- [ ] Add proper error recovery mechanisms
-  - Requirements:
-    - Define error categories
-    - Implement retry strategies
-    - Add circuit breakers
-    - Improve error reporting
-  - Components:
-    - RetryManager
-    - CircuitBreaker
-    - ErrorClassifier
-    - RecoveryStrategy
-  - Benefits:
-    - Better system resilience
-    - Clearer error handling
-    - Improved reliability
-    - Better user experience
-- [ ] Complete test coverage matrix  
-  - Requirements:  
-    - ✅ All message types covered in unit tests  
-    - ✅ All error conditions covered in mock tests  
-    - Live tests: All supported message types  
-  - Test Structure:  
-    - ✅ Unit: Core logic and data structures  
-    - ✅ Mock: External service interactions  
-    - Live: End-to-end workflows  
-  - Coverage Goals:  
-    - Unit tests: 100% coverage  
-    - Mock tests: All error conditions  
-    - Live tests: All supported message types  
-- [ ] Implement pydanticAI throughout codebase  
-  - Requirements:  
-    - Convert all data models to pydanticAI  
-    - Add type validation everywhere  
-    - Implement serialization/deserialization  
-  - Components:  
-    - Message models  
-    - Frame models  
-    - Configuration models  
-    - Transport models  
-  - Benefits:  
-    - Runtime type safety  
-    - Automatic validation  
-    - Better IDE support  
-    - Cleaner serialization  
-- [ ] Expand documentation  
-  - Code Documentation:  
-    - Docstrings for all classes  
-    - Type hints everywhere  
-    - Usage examples  
-    - Architecture diagrams  
-  - User Documentation:  
-    - Setup guides  
-    - Configuration reference  
-    - Message type support  
-    - Storage format specs  
-  - Developer Documentation:  
-    - Contributing guidelines  
-    - Test writing guide  
-    - Architecture decisions  
-    - Data flow diagrams  
-  
-### Documentation  
-- [ ] Update documentation  
-- [ ] Add API documentation  
-- [ ] Add deployment guide  
-- [ ] Add troubleshooting guide  
-- [ ] Add message format specification  
-- [ ] Add storage format specification  
-- [ ] Add configuration guide  
-  
-## Known Issues  
-- [ ] Voice messages saved with incorrect extension  
-- [ ] Large files cause memory pressure
+## Tech Debt Status
+
+- ✅ Comprehensive operation logging
+- 🕔 Comprehensive unit tests
+- 🕔 Comprehensive mock tests
+- 🕔 Comprehensive live tests
+- 🕔 Docstrings on all classes and methods
+- 🕔 PydanticAI on all classes and methods
+- 🕔 Error handling on all classes and methods
+- 🕔 Performance metrics
+- 🕔 Monitoring hooks  
+- 🕔 Add proper error recovery mechanisms
+
+## Documentation Status
+
+- 🕐 Comprehensive user documentation  
+- 🕐 Comprehensive developer documentation  
+- 🕐 Add deployment guide  
+- 🕐 Add troubleshooting guide  
+- 🕐 Add configuration guide  
+
+## Implementation Status
+
+### Comamands
+
+- ✅ Basic command processing infrastructure
+- ✅ Core command handlers:
+  - ✅ `/start`
+  - ✅ `/config`
+  - ✅ `/status`
+  - 🕐 `/help`
+
+### Frames
+
+- ✅ Base frame infrastructure
+- ✅ TextFrame implemented for text messages
+- ✅ CommandFrame implemented for command messages
+- ✅ MediaFrame base class implemented for media messages
+  - 🏗️ Photos: in progress in ImageFrame
+  - 🏗️ Audio files: in progress in AudioFrame
+  - 🏗️ Documents: in progress in DocumentFrame
+  - 🏗️ Voice messages: in progress in VoiceFrame
+  - 🏗️ Stickers: in progress in StickerFrame
+  - 🕔 Video messages: in progress in VideoFrame
+  - 🕔 Video files
+  - 🕔 Locations
+  - 🕔 Contacts
+  - 🕔 Polls
+  - 🕔 Invoices
+
+### Handlers
+
+- ✅ Base handler infrastructure
+- 🏗️  `/start` in progress in StartCommandHandler
+- 🏗️  `/config` in progressin ConfigCommandHandler
+- 🏗️  `/status` in progress in StatusCommandHandler
+
+### Pipeline
+
+- ✅ Core pipeline infrastructure
+- ✅ Basic runner implementation
+- 🕐 Pipeline features needed:
+  - 🕐 Error recovery
+  - 🕐 Monitoring
+  - 🕐 Configuration
+  - 🕐 State persistence
+  - 🕐 Health checks
+  - 🕐 Metrics
+
+### Services
+
+- ✅ Git sync service
+- 🕐 Media processing service
+- 🕐 Health monitoring service
+- 🕐 Metrics service
+
+### Storage
+
+- ✅ Core storage infrastructure
+- ✅ Git-based storage implementations
+  - ✅ synchronous git commit on outgoing and incoming messages
+  - ✅ environment-based git configuration
+  - ✅ basic file organization
+  - 🕐 Periodic async synchronization with upstream (pull/push)
+    - 🕔 basic retry mechanism for push failures
+  - 🕐 Conflict resolution
+  - 🕐 Log rotation
+
+### Transport
+
+- ✅ Core transport infrastructure
+- ✅ Telegram transport implementations
+  - ✅ support Telethon for telegram transport
+  - ✅ support python-telegram-bot for telegram transport
+- ✅ Message type support
+  - ✅ In-sync with Frame Media types
+- 🕔 Twitter transport
+- 🕔 Discord transport
+- 🕔 Slack transport
+- 🕔 Move MessageReceiver from tests to library for easier message verification
+
+## GitOps Status
+
+- 🕔 CI/CD automation on merge to main
+  - 🕔 Secrets storage and management
+  - 🕔 Run all unit tests
+  - 🕔 Run all mock tests
+
