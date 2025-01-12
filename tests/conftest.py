@@ -7,6 +7,8 @@ import pytest_asyncio
 from chronicler.storage.interface import User
 from chronicler.transports.telegram_factory import TelegramTransportFactory
 from chronicler.logging import get_logger, configure_logging
+import asyncio
+from pathlib import Path
 
 # Import centralized fixtures
 from tests.mocks.fixtures import mock_session_path, mock_telethon, mock_telegram_bot
@@ -115,5 +117,5 @@ async def test_cleanup():
             task.cancel()
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
+            except asyncio.CancelledError:
                 pass 

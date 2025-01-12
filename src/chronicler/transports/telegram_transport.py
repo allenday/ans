@@ -1,13 +1,16 @@
+"""Telegram transport implementation."""
+import logging
 from typing import Optional
 
-from telegram import Update
-from telegram.ext import Application, MessageHandler, CommandHandler, filters
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from chronicler.frames.base import Frame
+from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, StickerFrame, AudioFrame, VoiceFrame
-from chronicler.transports.base import BaseTransport
-from chronicler.commands.frames import CommandFrame
 from chronicler.logging import get_logger, trace_operation
+from chronicler.processors.command import CommandProcessor
+from chronicler.transports.base import BaseTransport
 
 logger = get_logger(__name__, component="telegram_transport")
 
@@ -129,7 +132,6 @@ class TelegramTransport(BaseTransport):
         # For forum messages, if no thread_id is present, this might be in the General topic
         if is_forum and not thread_id:
             thread_id = 1  # General topic in forums always has ID 1
-            logger.debug("Forum message without thread_id, assuming General topic (ID: 1)")
         
         # Get topic name if available
         topic_name = None
@@ -143,42 +145,30 @@ class TelegramTransport(BaseTransport):
                 if getattr(reply, 'forum_topic_created', None):
                     topic_name = reply.forum_topic_created.name
         
-        logger.debug(f"Received message types: {message_types} in {chat_type} chat")
-        
-        # Add chat context to the log
-        chat_info = f"[{chat_type}"
-        if update.message.chat.title:  # For groups/channels
-            chat_info += f": {update.message.chat.title}"
-            if thread_id:
-                thread_info = topic_name or f"Topic {thread_id}"
-                chat_info += f" (topic: {thread_info})"
-        if update.message.from_user:  # Add sender info if available
-            chat_info += f" from {update.message.from_user.username or update.message.from_user.first_name}"
-        chat_info += "]"
-        
-        # Log detailed message information
-        logger.debug(
-            f"Message details:\n"
-            f"- Chat: id={update.message.chat.id}, type={chat_type}\n"
-            f"- Is Forum: {is_forum}\n"
-            f"- Thread: id={thread_id}\n"
-            f"- Is Topic: {getattr(update.message, 'is_topic_message', False)}\n"
-            f"- Forum Topic: {forum_topic}\n"
-            f"- Reply To: {getattr(update.message, 'reply_to_message', None)}\n"
-            f"- Message ID: {update.message.message_id}\n"
-            f"- Message Types: {message_types}\n"
-            f"- Sender: id={update.message.from_user.id}, "
-            f"is_bot={update.message.from_user.is_bot}, "
-            f"name={update.message.from_user.first_name}\n"
-            f"- Has Caption: {bool(update.message.caption)}\n"
-            f"- Caption: {update.message.caption[:50] + '...' if update.message.caption else None}\n"
-            f"- File Info: {bool(update.message.document)}\n"
-            f"- Sticker Info: {bool(update.message.sticker)}"
-        )
+        logger.debug("Received message", extra={
+            'message_types': message_types,
+            'chat_type': chat_type,
+            'chat_id': update.message.chat.id,
+            'chat_title': update.message.chat.title,
+            'is_forum': is_forum,
+            'thread_id': thread_id,
+            'topic_name': topic_name,
+            'sender_id': update.message.from_user.id,
+            'sender_name': update.message.from_user.username or update.message.from_user.first_name,
+            'message_id': update.message.message_id,
+            'has_caption': bool(update.message.caption),
+            'has_document': bool(update.message.document),
+            'has_sticker': bool(update.message.sticker)
+        })
         
         # Process supported message types
         if update.message.text:
-            logger.info(f"{chat_info} Processing text message: {update.message.text[:50]}...")
+            logger.info("Processing text message", extra={
+                'chat_type': chat_type,
+                'chat_title': update.message.chat.title or "Private Chat",
+                'topic_name': topic_name,
+                'text_preview': update.message.text[:50]
+            })
             metadata = {
                 'chat_id': update.message.chat.id,
                 'chat_title': update.message.chat.title or "Private Chat",
@@ -246,7 +236,7 @@ class TelegramTransport(BaseTransport):
             logger.debug("TextFrame pushed to pipeline")
             
         elif update.message.photo:
-            logger.info(f"{chat_info} Processing photo message")
+            logger.info(f"Processing photo message")
             photo = update.message.photo[-1]  # Get highest quality photo
             logger.debug(f"Photo size: {photo.width}x{photo.height}")
             file = await context.bot.get_file(photo.file_id)
@@ -298,7 +288,7 @@ class TelegramTransport(BaseTransport):
             logger.debug("ImageFrame pushed to pipeline")
 
         elif update.message.sticker:
-            logger.info(f"{chat_info} Processing sticker message")
+            logger.info(f"Processing sticker message")
             sticker = update.message.sticker
             logger.debug(f"Sticker: animated={sticker.is_animated}, video={sticker.is_video}, size={sticker.width}x{sticker.height}")
             file = await context.bot.get_file(sticker.file_id)
@@ -348,7 +338,7 @@ class TelegramTransport(BaseTransport):
             logger.debug("StickerFrame pushed to pipeline")
 
         elif update.message.document:
-            logger.info(f"{chat_info} Processing document message")
+            logger.info(f"Processing document message")
             doc = update.message.document
             logger.debug(f"Document: name={doc.file_name}, type={doc.mime_type}, size={doc.file_size}")
             file = await context.bot.get_file(doc.file_id)
@@ -382,7 +372,7 @@ class TelegramTransport(BaseTransport):
             logger.debug("DocumentFrame pushed to pipeline")
 
         elif update.message.video:
-            logger.info(f"{chat_info} Processing video message")
+            logger.info(f"Processing video message")
             video = update.message.video
             logger.debug(f"Video: name={video.file_name}, type={video.mime_type}, size={video.file_size}, duration={video.duration}s, dimensions={video.width}x{video.height}")
             file = await context.bot.get_file(video.file_id)
@@ -467,7 +457,7 @@ class TelegramTransport(BaseTransport):
             logger.debug("Video DocumentFrame pushed to pipeline")
 
         elif update.message.audio or update.message.voice:
-            logger.info(f"{chat_info} Processing audio/voice message")
+            logger.info(f"Processing audio/voice message")
             audio = update.message.audio or update.message.voice
             logger.debug(f"Audio: duration={audio.duration}s, size={getattr(audio, 'file_size', 'unknown')}")
             file = await context.bot.get_file(audio.file_id)
@@ -554,12 +544,25 @@ class TelegramTransport(BaseTransport):
                 logger.debug("VoiceFrame pushed to pipeline")
 
         else:
-            logger.info(f"{chat_info} Received unsupported message types: {message_types}")
+            logger.info(f"Received unsupported message types: {message_types}")
             
     @trace_operation('transport.telegram')
-    async def process_frame(self, frame: Frame):
-        """Process frames (not used in this transport as it's input-only)."""
-        logger.debug(f"Ignoring incoming frame of type {type(frame)}")
+    async def process_frame(self, frame: dict) -> Optional[Frame]:
+        """Process an incoming frame."""
+        if 'message' in frame:
+            message = frame['message']
+            if 'text' in message and message['text'].startswith('/'):
+                command = message['text'].split()[0]
+                args = message['text'].split()[1:]
+                metadata = {
+                    'sender_id': message['from']['id'],
+                    'sender_name': message['from'].get('username', str(message['from']['id'])),
+                    'chat_id': message['chat']['id']
+                }
+                command_frame = CommandFrame(command=command, args=args, metadata=metadata)
+                logger.debug(f"Created CommandFrame: {command} with {len(args)} args")
+                return await self.processor.process_frame(command_frame)
+        return None
 
     @trace_operation('transport.telegram')
     async def send(self, frame: Frame) -> Optional[Frame]:

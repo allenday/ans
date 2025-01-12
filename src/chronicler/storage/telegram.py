@@ -23,11 +23,9 @@ class TelegramAttachmentHandler:
     def get_attachment_info(self, message: Message, attachment: Attachment) -> AttachmentInfo:
         """Get attachment storage information."""
         try:
-            logger.info("TG - Getting attachment info")
             # Handle stickers
             if message.metadata.get('sticker_set'):
-                logger.debug(f"TG - Processing sticker from set: {message.metadata['sticker_set']}")
-                format = message.metadata['format']  # tgs/webp/webm from transport
+                format = message.metadata['format']
                 filename = f"{message.metadata['file_unique_id']}.{format}"
                 info = AttachmentInfo(
                     category='sticker',
@@ -35,11 +33,14 @@ class TelegramAttachmentHandler:
                     filename=filename,
                     path_parts=(message.metadata['sticker_set'], filename)
                 )
-                logger.debug(f"TG - Created sticker info: category={info.category}, format={info.format}")
+                logger.debug("Created sticker info", extra={
+                    'category': info.category,
+                    'format': info.format,
+                    'sticker_set': message.metadata['sticker_set']
+                })
                 return info
                 
             # Handle regular attachments
-            logger.debug("TG - Processing regular attachment")
             format = message.metadata.get('format')
             if not format:
                 # Fallback to MIME type subtype
@@ -49,15 +50,13 @@ class TelegramAttachmentHandler:
                 # Clean up common MIME subtypes
                 if format == 'jpeg':
                     format = 'jpg'
-                logger.debug(f"TG - Determined format from MIME type: {format}")
+                logger.debug("Determined format from MIME type", extra={'format': format})
                     
             # Use original filename if available, otherwise fallback to ID
             if attachment.filename:
                 filename = attachment.filename
-                logger.debug(f"TG - Using original filename: {filename}")
             else:
                 filename = f"{attachment.id}.{format}"
-                logger.debug(f"TG - Using generated filename: {filename}")
                 
             info = AttachmentInfo(
                 category=format,
@@ -65,10 +64,17 @@ class TelegramAttachmentHandler:
                 filename=filename,
                 path_parts=(filename,)
             )
-            logger.debug(f"TG - Created attachment info: category={info.category}, format={info.format}")
+            logger.debug("Created attachment info", extra={
+                'category': info.category,
+                'format': info.format,
+                'filename': filename
+            })
             return info
         except Exception as e:
-            logger.error(f"TG - Failed to get attachment info: {e}", exc_info=True)
+            logger.error("Failed to get attachment info", exc_info=True, extra={
+                'error': str(e),
+                'attachment_id': attachment.id
+            })
             raise
         
     @trace_operation('storage.telegram')

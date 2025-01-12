@@ -16,9 +16,12 @@ class User:
     metadata: Dict[str, Any] = None
     
     def __post_init__(self):
-        logger.debug(f"Creating user {self.id} with name {self.name}")
         if self.metadata is None:
             self.metadata = {}
+        logger.debug("Created user", extra={
+            'user_id': self.id,
+            'user_name': self.name
+        })
 
 @dataclass
 class Topic:
@@ -28,9 +31,12 @@ class Topic:
     metadata: Dict[str, Any] = None
     
     def __post_init__(self):
-        logger.debug(f"Creating topic {self.id} with name {self.name}")
         if self.metadata is None:
             self.metadata = {}
+        logger.debug("Created topic", extra={
+            'topic_id': self.id,
+            'topic_name': self.name
+        })
 
 @dataclass
 class Message:
@@ -42,17 +48,19 @@ class Message:
     attachments: List['Attachment'] = None
     
     def __post_init__(self):
-        logger.debug(f"Creating message from {self.source} with {len(self.content)} chars")
         if self.metadata is None:
             self.metadata = {}
         if self.timestamp is None:
             self.timestamp = datetime.utcnow()
         if self.attachments:
-            logger.debug(f"Message has {len(self.attachments)} attachments")
+            logger.debug("Created message", extra={
+                'source': self.source,
+                'content_length': len(self.content),
+                'attachment_count': len(self.attachments)
+            })
     
     def to_json(self) -> str:
         """Convert message to JSON string"""
-        logger.debug(f"Converting message from {self.source} to JSON")
         data = asdict(self)
         data['timestamp'] = self.timestamp.isoformat()
         return json.dumps(data)
@@ -60,7 +68,6 @@ class Message:
     @classmethod
     def from_json(cls, json_str: str) -> 'Message':
         """Create message from JSON string"""
-        logger.debug("Creating message from JSON string")
         data = json.loads(json_str)
         data['timestamp'] = datetime.fromisoformat(data['timestamp'])
         return cls(**data)
