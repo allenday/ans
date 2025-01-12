@@ -84,7 +84,7 @@ Systematic implementation of operational logging across the project to improve o
 8.2. ✅ Update .cursor/ documents to clearly indicate that emoji are to be used in PRD.md and CHECKLIST.md derived from their respective templates, according to "status indicators" described in PROMPT.md "status tracking".
 8.3. ✅ Identify and eliminate the bug that causes implementation to begin before tests are written / failing according to red-green-refactor methodology.
 8.4. 🕔 Formulate a plan to add meetrics to BACKLOG.md to for monitoring tech debt. Metrics for:
-   8.4.1. 🕔 Unit test coverage
+   8.4.1. ✅ Unit test coverage
    8.4.2. 🕔 Mock test coverage
    8.4.3. 🕔 Live test coverage
    8.4.4. 🕔 Docstring coverage
@@ -95,3 +95,4 @@ Systematic implementation of operational logging across the project to improve o
    8.5.1. ✅ Updating PRD.md or CHECKLIST.md when completing an item.
    8.5.2. ✅ Creating git add/commit for each bullet being completed from CHECKLIST.md and/or PRD.md
 8.6. ✅ I propose that all documents in .cursor/ use numbered sections and items and refrain from using bullets. Lead by example how we want all docs to be formatted.
+8.7. 🕔 find and excise bug allowing "rm" to be used instead of "git rm", likewise for "mv" instead of "git mv".
