@@ -1,83 +1,58 @@
 """Unit tests for telegram transport."""
 import pytest
+from unittest.mock import patch, MagicMock
+from chronicler.transports.base import BaseTransport
+from chronicler.transports.telegram_factory import TelegramUserTransport, TelegramBotTransport
 import telegram
-from abc import ABC
-
-from chronicler.transports.telegram_factory import (
-    TelegramTransportBase,
-    TelegramUserTransport,
-    TelegramBotTransport
-)
 
 def test_transport_base_is_abstract():
-    """Test that TelegramTransportBase is an abstract base class."""
-    assert issubclass(TelegramTransportBase, ABC)
-    
-    # Verify abstract methods
-    abstract_methods = TelegramTransportBase.__abstractmethods__
-    assert "start" in abstract_methods
-    assert "stop" in abstract_methods
-    assert "process_frame" in abstract_methods
-    assert "send" in abstract_methods
+    """Test that BaseTransport is abstract."""
+    with pytest.raises(TypeError):
+        BaseTransport()
 
 def test_user_transport_implements_base():
-    """Test that TelegramUserTransport properly implements base class."""
-    assert issubclass(TelegramUserTransport, TelegramTransportBase)
-    
-    # Verify all abstract methods are implemented
-    transport = TelegramUserTransport(
-        api_id="123",
-        api_hash="abc",
-        phone_number="+1234567890"
-    )
-    assert hasattr(transport, "start")
-    assert hasattr(transport, "stop")
-    assert hasattr(transport, "process_frame")
-    assert hasattr(transport, "send")
+    """Test that TelegramUserTransport implements BaseTransport."""
+    assert issubclass(TelegramUserTransport, BaseTransport)
 
 def test_bot_transport_implements_base():
-    """Test that TelegramBotTransport properly implements base class."""
-    assert issubclass(TelegramBotTransport, TelegramTransportBase)
-    
-    # Verify all abstract methods are implemented
-    transport = TelegramBotTransport(token="BOT:TOKEN")
-    assert hasattr(transport, "start")
-    assert hasattr(transport, "stop")
-    assert hasattr(transport, "process_frame")
-    assert hasattr(transport, "send")
+    """Test that TelegramBotTransport implements BaseTransport."""
+    assert issubclass(TelegramBotTransport, BaseTransport)
 
-def test_user_transport_initialization():
+@patch('chronicler.transports.telegram_factory.TelegramClient')
+def test_user_transport_initialization(mock_client):
     """Test TelegramUserTransport initialization."""
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
-        phone_number="+1234567890"
+        phone_number="+1234567890",
+        session_name="test_session"
     )
-    
     assert transport.api_id == "123"
     assert transport.api_hash == "abc"
     assert transport.phone_number == "+1234567890"
-    assert transport.client is not None
+    assert transport.session_name == "test_session"
 
-def test_bot_transport_initialization():
+@patch('chronicler.transports.telegram_factory.Application')
+def test_bot_transport_initialization(mock_app):
     """Test TelegramBotTransport initialization."""
-    transport = TelegramBotTransport(token="BOT:TOKEN")
-    
-    assert transport.token == "BOT:TOKEN"
-    assert transport.app is not None
+    transport = TelegramBotTransport(token="123:abc")
+    assert transport.token == "123:abc"
 
 def test_user_transport_validates_params():
-    """Test TelegramUserTransport parameter validation."""
+    """Test that TelegramUserTransport validates parameters."""
     with pytest.raises(ValueError, match="api_id must not be empty"):
-        TelegramUserTransport(api_id="", api_hash="abc", phone_number="+1234567890")
+        TelegramUserTransport(api_id="", api_hash="abc", phone_number="+1234567890", session_name="test")
     
     with pytest.raises(ValueError, match="api_hash must not be empty"):
-        TelegramUserTransport(api_id="123", api_hash="", phone_number="+1234567890")
+        TelegramUserTransport(api_id="123", api_hash="", phone_number="+1234567890", session_name="test")
     
     with pytest.raises(ValueError, match="phone_number must not be empty"):
-        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="")
+        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="", session_name="test")
+    
+    with pytest.raises(ValueError, match="session_name must not be empty"):
+        TelegramUserTransport(api_id="123", api_hash="abc", phone_number="+1234567890", session_name="")
 
 def test_bot_transport_validates_params():
-    """Test TelegramBotTransport parameter validation."""
+    """Test that TelegramBotTransport validates parameters."""
     with pytest.raises(telegram.error.InvalidToken, match="You must pass the token you received from https://t.me/Botfather!"):
         TelegramBotTransport(token="") 

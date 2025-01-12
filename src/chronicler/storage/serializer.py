@@ -2,13 +2,13 @@
 from pathlib import Path
 import json
 import yaml
-import logging
+from chronicler.logging import get_logger
 from datetime import datetime
 from typing import Dict, Any, List
 
 from chronicler.storage.interface import Message, Attachment
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class MessageSerializer:
     """Handles message serialization and metadata management."""

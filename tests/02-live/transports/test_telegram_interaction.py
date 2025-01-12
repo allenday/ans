@@ -1,15 +1,11 @@
-"""Live tests for Telegram command interactions."""
+"""Live tests for Telegram interactions."""
 import os
 import pytest
-import logging
-import asyncio
 import pytest_asyncio
+import asyncio
 from typing import AsyncGenerator
-from telethon import events
-from telegram.ext import MessageHandler, filters
-from telegram.error import TimedOut
 
-from chronicler.frames.command import CommandFrame
+from chronicler.logging import get_logger, configure_logging
 from chronicler.frames.media import TextFrame
 from chronicler.transports.telegram_factory import (
     TelegramTransportFactory,
@@ -18,7 +14,14 @@ from chronicler.transports.telegram_factory import (
 )
 from chronicler.transports.events import EventMetadata
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+@pytest.fixture(autouse=True)
+def setup_logging(caplog):
+    """Set up logging for all tests."""
+    configure_logging(level='DEBUG')
+    caplog.set_level('DEBUG')
+    yield
 
 @pytest.mark.asyncio(loop_scope="function")
 async def test_user_to_bot_text_exchange(user_transport: TelegramUserTransport, test_bot_transport: TelegramBotTransport, caplog):

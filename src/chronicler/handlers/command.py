@@ -1,5 +1,5 @@
 """Command handler implementations."""
-import logging
+from chronicler.logging import get_logger
 from typing import Optional
 
 from chronicler.frames.base import Frame
@@ -8,7 +8,7 @@ from chronicler.frames.media import TextFrame
 from chronicler.storage import StorageAdapter
 from chronicler.storage.interface import User, Topic
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class CommandHandler:
     """Base class for command handlers."""

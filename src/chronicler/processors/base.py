@@ -1,11 +1,11 @@
 """Base processor implementation."""
-import logging
 from abc import ABC, abstractmethod
 from typing import Optional
+from chronicler.logging import get_logger
 
 from chronicler.frames.base import Frame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class BaseProcessor(ABC):
     """Base class for frame processors."""

@@ -115,6 +115,44 @@ feat(telegram): add support for voice messages
 - Update CHANGELOG.md for significant changes
 - Include example usage where appropriate
 
+## Test Coverage
+
+### Requirements
+1. All new code must maintain minimum 80% test coverage
+2. Both statement and branch coverage are measured
+3. Coverage reports are generated for each test run
+
+### Running Tests with Coverage
+```bash
+# Run tests with coverage reporting
+pytest
+
+# View detailed HTML coverage report
+open coverage_html/index.html
+```
+
+### Coverage Configuration
+1. Coverage settings are defined in:
+   - .coveragerc: Tool configuration
+   - pytest.ini: Test runner settings
+
+2. Excluded patterns:
+   - Test files
+   - __init__.py files
+   - Specific exclusions via "# pragma: no cover"
+
+3. Coverage reports show:
+   - Statement coverage percentage
+   - Branch coverage percentage
+   - Missing lines
+   - Excluded lines
+
+### Maintaining Coverage
+1. Review coverage reports before submitting PRs
+2. Add tests for any missing coverage
+3. Document any intentionally excluded code
+4. Update minimum coverage requirements as needed
+
 ## Questions?
 
 Feel free to:

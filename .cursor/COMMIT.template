@@ -1,0 +1,15 @@
+# Status Update: {emoji} {action}: {item_description}
+#
+# File: {relative_path}
+# Item: {section}.{subsection}
+#
+# Examples:
+# ✅ Complete: Add logging to core components
+# File: .cursor/docs/refactor/implement-operational-logging/PRD.md
+# Item: 4.3.2
+#
+# 🕔 Reopen: Implement log rotation
+# File: .cursor/docs/refactor/implement-operational-logging/PRD.md
+# Item: 4.2.1
+#
+# Delete these comments and fill in the values in {} 

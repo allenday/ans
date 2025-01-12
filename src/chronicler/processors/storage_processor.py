@@ -1,5 +1,5 @@
 """Storage processor for saving messages."""
-import logging
+from chronicler.logging import get_logger
 from pathlib import Path
 from datetime import datetime
 
@@ -11,7 +11,7 @@ from chronicler.pipeline import (
 from chronicler.storage.interface import Message, Attachment, User, Topic
 from chronicler.storage.coordinator import StorageCoordinator
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class StorageProcessor(BaseProcessor):
     """Processor that saves messages to storage."""

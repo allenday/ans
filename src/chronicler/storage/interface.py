@@ -4,9 +4,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import json
-import logging
+from chronicler.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class User:

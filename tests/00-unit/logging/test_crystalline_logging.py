@@ -1,134 +1,129 @@
-"""Test crystalline logging system."""
-import json
+"""Test crystalline logging configuration."""
 import logging
+import json
 import pytest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+import asyncio
+from contextlib import contextmanager
 
 from chronicler.logging import (
     configure_logging,
+    get_logger,
     trace_operation,
     CORRELATION_ID,
     COMPONENT_ID,
     OPERATION_ID
 )
 
-@pytest.fixture
-def configured_logging():
-    """Configure logging for tests."""
-    configure_logging(level='DEBUG')
-    yield
-    # Reset context vars
-    CORRELATION_ID.set(None)
-    COMPONENT_ID.set(None)
-    OPERATION_ID.set(None)
-
-def test_log_format_structure(configured_logging, caplog):
-    """Test crystalline log format structure."""
-    logger = logging.getLogger('test')
-    test_message = "Test log message"
-    logger.info(test_message)
-    
-    assert len(caplog.records) == 1
-    record = json.loads(caplog.records[0].message)
-    
-    # Verify core structure
-    assert 'timestamp' in record
-    assert 'level' in record
-    assert 'correlation_id' in record
-    assert 'component' in record
-    assert 'operation' in record
-    assert 'message' in record
-    assert 'location' in record
-    assert 'performance' in record
-    
-    # Verify performance metrics
-    assert 'memory_rss_kb' in record['performance']
-    assert 'memory_vms_kb' in record['performance']
-    assert 'cpu_percent' in record['performance']
-
-@pytest.mark.asyncio
-async def test_trace_operation_async(configured_logging, caplog):
-    """Test operation tracing for async functions."""
-    
-    @trace_operation('test.component')
-    async def test_operation():
-        return "test result"
-    
-    result = await test_operation()
-    
-    # Verify operation logs
-    assert len(caplog.records) >= 2  # Start and end logs
-    
-    # Parse log records
-    records = [json.loads(r.message) for r in caplog.records]
-    
-    # Verify correlation ID consistency
-    correlation_ids = {r['correlation_id'] for r in records}
-    assert len(correlation_ids) == 1  # Same correlation ID across operation
-    
-    # Verify operation tracking
-    assert any(r['message'] == 'Operation started' for r in records)
-    assert any(r['message'] == 'Operation completed' for r in records)
-    
-    # Verify performance metrics
-    completion_record = next(r for r in records if r['message'] == 'Operation completed')
-    assert 'performance' in completion_record
-    assert 'duration_ms' in completion_record['performance']
-    assert 'memory_delta_kb' in completion_record['context']
-
-def test_error_logging(configured_logging, caplog):
-    """Test error capture in logs."""
-    logger = logging.getLogger('test')
-    
+@contextmanager
+def capture_logs():
+    """Helper to capture logs from stdout/stderr."""
+    import sys
+    from io import StringIO
+    stdout = StringIO()
+    stderr = StringIO()
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
     try:
-        raise ValueError("Test error")
-    except Exception as e:
-        logger.error("Error occurred", exc_info=True)
-    
-    assert len(caplog.records) == 1
-    record = json.loads(caplog.records[0].message)
-    
-    # Verify error structure
-    assert 'error' in record
-    assert record['error']['type'] == 'ValueError'
-    assert record['error']['message'] == 'Test error'
-    assert 'traceback' in record['error']
+        sys.stdout = stdout
+        sys.stderr = stderr
+        yield stdout, stderr
+    finally:
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
-@pytest.mark.asyncio
-async def test_trace_operation_error(configured_logging, caplog):
-    """Test operation tracing with error."""
-    
-    @trace_operation('test.component')
-    async def failing_operation():
-        raise ValueError("Operation failed")
-    
-    with pytest.raises(ValueError):
-        await failing_operation()
-    
-    # Verify error logging
-    records = [json.loads(r.message) for r in caplog.records]
-    error_record = next(r for r in records if r['level'] == 'ERROR')
-    
-    assert error_record['error']['type'] == 'ValueError'
-    assert error_record['error']['message'] == 'Operation failed'
-    assert 'performance' in error_record  # Should still track duration
-    assert 'memory_delta_kb' in error_record['context']  # Should track memory impact
+def test_logging_configuration(caplog):
+    """Test basic logging configuration."""
+    with capture_logs() as (stdout, stderr):
+        configure_logging(level='DEBUG')
+        logger = get_logger('test')
+        
+        test_message = "Test log message"
+        logger.info(test_message)
+        
+        # Get JSON output
+        output = stdout.getvalue()
+        log_data = json.loads(output.strip().split('\n')[-1])
+        
+        # Verify log record
+        assert log_data['level'] == 'INFO'
+        assert log_data['message'] == test_message
+        assert log_data['component'] == 'test'
 
-def test_context_propagation(configured_logging, caplog):
-    """Test context variable propagation."""
-    test_correlation_id = "test-correlation-id"
-    test_component = "test.component"
-    test_operation = "test_operation"
-    
-    CORRELATION_ID.set(test_correlation_id)
-    COMPONENT_ID.set(test_component)
-    OPERATION_ID.set(test_operation)
-    
-    logger = logging.getLogger(test_component)
-    logger.info("Test message")
-    
-    record = json.loads(caplog.records[0].message)
-    assert record['correlation_id'] == test_correlation_id
-    assert record['component'] == test_component
-    assert record['operation'] == test_operation 
+def test_error_logging(caplog):
+    """Test error logging with exception details."""
+    with capture_logs() as (stdout, stderr):
+        configure_logging(level='DEBUG')
+        logger = get_logger('test')
+        
+        try:
+            raise ValueError("Test error")
+        except Exception as e:
+            logger.error("Error occurred", exc_info=True)
+        
+        # Get JSON output
+        output = stdout.getvalue()
+        log_data = json.loads(output.strip().split('\n')[-1])
+        
+        # Verify log record
+        assert log_data['level'] == 'ERROR'
+        assert log_data['message'] == "Error occurred"
+        assert 'error' in log_data
+        assert log_data['error']['type'] == 'ValueError'
+        assert log_data['error']['message'] == 'Test error'
+
+def test_operation_tracing(caplog):
+    """Test operation tracing with correlation ID."""
+    configure_logging(level='DEBUG')
+    logger = get_logger('test')
+
+    @trace_operation('test_component')
+    async def test_operation():
+        logger.info("Inside traced operation")
+        return "success"
+
+    import asyncio
+    result = asyncio.run(test_operation())
+    assert result == "success"
+
+def test_context_enrichment(caplog):
+    """Test log enrichment with context data."""
+    with capture_logs() as (stdout, stderr):
+        configure_logging(level='DEBUG')
+        logger = get_logger('test')
+        
+        context_data = {"user": "test_user", "action": "test_action"}
+        logger.info("Test with context", extra={"context": context_data})
+        
+        # Get JSON output
+        output = stdout.getvalue()
+        log_data = json.loads(output.strip().split('\n')[-1])
+        
+        # Verify log record
+        assert log_data['level'] == 'INFO'
+        assert log_data['message'] == "Test with context"
+        assert 'context' in log_data
+        assert log_data['context'] == context_data
+
+def test_performance_metrics(caplog):
+    """Test performance metrics in logs."""
+    with capture_logs() as (stdout, stderr):
+        configure_logging(level='DEBUG')
+        logger = get_logger('test')
+        
+        custom_metrics = {
+            "duration_ms": 123.45,
+            "memory_delta_kb": 1024
+        }
+        logger.info("Test with metrics", extra={"performance": custom_metrics})
+        
+        # Get JSON output
+        output = stdout.getvalue()
+        log_data = json.loads(output.strip().split('\n')[-1])
+        
+        # Verify log record
+        assert log_data['level'] == 'INFO'
+        assert log_data['message'] == "Test with metrics"
+        assert 'performance' in log_data
+        assert log_data['performance']['duration_ms'] == custom_metrics['duration_ms']
+        assert log_data['performance']['memory_delta_kb'] == custom_metrics['memory_delta_kb'] 

@@ -1,9 +1,9 @@
 """File system storage organization."""
 from pathlib import Path
-import logging
+from chronicler.logging import get_logger
 from typing import List, Optional
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class FileSystemStorage:
     """Handles file system organization and operations."""

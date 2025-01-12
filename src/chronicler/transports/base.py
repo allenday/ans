@@ -1,7 +1,7 @@
 """Base transport implementation."""
-import logging
 from abc import ABC, abstractmethod
 from typing import Optional
+from chronicler.logging import get_logger
 
 from chronicler.frames.base import Frame
 
@@ -10,7 +10,7 @@ class BaseTransport(ABC):
 
     def __init__(self):
         """Initialize the transport."""
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.logger.debug("TRANSPORT - Initialized BaseTransport")
         self._start_time = None
         self._message_count = 0
