@@ -86,11 +86,12 @@ class CrystallineFormatter(logging.Formatter):
         record.getMessage = lambda: json_str
         return json_str
 
-def configure_logging(level: str = 'INFO') -> None:
+def configure_logging(level: str = 'INFO', use_stream_handler: bool = True) -> None:
     """Configure logging with crystalline structure.
     
     Args:
         level: Logging level to set
+        use_stream_handler: Whether to add a StreamHandler. Set to False in tests.
     """
     root = logging.getLogger()
     root.setLevel(level)
@@ -100,9 +101,13 @@ def configure_logging(level: str = 'INFO') -> None:
         root.removeHandler(handler)
     
     # Add handler with crystalline formatter
-    handler = logging.StreamHandler()
-    handler.setFormatter(CrystallineFormatter())
-    root.addHandler(handler)
+    if use_stream_handler:
+        handler = logging.StreamHandler()
+        handler.setFormatter(CrystallineFormatter())
+        root.addHandler(handler)
+    else:
+        # In test environment, use NullHandler to allow caplog to work
+        root.addHandler(logging.NullHandler())
 
 def trace_operation(component: str):
     """Decorator for operation tracing with correlation."""

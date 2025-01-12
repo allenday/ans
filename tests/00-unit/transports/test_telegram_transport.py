@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from chronicler.transports.base import BaseTransport
 from chronicler.transports.telegram_factory import TelegramUserTransport, TelegramBotTransport
+import telegram
 
 def test_transport_base_is_abstract():
     """Test that BaseTransport is abstract."""
@@ -53,5 +54,5 @@ def test_user_transport_validates_params():
 
 def test_bot_transport_validates_params():
     """Test that TelegramBotTransport validates parameters."""
-    with pytest.raises(ValueError, match="token must not be empty"):
+    with pytest.raises(telegram.error.InvalidToken, match="You must pass the token you received from https://t.me/Botfather!"):
         TelegramBotTransport(token="") 
