@@ -27,12 +27,16 @@ class EventMetadata:
     guild_id: Optional[str] = None    # Discord server
     is_private: bool = False
     is_group: bool = False
+    
+    def get(self, field: str, default=None):
+        """Get a field value with an optional default."""
+        return getattr(self, field, default)
 
 class EventBase(ABC):
     """Abstract base class for transport events."""
     
     @abstractmethod
-    def get_text(self) -> str:
+    async def get_text(self) -> str:
         """Get message text."""
         pass
     
@@ -42,12 +46,12 @@ class EventBase(ABC):
         pass
     
     @abstractmethod
-    def get_command(self) -> Optional[str]:
+    async def get_command(self) -> Optional[str]:
         """Get command if message is a command, otherwise None."""
         pass
     
     @abstractmethod
-    def get_command_args(self) -> List[str]:
+    async def get_command_args(self) -> List[str]:
         """Get command arguments if message is a command."""
         pass
 
@@ -57,7 +61,7 @@ class TelethonEvent(EventBase):
     def __init__(self, event):
         self._event = event
     
-    def get_text(self) -> str:
+    async def get_text(self) -> str:
         return self._event.message.text
     
     def get_metadata(self) -> EventMetadata:
@@ -75,16 +79,40 @@ class TelethonEvent(EventBase):
             message_id=self._event.message.id
         )
     
-    def get_command(self) -> Optional[str]:
-        text = self.get_text()
-        if text.startswith('/'):
+    async def get_command(self) -> Optional[str]:
+        """Get command from event if present."""
+        text = await self.get_text()
+        if isinstance(text, str) and text.startswith('/'):
             return text.split()[0].lower()
         return None
     
-    def get_command_args(self) -> List[str]:
-        text = self.get_text()
-        parts = text.split()
-        return parts[1:] if len(parts) > 1 else []
+    async def get_command_args(self) -> List[str]:
+        """Get command arguments from event."""
+        text = await self.get_text()
+        if isinstance(text, str) and text.startswith('/'):
+            parts = text.split()
+            return parts[1:] if len(parts) > 1 else []
+        return []
+    
+    async def get_chat_id(self) -> int:
+        """Get chat ID."""
+        return self._event.chat_id
+    
+    async def get_chat_title(self) -> str:
+        """Get chat title."""
+        return self._event.chat.title
+
+    async def get_sender_id(self) -> int:
+        """Get sender ID."""
+        return self._event.sender_id
+
+    async def get_sender_username(self) -> str:
+        """Get sender username."""
+        return self._event.sender.username
+
+    async def get_sender_name(self) -> str:
+        """Get sender name."""
+        return self._event.sender.first_name
 
 class TelegramBotEvent(EventBase):
     """Wrapper for python-telegram-bot events."""
@@ -93,28 +121,49 @@ class TelegramBotEvent(EventBase):
         self._update = update
         self._context = context
     
-    def get_text(self) -> str:
-        return self._update.message.text
+    async def get_text(self) -> str:
+        return self._update.effective_message.text
     
     def get_metadata(self) -> EventMetadata:
         return EventMetadata(
-            chat_id=self._update.message.chat_id,
-            chat_title=self._update.message.chat.title,
-            sender_id=self._update.message.from_user.id if self._update.message.from_user else None,
-            sender_name=(self._update.message.from_user.username or self._update.message.from_user.first_name) 
-                if self._update.message.from_user else None,
-            message_id=self._update.message.message_id
+            chat_id=self._update.effective_chat.id,
+            chat_title=self._update.effective_chat.title,
+            sender_id=self._update.effective_user.id if self._update.effective_user else None,
+            sender_name=(self._update.effective_user.username or self._update.effective_user.first_name) 
+                if self._update.effective_user else None,
+            message_id=self._update.effective_message.message_id
         )
     
-    def get_command(self) -> Optional[str]:
-        text = self.get_text()
-        if text.startswith('/'):
+    async def get_command(self) -> Optional[str]:
+        """Get command from event if present."""
+        text = await self.get_text()
+        if isinstance(text, str) and text.startswith('/'):
             return text.split()[0].lower()
         return None
     
-    def get_command_args(self) -> List[str]:
+    async def get_command_args(self) -> List[str]:
         if self._context and self._context.args:
             return self._context.args
-        text = self.get_text()
+        text = await self.get_text()
         parts = text.split()
         return parts[1:] if len(parts) > 1 else [] 
+    
+    async def get_chat_id(self) -> int:
+        """Get chat ID."""
+        return self._update.effective_chat.id
+    
+    async def get_chat_title(self) -> str:
+        """Get chat title."""
+        return self._update.effective_chat.title
+
+    async def get_sender_id(self) -> int:
+        """Get sender ID."""
+        return self._update.effective_user.id
+
+    async def get_sender_username(self) -> str:
+        """Get sender username."""
+        return self._update.effective_user.username
+
+    async def get_sender_name(self) -> str:
+        """Get sender name."""
+        return self._update.effective_user.first_name 
