@@ -8,8 +8,45 @@
 3. Reference format: "section.number" (e.g., "2.1" for first item in New Features)
 4. Checkbox format: `1. 🕔 Requirement description`
 
-## Code Style
+### Branch Naming
+1. **Format**: `{type}/{description}`
+   - Type must be one of: feature, fix, docs, refactor
+   - Description must be kebab-case
+   - Example: `feature/add-voice-messages`
 
+2. **Branch Types**
+   - `main`: Protected, requires PR
+   - `feature/*`: New features and enhancements
+   - `fix/*`: Bug fixes and corrections
+   - `docs/*`: Documentation updates
+   - `refactor/*`: Code cleanup without behavior changes
+
+### Git Workflow
+1. **Commits**
+   - Use conventional commits
+   - Include scope
+   - Write clear messages
+
+2. **Pull Requests**
+   - Reference issues
+   - Include tests
+   - Update docs
+   - Clean commits
+
+### State Tracking
+1. **Branch State**
+   - Use branch-specific scratch directory
+   - Track progress in PRD.md (🕔 -> ✅)
+   - Document scope changes
+
+2. **Documentation State**
+   - Keep documentation in sync with code
+   - Update related docs in same PR
+   - Cross-reference related changes
+
+## Technical Style Guide
+
+### Code Style
 1. **Python Standards**
    - Follow PEP 8
    - Use type hints
@@ -22,7 +59,8 @@
    - Variables: `snake_case`
    - Constants: `UPPER_SNAKE_CASE`
 
-3. **Documentation**
+### Documentation Standards
+1. **Module Documentation**
    - Module docstrings explain purpose
    - Class docstrings describe behavior
    - Method docstrings include:
@@ -31,7 +69,7 @@
      - Raises
      - Examples (if complex)
 
-4. **Code Organization**
+2. **Code Organization**
    - Follow MECE principle:
      - Methods should be mutually exclusive (no overlapping functionality)
      - Class coverage should be collectively exhaustive (no missing cases)
@@ -40,8 +78,7 @@
    - Organize by responsibility
    - Group related functionality
 
-## Project Structure
-
+### Project Structure
 1. **Directory Organization**
    ```
    src/chronicler/
@@ -57,24 +94,4 @@
    ├── 00-unit/      # Unit tests
    ├── 01-mock/      # Mock integration tests
    └── 02-live/      # Live integration tests
-   ```
-
-## Git Practices
-
-1. **Branches**
-   - `main`: Protected, requires PR
-   - `feature/*`: New features
-   - `fix/*`: Bug fixes
-   - `docs/*`: Documentation
-   - `refactor/*`: Code cleanup
-
-2. **Commits**
-   - Use conventional commits
-   - Include scope
-   - Write clear messages
-
-3. **Pull Requests**
-   - Reference issues
-   - Include tests
-   - Update docs
-   - Clean commits 
+   ``` 
