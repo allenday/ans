@@ -1,18 +1,19 @@
 from typing import List, Type
 import asyncio
-import logging
 import signal
 from pathlib import Path
+
+from chronicler.logging import configure_logging, get_logger
 
 from .frames import Frame
 from .pipeline import Pipeline
 
 # Set up logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+configure_logging(
+    component_context="pipeline.runner",
+    log_level="DEBUG"
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def run_bot(token: str, storage_path: str):
     """Run the Telegram bot with pipeline-based processing."""

@@ -1,11 +1,11 @@
 """Command frame definitions."""
-import logging
 from typing import List
 from dataclasses import dataclass, field
+from chronicler.logging import get_logger
 
 from .base import Frame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class CommandFrame(Frame):

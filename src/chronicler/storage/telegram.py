@@ -1,12 +1,12 @@
 """Telegram-specific attachment handling."""
 from dataclasses import dataclass
 from pathlib import Path
-import logging
 from typing import Dict, Any, Optional, Tuple
+from chronicler.logging import get_logger
 
 from chronicler.storage.interface import Message, Attachment
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @dataclass
 class AttachmentInfo:

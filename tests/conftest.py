@@ -10,6 +10,8 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
 from chronicler.storage.interface import User
 from chronicler.transports.telegram_factory import TelegramTransportFactory
+from pathlib import Path
+from chronicler.logging import get_logger, configure_logging
 
 # Add the src directory to the Python path
 src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -26,7 +28,7 @@ for path in test_paths:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def pytest_configure(config):
     """Configure pytest"""
@@ -60,10 +62,10 @@ def test_user():
     return User(id="test_user", name="Test User") 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_test_env():
-    """Set up test environment."""
-    # Add any test environment setup here
-    pass
+def setup_logging():
+    """Configure logging for all tests."""
+    configure_logging(level='DEBUG')
+    yield
 
 # Mock fixtures
 

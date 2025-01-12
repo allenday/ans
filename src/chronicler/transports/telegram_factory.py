@@ -1,6 +1,5 @@
 """Telegram transport factory and implementations."""
 from abc import ABC, abstractmethod
-import logging
 import re
 from typing import Optional
 import time
@@ -16,14 +15,9 @@ from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame
 from chronicler.frames.command import CommandFrame
 from chronicler.transports.base import BaseTransport
 from chronicler.transports.events import TelethonEvent, TelegramBotEvent, EventMetadata
+from chronicler.logging import configure_logging, get_logger
 
-logger = logging.getLogger(__name__)
-
-# Set up debug logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logger = get_logger("chronicler.transports.telegram")
 
 class TelegramTransportBase(BaseTransport, ABC):
     """Base class for Telegram transports."""

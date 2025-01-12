@@ -1,5 +1,4 @@
 from typing import Optional
-import logging
 
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
@@ -8,8 +7,9 @@ from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame, StickerFrame, AudioFrame, VoiceFrame
 from chronicler.transports.base import BaseTransport
 from chronicler.commands.frames import CommandFrame
+from chronicler.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__, component="telegram_transport")
 
 class TelegramTransport(BaseTransport):
     """A transport for Telegram that converts Telegram messages to frames."""
@@ -33,7 +33,7 @@ class TelegramTransport(BaseTransport):
             self._handle_message
         ))
         logger.debug("Added message handler for all message types")
-        
+    
     async def start(self):
         """Start the Telegram bot and message handling."""
         logger.info("Starting Telegram transport")

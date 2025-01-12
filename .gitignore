@@ -49,3 +49,8 @@ media/
 
 # Telegram
 *.session
+
+# Coverage
+.coverage
+coverage_html/
+htmlcov/

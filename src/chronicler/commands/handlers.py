@@ -1,5 +1,5 @@
 """Command handlers for Chronicler bot."""
-import logging
+from chronicler.logging import get_logger
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -8,7 +8,7 @@ from chronicler.frames.media import TextFrame
 from chronicler.storage.coordinator import StorageCoordinator
 from chronicler.storage.interface import User
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class CommandHandler(ABC):
     """Base class for command handlers."""

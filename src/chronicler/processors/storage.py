@@ -1,5 +1,5 @@
 """Storage processor implementation."""
-import logging
+from chronicler.logging import get_logger
 from typing import Optional
 from datetime import datetime
 
@@ -9,7 +9,7 @@ from chronicler.storage import StorageAdapter
 from chronicler.storage.interface import Message, Attachment
 from .base import BaseProcessor
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class StorageProcessor(BaseProcessor):
     """Processor for storing frames in git."""
