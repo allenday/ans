@@ -3,7 +3,7 @@ import pytest
 import os
 import uuid
 from chronicler.transports.base import BaseTransport
-from chronicler.transports.telegram import TelegramUserTransport, TelegramBotTransport
+from chronicler.transports.telegram_factory import TelegramUserTransport, TelegramBotTransport
 
 def get_test_session():
     """Generate a unique session file name for tests."""
