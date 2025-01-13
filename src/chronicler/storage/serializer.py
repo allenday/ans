@@ -48,9 +48,13 @@ class MessageSerializer:
             logger.info(f"SER - Reading metadata from: {path}")
             try:
                 with open(path) as f:
-                    metadata = yaml.safe_load(f) or {}
-                logger.debug(f"SER - Read metadata with {len(metadata)} top-level keys")
-                return metadata
+                    try:
+                        metadata = yaml.safe_load(f) or {}
+                        logger.debug(f"SER - Read metadata with {len(metadata)} top-level keys")
+                        return metadata
+                    except yaml.YAMLError as e:
+                        logger.warning(f"SER - Invalid YAML in metadata file: {e}")
+                        return {}
             except FileNotFoundError:
                 logger.debug("SER - No existing metadata file, returning empty dict")
                 return {}
