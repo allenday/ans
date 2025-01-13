@@ -39,6 +39,8 @@ class ImageFrame(Frame):
         if self.caption is not None and not isinstance(self.caption, str):
             raise TypeError("caption must be a string")
         logger.debug(f"FRAME - Initializing ImageFrame: size={self.size}, format={self.format}")
+        if self.caption:
+            self.text = self.caption
         super().__post_init__()
 
 @dataclass
