@@ -38,6 +38,29 @@
    3. Refine steps until actionable
    4. Use CHECKLIST.md for execution
 
+### Exception Handling
+1. **STOP Conditions**
+   1. Scope STOP 🛑
+      - IF scope exceeds PRD item
+      - THEN choose:
+         1. Create new branch
+         2. Add to BACKLOG.md
+   
+   2. Process STOP 🛑
+      - IF steps out of order
+      - OR IF state tracking lost
+      - THEN realign with checklist
+
+2. **Feedback Loop**
+   1. Use BACKLOG.md for:
+      - Capturing scope changes
+      - Recording discovered improvements
+      - Tracking technical debt
+   2. Each entry must reference:
+      - Source PRD item
+      - Reason for deferral
+      - Priority assessment
+
 ### State Management
 1. **Status Indicators**
    1. 🕔 Pending/Not started
