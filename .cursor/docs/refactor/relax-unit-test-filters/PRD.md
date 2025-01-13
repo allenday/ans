@@ -56,14 +56,16 @@
                ✅ 2.4.1.2. Coordinator: Add tests for message handling and attachment processing (100% coverage achieved)
                ✅ 2.4.1.3. Filesystem: Add tests for file operations and error handling (100% coverage achieved)
         🕔 2.4.2. Pipeline components:
-               ✅ 2.4.2.1. Frames: Add tests for frame processing and validation
+               ✅ 2.4.2.1. Frames: Add comprehensive tests for:
+                       ✅ 2.4.2.1.1. Base Frame validation and logging
+                       ✅ 2.4.2.1.2. TextFrame content validation
+                       ✅ 2.4.2.1.3. ImageFrame metadata and content checks
+                       ✅ 2.4.2.1.4. DocumentFrame file handling and MIME types
+                       ✅ 2.4.2.1.5. AudioFrame duration and format validation
+                       ✅ 2.4.2.1.6. VoiceFrame message validation
+                       ✅ 2.4.2.1.7. StickerFrame emoji and set validation
+                       ✅ 2.4.2.1.8. CommandFrame parsing and validation
                🕔 2.4.2.2. Pipecat runner: Add tests for pipeline execution and error handling
-               ✅ 2.4.2.3. Storage processor: Add comprehensive tests for:
-                       ✅ 2.4.2.3.1. Metadata validation and error handling
-                       ✅ 2.4.2.3.2. Topic creation edge cases
-                       ✅ 2.4.2.3.3. Frame processing error conditions
-                       ✅ 2.4.2.3.4. Attachment handling edge cases
-                       ✅ 2.4.2.3.5. Logging verification
         ✅ 2.4.3. Transport components:
                ✅ 2.4.3.1. Telegram transport: Add tests for message handling and API interactions
                ✅ 2.4.3.2. Events: Add tests for event processing and error handling

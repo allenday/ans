@@ -86,10 +86,41 @@
                5.1.4.3. ✅ Add path management tests
 
    5.2. Pipeline Components
-        5.2.1. 🕔 Add frames tests (0% -> target 80%)
-               5.2.1.1. 🕔 Add frame processing tests
-               5.2.1.2. 🕔 Add validation tests
-               5.2.1.3. 🕔 Add error handling tests
+        5.2.1. ✅ Add frames tests (0% -> 100%)
+               5.2.1.1. ✅ Base Frame Tests
+                       5.2.1.1.1. ✅ Test metadata handling
+                       5.2.1.1.2. ✅ Test optional text field
+                       5.2.1.1.3. ✅ Test logging functionality
+               5.2.1.2. ✅ TextFrame Tests
+                       5.2.1.2.1. ✅ Test valid string content
+                       5.2.1.2.2. ✅ Test invalid content types
+                       5.2.1.2.3. ✅ Test empty string handling
+               5.2.1.3. ✅ ImageFrame Tests
+                       5.2.1.3.1. ✅ Test valid image data
+                       5.2.1.3.2. ✅ Test size validation
+                       5.2.1.3.3. ✅ Test format handling
+                       5.2.1.3.4. ✅ Test caption handling
+               5.2.1.4. ✅ DocumentFrame Tests
+                       5.2.1.4.1. ✅ Test valid document data
+                       5.2.1.4.2. ✅ Test filename validation
+                       5.2.1.4.3. ✅ Test MIME type handling
+                       5.2.1.4.4. ✅ Test caption propagation
+               5.2.1.5. ✅ AudioFrame Tests
+                       5.2.1.5.1. ✅ Test valid audio data
+                       5.2.1.5.2. ✅ Test duration validation
+                       5.2.1.5.3. ✅ Test MIME type handling
+               5.2.1.6. ✅ VoiceFrame Tests
+                       5.2.1.6.1. ✅ Test valid voice data
+                       5.2.1.6.2. ✅ Test duration validation
+                       5.2.1.6.3. ✅ Test MIME type handling
+               5.2.1.7. ✅ StickerFrame Tests
+                       5.2.1.7.1. ✅ Test valid sticker data
+                       5.2.1.7.2. ✅ Test emoji validation
+                       5.2.1.7.3. ✅ Test set name handling
+               5.2.1.8. ✅ CommandFrame Tests
+                       5.2.1.8.1. ✅ Test command validation
+                       5.2.1.8.2. ✅ Test argument handling
+                       5.2.1.8.3. ✅ Test command normalization
         5.2.2. 🕔 Add pipecat_runner tests (23% -> target 80%)
                5.2.2.1. 🕔 Add pipeline execution tests
                5.2.2.2. 🕔 Add error handling tests
