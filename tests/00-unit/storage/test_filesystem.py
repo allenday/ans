@@ -3,11 +3,21 @@ import pytest
 from pathlib import Path
 import os
 from unittest.mock import patch, mock_open, MagicMock
+import psutil
 
 from chronicler.storage.filesystem import FileSystemStorage
 
 @pytest.fixture
-def fs_storage(tmp_path):
+def mock_process():
+    """Mock psutil.Process for memory metrics."""
+    with patch('psutil.Process') as mock:
+        memory_info = MagicMock()
+        memory_info.rss = 1024 * 1024  # 1MB in bytes
+        mock.return_value.memory_info.return_value = memory_info
+        yield mock
+
+@pytest.fixture
+def fs_storage(tmp_path, mock_process):
     """Create a FileSystemStorage instance with a temporary base path."""
     return FileSystemStorage(tmp_path)
 
@@ -77,7 +87,7 @@ def test_save_file(fs_storage):
     assert test_path.exists()
     assert test_path.read_bytes() == test_content
 
-def test_save_file_error(fs_storage):
+def test_save_file_error(fs_storage, mock_process):
     """Test file saving error handling."""
     test_path = fs_storage.base_path / "test.txt"
     test_content = b"Hello, World!"
@@ -114,7 +124,7 @@ def test_append_jsonl(fs_storage):
         assert lines[0].strip() == test_content
         assert lines[1].strip() == second_content
 
-def test_append_jsonl_error(fs_storage):
+def test_append_jsonl_error(fs_storage, mock_process):
     """Test JSONL file appending error handling."""
     test_path = fs_storage.base_path / "test.jsonl"
     test_content = '{"key": "value"}'
@@ -265,7 +275,7 @@ def test_path_too_long(fs_storage):
     with pytest.raises(Exception):
         fs_storage.get_topic_path("telegram", very_long_name, very_long_name)
 
-def test_disk_io_errors(fs_storage, monkeypatch):
+def test_disk_io_errors(fs_storage, mock_process):
     """Test handling of various disk I/O errors."""
     test_path = fs_storage.base_path / "test.txt"
     test_data = b"test data"
@@ -281,10 +291,9 @@ def test_disk_io_errors(fs_storage, monkeypatch):
     mock_file.write.side_effect = mock_write_full
 
     mock_open = MagicMock(return_value=mock_file)
-    monkeypatch.setattr("builtins.open", mock_open)
-
-    with pytest.raises(OSError, match="No space left on device"):
-        fs_storage.save_file(test_path, test_data)
+    with patch("builtins.open", mock_open):
+        with pytest.raises(OSError, match="No space left on device"):
+            fs_storage.save_file(test_path, test_data)
 
 def test_race_conditions(fs_storage, monkeypatch):
     """Test handling of race conditions in file operations."""
