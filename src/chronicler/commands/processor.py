@@ -43,7 +43,7 @@ class CommandProcessor(BaseProcessor):
 
         if command not in self._handlers:
             self.logger.error(f"COMMAND - No handler registered for command: {command}")
-            return TextFrame(text=f"Unknown command: {command}", metadata=metadata)
+            return TextFrame(content=f"Unknown command: {command}", metadata=metadata)
 
         handler = self._handlers[command]
         self.logger.debug(f"COMMAND - Using handler {handler.__class__.__name__} for {command}")

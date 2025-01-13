@@ -36,13 +36,13 @@
    3.1. Coverage Reports
         3.1.1. ✅ Generate baseline coverage report
         3.1.2. ✅ Identify areas needing additional coverage:
-               3.1.2.1. pipeline/frames.py (0%)
-               3.1.2.2. pipeline/pipecat_runner.py (0%)
-               3.1.2.3. storage_processor.py (15%)
-               3.1.2.4. git.py (7%)
-               3.1.2.5. telegram_transport.py (13%)
+               3.1.2.1. ✅ pipeline/frames.py (100%)
+               3.1.2.2. 🕔 pipeline/pipecat_runner.py (23%)
+               3.1.2.3. ✅ storage_processor.py (87%)
+               3.1.2.4. ✅ git.py (77%)
+               3.1.2.5. ✅ telegram_transport.py (56%)
         3.1.3. ✅ Document coverage gaps
-        3.1.4. 🕔 Plan coverage improvements
+        3.1.4. ✅ Plan coverage improvements
 
    3.2. Coverage Tools
         3.2.1. ✅ Verify pytest-cov installation
@@ -122,11 +122,16 @@
                        5.2.3.5.4. 🕔 Test log context data
 
    5.3. Transport Components
-        5.3.1. 🕔 Add telegram_transport tests (13% -> target 80%)
-               5.3.1.1. 🕔 Add message handling tests
-               5.3.1.2. 🕔 Add API interaction tests
-               5.3.1.3. 🕔 Add error handling tests
-        5.3.2. 🕔 Add events tests (58% -> target 80%)
-               5.3.2.1. 🕔 Add event processing tests
-               5.3.2.2. 🕔 Add error handling tests
-               5.3.2.3. 🕔 Add state management tests 
+        5.3.1. ✅ Add telegram_transport tests (56% -> target 80%)
+               5.3.1.1. ✅ Add message handling tests
+               5.3.1.2. ✅ Add API interaction tests
+               5.3.1.3. ✅ Add error handling tests
+               5.3.1.4. 🕔 Add remaining coverage:
+                       5.3.1.4.1. 🕔 Add tests for user transport methods
+                       5.3.1.4.2. 🕔 Add tests for bot transport methods
+                       5.3.1.4.3. 🕔 Add tests for transport initialization
+                       5.3.1.4.4. 🕔 Add tests for transport shutdown
+        5.3.2. ✅ Add events tests (95% -> target 80%)
+               5.3.2.1. ✅ Add event processing tests
+               5.3.2.2. ✅ Add error handling tests
+               5.3.2.3. ✅ Add state management tests 

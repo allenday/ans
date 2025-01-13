@@ -45,7 +45,7 @@ async def test_register_handler_validation():
 async def test_process_non_command_frame():
     """Test processing non-command frame."""
     processor = CommandProcessor()
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     
     result = await processor.process(frame)
     assert result is None
@@ -58,7 +58,7 @@ async def test_process_unknown_command():
     
     result = await processor.process_frame(frame)
     assert isinstance(result, TextFrame)
-    assert "Unknown command" in result.text
+    assert "Unknown command" in result.content
 
 @pytest.mark.asyncio
 async def test_handler_error(command_handler_mock):

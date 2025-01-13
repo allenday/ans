@@ -183,7 +183,7 @@ class TelegramUserTransport(TelegramTransportBase):
         
         try:
             if isinstance(frame, TextFrame):
-                await self.client.send_message(chat_id, frame.text)
+                await self.client.send_message(chat_id, frame.content)
                 self._message_count += 1
             elif isinstance(frame, ImageFrame):
                 await self.client.send_file(
@@ -227,7 +227,10 @@ class TelegramUserTransport(TelegramTransportBase):
         
         try:
             if isinstance(frame, TextFrame):
-                message = await self.client.send_message(chat_id, frame.text)
+                message = await self.client.send_message(
+                    chat_id=chat_id,
+                    text=frame.content
+                )
                 frame.metadata = EventMetadata(
                     chat_id=chat_id,
                     chat_title=frame.metadata.chat_title,
@@ -333,15 +336,17 @@ class TelegramUserTransport(TelegramTransportBase):
             raise
 
 class TelegramBotTransport(TelegramTransportBase):
-    """Telegram bot transport implementation."""
+    """Transport implementation for Telegram Bot API."""
 
     def __init__(self, token: str):
-        """Initialize the bot transport.
-        
+        """Initialize the transport.
+
         Args:
-            token: Bot token
+            token: Bot token from BotFather
         """
         super().__init__()
+        if not token or not isinstance(token, str):
+            raise InvalidToken("You must pass the token you received from https://t.me/Botfather!")
         self._token = token
         self._app = None
         self._command_handlers = {}
@@ -349,6 +354,7 @@ class TelegramBotTransport(TelegramTransportBase):
 
     @property
     def token(self) -> str:
+        """Get the bot token."""
         return self._token
 
     async def register_command(self, command: str, handler: Callable[[CommandFrame], Awaitable[None]]) -> None:
@@ -366,7 +372,8 @@ class TelegramBotTransport(TelegramTransportBase):
     async def start(self) -> None:
         """Start the transport."""
         await super().start()
-        self._app = Application.builder().token(self._token).build()
+        builder = Application.builder().token(self._token)
+        self._app = await builder.build()
         await self._app.initialize()
         await self._app.start()
         self._initialized = True
@@ -426,7 +433,7 @@ class TelegramBotTransport(TelegramTransportBase):
             if isinstance(frame, TextFrame):
                 message = await self._app.bot.send_message(
                     chat_id=frame.metadata.chat_id,
-                    text=frame.text
+                    text=frame.content
                 )
                 frame.metadata.message_id = message.message_id
                 return frame
@@ -444,7 +451,7 @@ class TelegramBotTransport(TelegramTransportBase):
 
         except Exception as e:
             self.logger.error(f"Failed to send message: {str(e)}")
-            raise Exception("Failed to send message") from e
+            raise e
 
 class TelegramTransportFactory:
     """Factory for creating Telegram transports."""

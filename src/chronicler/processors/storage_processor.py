@@ -134,8 +134,17 @@ class StorageProcessor(BaseProcessor):
                     'thread_id': thread_id
                 }
             )
-            topic_id = await self.storage.create_topic(topic)
-            logger.info(f"Created new topic with ID: {topic_id}")
+            
+            try:
+                topic_id = await self.storage.create_topic(topic)
+                logger.info(f"Created new topic with ID: {topic_id}")
+            except ValueError as e:
+                if "Topic already exists" in str(e):
+                    logger.debug(f"Topic {thread_id} already exists, using existing topic")
+                    topic_id = str(thread_id)
+                else:
+                    raise
+                
             return topic_id
             
         except Exception as e:
@@ -147,7 +156,7 @@ class StorageProcessor(BaseProcessor):
         try:
             logger.info(f"Processing text frame for topic {topic_id}")
             message = Message(
-                content=frame.text,
+                content=frame.content,
                 source='telegram',
                 metadata=metadata
             )
@@ -161,6 +170,12 @@ class StorageProcessor(BaseProcessor):
         """Process an image frame."""
         try:
             logger.info(f"Processing image frame for topic {topic_id}")
+            
+            # Validate image content
+            if not frame.content:
+                logger.error("Empty image content")
+                raise ValueError("Image content cannot be empty")
+                
             # Get file ID from metadata, fallback to timestamp if not available
             file_id = metadata.get('file_id', f"image_{datetime.utcnow().isoformat()}")
             
@@ -192,6 +207,23 @@ class StorageProcessor(BaseProcessor):
         """Process a document frame."""
         try:
             logger.info(f"Processing document frame for topic {topic_id}")
+            
+            # Validate MIME type
+            if not frame.mime_type or '/' not in frame.mime_type:
+                logger.error(f"Invalid MIME type: {frame.mime_type}")
+                raise ValueError(f"Invalid MIME type: {frame.mime_type}")
+                
+            type_parts = frame.mime_type.split('/')
+            if len(type_parts) != 2 or not type_parts[0] or not type_parts[1]:
+                logger.error(f"Invalid MIME type format: {frame.mime_type}")
+                raise ValueError(f"Invalid MIME type: {frame.mime_type}")
+                
+            # Check against common MIME type prefixes
+            valid_types = {'application', 'audio', 'image', 'text', 'video', 'multipart'}
+            if type_parts[0] not in valid_types:
+                logger.error(f"Invalid MIME type prefix: {type_parts[0]}")
+                raise ValueError(f"Invalid MIME type: {frame.mime_type}")
+                
             attachment_id = metadata.get('file_unique_id', metadata.get('file_id', 'unknown'))
             logger.debug(f"Using attachment ID: {attachment_id}")
             

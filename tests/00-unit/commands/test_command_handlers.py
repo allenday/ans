@@ -39,7 +39,7 @@ class TestStartCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "Welcome to Chronicler!" in result.text
+        assert "Welcome to Chronicler!" in result.content
         coordinator_mock.init_storage.assert_called_once()
         coordinator_mock.create_topic.assert_called_once()
     
@@ -79,7 +79,7 @@ class TestConfigCommandHandler:
         
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
-        assert "Usage: /config" in result.text
+        assert "Usage: /config" in result.content
         coordinator_mock.set_github_config.assert_not_called()
     
     @pytest.mark.asyncio
@@ -99,11 +99,12 @@ class TestConfigCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "GitHub configuration updated" in result.text
+        assert "GitHub configuration updated" in result.content
         coordinator_mock.set_github_config.assert_called_once_with(
             token="token123",
             repo="owner/repo"
         )
+        coordinator_mock.sync.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_handle_config_error(self, coordinator_mock):
@@ -142,7 +143,7 @@ class TestStatusCommandHandler:
         
         result = await handler.handle(frame)
         assert isinstance(result, TextFrame)
-        assert "Storage not initialized" in result.text
+        assert "Storage not initialized" in result.content
         coordinator_mock.sync.assert_not_called()
     
     @pytest.mark.asyncio
@@ -162,5 +163,5 @@ class TestStatusCommandHandler:
         result = await handler.handle(frame)
         
         assert isinstance(result, TextFrame)
-        assert "Chronicler Status" in result.text
+        assert "Chronicler Status" in result.content
         coordinator_mock.sync.assert_called_once() 

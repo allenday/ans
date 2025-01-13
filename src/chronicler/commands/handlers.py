@@ -52,7 +52,7 @@ class StartCommandHandler(CommandHandler):
             logger.info(f"HANDLER - Created default topic for user {user.id}")
             
             return TextFrame(
-                text=(
+                content=(
                     "Welcome to Chronicler! 🤖\n\n"
                     "I'll help you archive your Telegram messages in a Git repository.\n\n"
                     "To get started, configure your repository with:\n"
@@ -81,7 +81,7 @@ class ConfigCommandHandler(CommandHandler):
         if len(frame.args) < 2:
             logger.warning(f"HANDLER - Invalid number of arguments for /config command from user {user_id}")
             return TextFrame(
-                text=(
+                content=(
                     "Usage: /config <github_repo> <token>\n\n"
                     "Example:\n"
                     "/config username/repo ghp_1234567890abcdef"
@@ -103,7 +103,7 @@ class ConfigCommandHandler(CommandHandler):
             logger.info(f"HANDLER - Successfully synced repository for user {user_id}")
             
             return TextFrame(
-                text=(
+                content=(
                     "GitHub configuration updated!\n\n"
                     "I'll now archive your messages to:\n"
                     f"https://github.com/{repo}\n\n"
@@ -133,7 +133,7 @@ class StatusCommandHandler(CommandHandler):
             if not initialized:
                 logger.warning(f"HANDLER - Storage not initialized for user {user_id}")
                 return TextFrame(
-                    text="Storage not initialized. Please use /start first.",
+                    content="Storage not initialized. Please use /start first.",
                     metadata=frame.metadata
                 )
             
@@ -142,7 +142,7 @@ class StatusCommandHandler(CommandHandler):
             logger.info(f"HANDLER - Successfully synced repository for user {user_id}")
             
             return TextFrame(
-                text=(
+                content=(
                     "Chronicler Status:\n"
                     "- Storage: Initialized\n"
                     "- GitHub: Connected\n"

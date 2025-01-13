@@ -15,10 +15,10 @@ class EventMetadata:
     """
     # Currently used (Telegram)
     chat_id: int
-    chat_title: Optional[str]
-    sender_id: Optional[int]
-    sender_name: Optional[str]
-    message_id: int
+    chat_title: Optional[str] = None
+    sender_id: Optional[int] = None
+    sender_name: Optional[str] = None
+    message_id: Optional[int] = None
     
     # Future platform support (not used yet)
     platform: str = "telegram"  # 'telegram', 'twitter', 'discord'
