@@ -156,6 +156,7 @@ class TelegramUserTransport(TelegramTransportBase):
                 self.logger.debug("Registered global command event handler")
             
             logger.info("Telegram user transport started successfully")
+            self._initialized = True
         except Exception as e:
             self._error_count += 1
             logger.error("Failed to start transport", exc_info=True)
@@ -167,6 +168,7 @@ class TelegramUserTransport(TelegramTransportBase):
         await super().stop()
         logger.info("Stopping Telegram user transport")
         await self.client.disconnect()
+        self._initialized = False
         logger.info("Telegram user transport stopped")
     
     @trace_operation('transport.telegram.user')

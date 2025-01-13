@@ -66,24 +66,35 @@ def test_bot_transport_validates_params():
 @patch('chronicler.transports.telegram_factory.TelegramClient')
 async def test_user_transport_start_stop(mock_client):
     """Test starting and stopping TelegramUserTransport."""
+    mock_client_instance = AsyncMock()
+    mock_client.return_value = mock_client_instance
+    mock_client_instance.connect = AsyncMock()
+    mock_client_instance.disconnect = AsyncMock()
+    mock_client_instance.is_user_authorized = AsyncMock(return_value=True)
+    mock_client_instance.start = AsyncMock()
+    
+    # Mock the on method to return a function that can be called with the command handler
+    def mock_on(event):
+        def register_handler(handler):
+            return handler
+        return register_handler
+    mock_client_instance.on = mock_on
+
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
         phone_number="+1234567890",
         session_name="test_session"
     )
-    
-    mock_client_instance = MagicMock()
-    mock_client.return_value = mock_client_instance
-    mock_client_instance.start = AsyncMock()
-    mock_client_instance.disconnect = AsyncMock()
-    
+
     await transport.start()
-    assert transport._initialized
-    mock_client_instance.start.assert_called_once()
-    
+    assert transport._initialized is True
+    mock_client_instance.connect.assert_called_once()
+    mock_client_instance.is_user_authorized.assert_called_once()
+    mock_client_instance.start.assert_called_once_with(phone="+1234567890")
+
     await transport.stop()
-    assert not transport._initialized
+    assert transport._initialized is False
     mock_client_instance.disconnect.assert_called_once()
 
 @pytest.mark.asyncio
@@ -91,47 +102,58 @@ async def test_user_transport_start_stop(mock_client):
 async def test_bot_transport_start_stop(mock_app):
     """Test starting and stopping TelegramBotTransport."""
     transport = TelegramBotTransport(token="123:abc")
-    
-    mock_app_instance = MagicMock()
-    mock_app.builder.return_value.token.return_value.build.return_value = mock_app_instance
-    mock_app_instance.start = AsyncMock()
-    mock_app_instance.stop = AsyncMock()
-    
-    await transport.start()
-    assert transport._initialized
-    mock_app_instance.start.assert_called_once()
-    
-    await transport.stop()
-    assert not transport._initialized
-    mock_app_instance.stop.assert_called_once()
 
-@pytest.mark.asyncio
-@patch('chronicler.transports.telegram_factory.TelegramClient')
-async def test_user_transport_start_error(mock_client):
-    """Test error handling during TelegramUserTransport start."""
-    transport = TelegramUserTransport(
-        api_id="123",
-        api_hash="abc",
-        phone_number="+1234567890",
-        session_name="test_session"
-    )
-    
-    mock_client_instance = MagicMock()
-    mock_client.return_value = mock_client_instance
-    mock_client_instance.start = AsyncMock(side_effect=Exception("Connection failed"))
-    
-    with pytest.raises(Exception, match="Connection failed"):
-        await transport.start()
-    assert not transport._initialized
+    mock_app_instance = AsyncMock()
+    mock_builder = MagicMock()
+    mock_builder.token.return_value = mock_builder
+    mock_builder.build = AsyncMock(return_value=mock_app_instance)
+    mock_app.builder.return_value = mock_builder
+
+    await transport.start()
+    assert transport._initialized is True
+    assert mock_builder.token.called
+    assert mock_builder.build.called
+
+    await transport.stop()
+    assert transport._initialized is False
+    assert mock_app_instance.stop.called
 
 @pytest.mark.asyncio
 @patch('chronicler.transports.telegram_factory.Application')
 async def test_bot_transport_start_error(mock_app):
     """Test error handling during TelegramBotTransport start."""
     transport = TelegramBotTransport(token="123:abc")
-    
-    mock_app.builder.return_value.token.return_value.build.side_effect = InvalidToken("Invalid token")
-    
+
+    mock_builder = MagicMock()
+    mock_builder.token.return_value = mock_builder
+    mock_builder.build.side_effect = InvalidToken("Invalid token")
+    mock_app.builder.return_value = mock_builder
+
     with pytest.raises(InvalidToken, match="Invalid token"):
         await transport.start()
-    assert not transport._initialized 
+    assert not transport._initialized
+
+@pytest.mark.asyncio
+@patch('chronicler.transports.telegram_factory.TelegramClient')
+async def test_user_transport_start_error(mock_client):
+    """Test error handling during TelegramUserTransport start."""
+    mock_client_instance = AsyncMock()
+    mock_client.return_value = mock_client_instance
+    mock_client_instance.connect = AsyncMock(side_effect=ConnectionError("Connection failed"))
+    mock_client_instance.is_user_authorized = AsyncMock(return_value=False)
+    mock_client_instance.start = AsyncMock()
+
+    transport = TelegramUserTransport(
+        api_id="123",
+        api_hash="abc",
+        phone_number="+1234567890",
+        session_name="test_session"
+    )
+
+    with pytest.raises(ConnectionError, match="Connection failed"):
+        await transport.start()
+
+    assert transport._initialized is False
+    mock_client_instance.connect.assert_called_once()
+    mock_client_instance.is_user_authorized.assert_not_called()
+    mock_client_instance.start.assert_not_called() 
