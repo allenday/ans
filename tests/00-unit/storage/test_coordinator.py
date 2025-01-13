@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from pathlib import Path
+from datetime import datetime, timezone
 
 from chronicler.storage.coordinator import StorageCoordinator
 from chronicler.storage.interface import Topic, Message, Attachment, User
@@ -312,4 +313,129 @@ async def test_set_github_config_error(coordinator, git_storage_mock):
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Config error"):
-        await coordinator.set_github_config("test_token", "test_repo") 
+        await coordinator.set_github_config("test_token", "test_repo")
+
+@pytest.mark.asyncio
+async def test_save_message_with_multiple_attachments(coordinator, git_storage_mock, file_storage_mock, attachment_handler_mock):
+    """Test saving a message with multiple attachments."""
+    message = Message(
+        id="test_message",
+        content="Test content",
+        source="test",
+        timestamp=datetime.now(timezone.utc),
+        metadata={},
+        attachments=[
+            Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
+            Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
+            Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt")
+        ]
+    )
+    
+    # Execute
+    await coordinator.save_message("test_topic", message)
+    
+    # Verify attachments were processed and saved
+    assert attachment_handler_mock.process.call_count == 3
+    assert file_storage_mock.save_attachment.call_count == 3
+    
+    # Verify message was saved after attachments
+    git_storage_mock.save_message.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_save_message_with_binary_content(coordinator, git_storage_mock):
+    """Test saving a message with binary content."""
+    message = Message(
+        id="test_message",
+        content=b"Binary \x80\x81 content",
+        source="test",
+        timestamp=datetime.now(timezone.utc),
+        metadata={}
+    )
+    
+    # Execute
+    await coordinator.save_message("test_topic", message)
+    
+    # Verify message was saved
+    git_storage_mock.save_message.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_save_message_partial_attachment_failure(coordinator, git_storage_mock, file_storage_mock, attachment_handler_mock):
+    """Test handling of partial attachment failures."""
+    # Make second attachment save fail
+    file_storage_mock.save_attachment.side_effect = [None, RuntimeError("Test error"), None]
+    
+    message = Message(
+        id="test_message",
+        content="Test content",
+        source="test",
+        timestamp=datetime.now(timezone.utc),
+        metadata={},
+        attachments=[
+            Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
+            Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
+            Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt")
+        ]
+    )
+    
+    # Verify error is propagated
+    with pytest.raises(RuntimeError, match="Test error"):
+        await coordinator.save_message("test_topic", message)
+    
+    # Verify first attachment was saved
+    assert file_storage_mock.save_attachment.call_count == 2
+    
+    # Verify message was not saved due to attachment failure
+    git_storage_mock.save_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_save_attachment_with_different_types(coordinator, file_storage_mock, attachment_handler_mock):
+    """Test saving attachments with different MIME types."""
+    attachments = [
+        Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
+        Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
+        Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt"),
+        Attachment(id="att4", type="image/png", data=b"test4", filename="test4.png")
+    ]
+    
+    # Save each attachment
+    for attachment in attachments:
+        await coordinator.save_attachment("test_topic", "test_message", attachment)
+    
+    # Verify each attachment was processed and saved
+    assert attachment_handler_mock.process.call_count == 4
+    assert file_storage_mock.save_attachment.call_count == 4
+
+@pytest.mark.asyncio
+async def test_save_attachment_processing_error(coordinator, attachment_handler_mock):
+    """Test error handling when attachment processing fails."""
+    attachment_handler_mock.process.side_effect = ValueError("Invalid attachment")
+    
+    attachment = Attachment(
+        id="test_att",
+        type="image/jpeg",
+        data=b"test",
+        filename="test.jpg"
+    )
+    
+    # Verify error is propagated
+    with pytest.raises(ValueError, match="Invalid attachment"):
+        await coordinator.save_attachment("test_topic", "test_message", attachment)
+
+@pytest.mark.asyncio
+async def test_save_attachment_concurrent(coordinator, file_storage_mock, attachment_handler_mock):
+    """Test saving multiple attachments concurrently."""
+    attachments = [
+        Attachment(id=f"att{i}", type="image/jpeg", data=b"test", filename=f"test{i}.jpg")
+        for i in range(5)
+    ]
+    
+    # Save attachments concurrently
+    import asyncio
+    await asyncio.gather(*[
+        coordinator.save_attachment("test_topic", "test_message", att)
+        for att in attachments
+    ])
+    
+    # Verify all attachments were processed and saved
+    assert attachment_handler_mock.process.call_count == 5
+    assert file_storage_mock.save_attachment.call_count == 5 
