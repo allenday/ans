@@ -72,8 +72,8 @@ class GitStorageAdapter(StorageAdapter):
         if not (self.repo_path / ".git").exists():
             logger.info("Initializing new git repository")
             self._repo = Repo.init(self.repo_path, initial_branch='main')
-            await self._repo.index.add(['topics', 'metadata.yaml'])
-            await self._repo.index.commit("Initial repository structure")
+            self._repo.index.add(['topics', 'metadata.yaml'])
+            self._repo.index.commit("Initial repository structure")
             logger.debug("Created initial commit with repository structure")
         else:
             logger.info("Using existing git repository")
@@ -192,21 +192,21 @@ class GitStorageAdapter(StorageAdapter):
                     group_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Stage each path separately
-                await self._repo.index.add([source])
-                await self._repo.index.add([f'{source}/{group_id}'])
-                await self._repo.index.add([str(topic_path.relative_to(self.repo_path))])
-                await self._repo.index.add(['metadata.yaml'])
+                self._repo.index.add([source])
+                self._repo.index.add([f'{source}/{group_id}'])
+                self._repo.index.add([str(topic_path.relative_to(self.repo_path))])
+                self._repo.index.add(['metadata.yaml'])
                 logger.debug("Staged all files")
             else:
                 # For non-sourced topics, add everything at once
-                await self._repo.index.add([
+                self._repo.index.add([
                     str(topic_path.relative_to(self.repo_path)),
                     'metadata.yaml'
                 ])
                 logger.debug("Staged topic files and metadata")
             
             # Commit changes
-            await self._repo.index.commit(f"Created topic: {topic.name}")
+            self._repo.index.commit(f"Created topic: {topic.name}")
             logger.info(f"Successfully created topic {topic.id} at {topic_path}")
             
         except Exception as e:
@@ -323,16 +323,16 @@ class GitStorageAdapter(StorageAdapter):
             
             # Stage changes
             messages_path = str(messages_file.relative_to(self.repo_path))
-            await self._repo.index.add([messages_path])
+            self._repo.index.add([messages_path])
             logger.debug(f"Staged messages file: {messages_path}")
 
             if attachment_paths:
                 for attachment_path in attachment_paths:
-                    await self._repo.index.add([attachment_path])
+                    self._repo.index.add([attachment_path])
                     logger.debug(f"Staged attachment: {attachment_path}")
 
             # Commit changes
-            await self._repo.index.commit(f"Added message to topic: {topic_info['name']}")
+            self._repo.index.commit(f"Added message to topic: {topic_info['name']}")
             logger.info(f"Successfully saved message to topic {topic_id}")
             
         except Exception as e:
@@ -417,11 +417,11 @@ class GitStorageAdapter(StorageAdapter):
                 
             # Stage changes
             attachment_path = str(file_path.relative_to(self.repo_path))
-            await self._repo.index.add([attachment_path])
+            self._repo.index.add([attachment_path])
             logger.debug(f"Staged attachment: {attachment_path}")
 
             # Commit changes
-            await self._repo.index.commit(f"Added attachment to topic: {topic_info['name']}")
+            self._repo.index.commit(f"Added attachment to topic: {topic_info['name']}")
             logger.info(f"Successfully saved attachment {attachment.id} to topic {topic_id}")
         else:
             logger.debug(f"No data to write for attachment {attachment.id}")
@@ -437,7 +437,7 @@ class GitStorageAdapter(StorageAdapter):
         if 'origin' in self._repo.remotes:
             try:
                 logger.debug("Pushing changes to remote")
-                await self._repo.git.push('-f', 'origin', 'main')
+                self._repo.git.push('-f', 'origin', 'main')
                 logger.debug("Successfully pushed changes")
             except Exception as e:
                 logger.error(f"Failed to sync with remote: {e}")
