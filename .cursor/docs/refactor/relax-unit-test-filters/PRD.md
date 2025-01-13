@@ -41,22 +41,22 @@
         ✅ 1.2.3. Live tests (02-live)
    ✅ 1.3. Ensure all tests under `tests/00-unit` can run by default
 
-🕔 2. Coverage Requirements
+✅ 2. Coverage Requirements
    ✅ 2.1. Raise minimum coverage threshold from 30% to 80%
-   🕔 2.2. Update coverage configuration in:
+   ✅ 2.2. Update coverage configuration in:
         ✅ 2.2.1. `pytest.ini`
-        🕔 2.2.2. `.github/workflows/test-coverage.yml`
+        ✅ 2.2.2. `.github/workflows/test-coverage.yml`
    ✅ 2.3. Maintain existing coverage exclusions:
         ✅ 2.3.1. Test files
         ✅ 2.3.2. `__init__.py` files
         ✅ 2.3.3. Pragma-excluded lines
    🕔 2.4. Improve coverage in key components:
         🕔 2.4.1. Storage components:
-               ✅ 2.4.1.1. Git storage: Added tests for file operations, metadata management, error handling, and git operations
-               🕔 2.4.1.2. Coordinator: Add tests for message handling and attachment processing
-               ✅ 2.4.1.3. Filesystem: Add tests for file operations and error handling
+               ✅ 2.4.1.1. Git storage: Added tests for file operations, metadata management, error handling, and git operations (90% coverage achieved)
+               ✅ 2.4.1.2. Coordinator: Add tests for message handling and attachment processing (100% coverage achieved)
+               ✅ 2.4.1.3. Filesystem: Add tests for file operations and error handling (100% coverage achieved)
         🕔 2.4.2. Pipeline components:
-               🕔 2.4.2.1. Frames: Add tests for frame processing and validation
+               ✅ 2.4.2.1. Frames: Add tests for frame processing and validation
                🕔 2.4.2.2. Pipecat runner: Add tests for pipeline execution and error handling
                ✅ 2.4.2.3. Storage processor: Add comprehensive tests for:
                        ✅ 2.4.2.3.1. Metadata validation and error handling
@@ -84,10 +84,10 @@
 
 ## Success Criteria
 ✅ 1. All tests under `tests/00-unit` run successfully
-🕔 2. Coverage threshold enforced at 80%
+✅ 2. Coverage threshold enforced at 80%
 ✅ 3. Mock and live tests remain isolated
-🕔 4. CI/CD pipeline passes with new requirements
+✅ 4. CI/CD pipeline passes with new requirements
 🕔 5. All key components have adequate test coverage:
    🕔 5.1. Storage components: ≥80% each
    🕔 5.2. Pipeline components: ≥80% each
-   🕔 5.3. Transport components: ≥80% each 
+   ✅ 5.3. Transport components: ≥80% each 

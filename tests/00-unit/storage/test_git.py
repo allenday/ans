@@ -373,3 +373,117 @@ async def test_set_github_config_not_initialized(git_adapter):
     """Test setting GitHub config before initialization."""
     with pytest.raises(RuntimeError, match="Must initialize repository first"):
         await git_adapter.set_github_config("test_token", "test/repo")
+
+@pytest.mark.asyncio
+async def test_await_uninitialized(git_adapter):
+    """Test awaiting uninitialized adapter."""
+    with pytest.raises(RuntimeError, match="Must call init_storage()"):
+        await git_adapter
+
+@pytest.mark.asyncio
+async def test_await_initialized(git_adapter, user):
+    """Test awaiting initialized adapter."""
+    await git_adapter.init_storage(user)
+    adapter = await git_adapter
+    assert adapter == git_adapter
+
+@pytest.mark.asyncio
+async def test_save_message_topic_not_exists(git_adapter, user):
+    """Test saving message to non-existent topic."""
+    await git_adapter.init_storage(user)
+    
+    message = Message(
+        content="Test message",
+        source="test",
+        metadata={"key": "value"}
+    )
+    
+    with pytest.raises(ValueError, match="Topic test_topic does not exist"):
+        await git_adapter.save_message("test_topic", message)
+
+@pytest.mark.asyncio
+async def test_save_message_missing_topic_dir(git_adapter, user, repo_mock):
+    """Test saving message when topic directory is missing."""
+    await git_adapter.init_storage(user)
+    
+    # Create topic in metadata but not on disk
+    metadata = {
+        'user_id': user.id,
+        'topics': {
+            'test_topic': {
+                'name': 'Test Topic',
+                'created_at': datetime.now().isoformat(),
+                'path': 'test_topic'
+            }
+        }
+    }
+    metadata_path = git_adapter.repo_path / "metadata.json"
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f)
+    
+    message = Message(
+        content="Test message",
+        source="test",
+        metadata={"key": "value"}
+    )
+    
+    with pytest.raises(RuntimeError, match="Topic directory .* does not exist"):
+        await git_adapter.save_message("test_topic", message)
+
+@pytest.mark.asyncio
+async def test_save_attachment_topic_not_exists(git_adapter, user):
+    """Test saving attachment to non-existent topic."""
+    await git_adapter.init_storage(user)
+    
+    attachment = Attachment(
+        id="test_attachment",
+        type="text/plain",
+        filename="test.txt",
+        data=b"test data"
+    )
+    
+    with pytest.raises(ValueError, match="Topic test_topic does not exist"):
+        await git_adapter.save_attachment("test_topic", "test_message", attachment)
+
+@pytest.mark.asyncio
+async def test_save_attachment_missing_topic_dir(git_adapter, user, repo_mock):
+    """Test saving attachment when topic directory is missing."""
+    await git_adapter.init_storage(user)
+    
+    # Create topic in metadata but not on disk
+    metadata = {
+        'user_id': user.id,
+        'topics': {
+            'test_topic': {
+                'name': 'Test Topic',
+                'created_at': datetime.now().isoformat(),
+                'path': 'test_topic'
+            }
+        }
+    }
+    metadata_path = git_adapter.repo_path / "metadata.json"
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f)
+    
+    attachment = Attachment(
+        id="test_attachment",
+        type="text/plain",
+        filename="test.txt",
+        data=b"test data"
+    )
+    
+    with pytest.raises(RuntimeError, match="Topic directory .* does not exist"):
+        await git_adapter.save_attachment("test_topic", "test_message", attachment)
+
+@pytest.mark.asyncio
+async def test_read_metadata_missing_file(git_adapter, user):
+    """Test reading metadata when file is missing."""
+    await git_adapter.init_storage(user)
+    
+    # Remove metadata file
+    metadata_path = git_adapter.repo_path / "metadata.json"
+    metadata_path.unlink()
+    
+    # Read metadata should return empty dict
+    metadata = await git_adapter._read_metadata()
+    assert metadata == {'user_id': None, 'topics': {}}
