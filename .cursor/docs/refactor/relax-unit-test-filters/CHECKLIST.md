@@ -80,57 +80,57 @@
                5.1.3.1. 🕔 Add message handling tests
                5.1.3.2. 🕔 Add attachment processing tests
                5.1.3.3. 🕔 Add error handling tests
-        5.1.4. 🕔 Add filesystem tests (27% -> target 80%)
-               5.1.4.1. 🕔 Add file operations tests
-               5.1.4.2. 🕔 Add error handling tests
-               5.1.4.3. 🕔 Add path management tests
+        5.1.4. ✅ Add filesystem tests (100% coverage)
+               5.1.4.1. ✅ Add file operations tests
+               5.1.4.2. ✅ Add error handling tests
+               5.1.4.3. ✅ Add path management tests
 
    5.2. Pipeline Components
         5.2.1. 🕔 Add frames tests (0% -> target 80%)
                5.2.1.1. 🕔 Add frame processing tests
                5.2.1.2. 🕔 Add validation tests
                5.2.1.3. 🕔 Add error handling tests
-        5.2.2. 🕔 Add pipecat_runner tests (0% -> target 80%)
+        5.2.2. 🕔 Add pipecat_runner tests (23% -> target 80%)
                5.2.2.1. 🕔 Add pipeline execution tests
                5.2.2.2. 🕔 Add error handling tests
                5.2.2.3. 🕔 Add state management tests
-        5.2.3. 🕔 Add storage_processor tests (15% -> target 80%)
+        5.2.3. ✅ Add storage_processor tests (87% -> target 80%)
                5.2.3.1. ✅ Add metadata validation tests:
                        5.2.3.1.1. ✅ Test missing required metadata fields
                        5.2.3.1.2. ✅ Test invalid metadata values
                        5.2.3.1.3. ✅ Test metadata field propagation
                        5.2.3.1.4. ✅ Test error handling for invalid metadata
-               5.2.3.2. 🕔 Add topic creation tests:
-                       5.2.3.2.1. 🕔 Test duplicate topic handling
-                       5.2.3.2.2. 🕔 Test invalid topic names
-                       5.2.3.2.3. 🕔 Test missing chat title
-                       5.2.3.2.4. 🕔 Test topic metadata validation
-               5.2.3.3. 🕔 Add frame processing tests:
+               5.2.3.2. ✅ Add topic creation tests:
+                       5.2.3.2.1. ✅ Test duplicate topic handling
+                       5.2.3.2.2. ✅ Test invalid topic names
+                       5.2.3.2.3. ✅ Test missing chat title
+                       5.2.3.2.4. ✅ Test topic metadata validation
+               5.2.3.3. ✅ Add frame processing tests:
                        5.2.3.3.1. ✅ Test unsupported frame types
-                       5.2.3.3.2. 🕔 Test frame content validation
-                       5.2.3.3.3. 🕔 Test frame processing errors
-                       5.2.3.3.4. 🕔 Test concurrent frame processing
-               5.2.3.4. 🕔 Add attachment tests:
-                       5.2.3.4.1. 🕔 Test missing attachment data
-                       5.2.3.4.2. 🕔 Test invalid MIME types
-                       5.2.3.4.3. 🕔 Test large attachments
-                       5.2.3.4.4. 🕔 Test multiple attachments
-               5.2.3.5. 🕔 Add logging tests:
-                       5.2.3.5.1. 🕔 Test error logging
-                       5.2.3.5.2. 🕔 Test debug logging
-                       5.2.3.5.3. 🕔 Test info logging
-                       5.2.3.5.4. 🕔 Test log context data
+                       5.2.3.3.2. ✅ Test frame content validation
+                       5.2.3.3.3. ✅ Test frame processing errors
+                       5.2.3.3.4. ✅ Test concurrent frame processing
+               5.2.3.4. ✅ Add attachment tests:
+                       5.2.3.4.1. ✅ Test missing attachment data
+                       5.2.3.4.2. ✅ Test invalid MIME types
+                       5.2.3.4.3. ✅ Test large attachments
+                       5.2.3.4.4. ✅ Test multiple attachments
+               5.2.3.5. ✅ Add logging tests:
+                       5.2.3.5.1. ✅ Test error logging
+                       5.2.3.5.2. ✅ Test debug logging
+                       5.2.3.5.3. ✅ Test info logging
+                       5.2.3.5.4. ✅ Test log context data
 
    5.3. Transport Components
         5.3.1. ✅ Add telegram_transport tests (56% -> target 80%)
                5.3.1.1. ✅ Add message handling tests
                5.3.1.2. ✅ Add API interaction tests
                5.3.1.3. ✅ Add error handling tests
-               5.3.1.4. 🕔 Add remaining coverage:
-                       5.3.1.4.1. 🕔 Add tests for user transport methods
-                       5.3.1.4.2. 🕔 Add tests for bot transport methods
-                       5.3.1.4.3. 🕔 Add tests for transport initialization
-                       5.3.1.4.4. 🕔 Add tests for transport shutdown
+               5.3.1.4. ✅ Add remaining coverage:
+                       5.3.1.4.1. ✅ Add tests for user transport methods
+                       5.3.1.4.2. ✅ Add tests for bot transport methods
+                       5.3.1.4.3. ✅ Add tests for transport initialization
+                       5.3.1.4.4. ✅ Add tests for transport shutdown
         5.3.2. ✅ Add events tests (95% -> target 80%)
                5.3.2.1. ✅ Add event processing tests
                5.3.2.2. ✅ Add error handling tests
