@@ -17,10 +17,10 @@ Modify pytest configuration to allow all tests under `tests/00-unit` to run whil
    3.3. `tests/02-live/`: Live integration tests
 
 4. Current coverage status:
-   4.1. Overall: 28%
+   4.1. Overall: 38%
    4.2. Storage components:
         4.2.1. Serializer: 100%
-        4.2.2. Git storage: 7%
+        4.2.2. Git storage: 77%
         4.2.3. Coordinator: 29%
         4.2.4. Filesystem: 27%
    4.3. Pipeline components:
@@ -52,7 +52,7 @@ Modify pytest configuration to allow all tests under `tests/00-unit` to run whil
         2.3.3. Pragma-excluded lines
    2.4. Improve coverage in key components:
         2.4.1. Storage components:
-               2.4.1.1. Git storage: Add tests for file operations, metadata management, and error handling
+               2.4.1.1. Git storage: ✅ Added tests for file operations, metadata management, error handling, and git operations
                2.4.1.2. Coordinator: Add tests for message handling and attachment processing
                2.4.1.3. Filesystem: Add tests for file operations and error handling
         2.4.2. Pipeline components:

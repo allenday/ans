@@ -3,12 +3,13 @@ from pathlib import Path
 from git import Repo
 import yaml
 import frontmatter
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
-from typing import Generator, Any
+from typing import Generator, Any, Dict
 import json
 import shutil
 from chronicler.logging import get_logger, trace_operation
+import re
 
 from chronicler.storage.interface import (
     StorageAdapter, User, Topic, Message, 
@@ -29,12 +30,12 @@ class GitStorageAdapter(StorageAdapter):
         self.base_path = Path(base_path)
         self._repo = None
         self._user = None
-        self.repo_path = None
         self._initialized = False
+        self.repo_path = None
     
     def is_initialized(self) -> bool:
         """Check if storage is initialized"""
-        return self._initialized
+        return self._initialized and self._repo is not None
         
     def __await__(self) -> Generator[Any, None, 'GitStorageAdapter']:
         """Make the adapter awaitable after initialization"""
@@ -45,476 +46,215 @@ class GitStorageAdapter(StorageAdapter):
         return self
     
     @trace_operation('storage.git')
-    async def init_storage(self, user: User) -> 'GitStorageAdapter':
-        """Initialize a git repository for the user"""
-        logger.info(f"Initializing storage for user {user.id}")
-        self._user = user
+    async def init_storage(self, user: User) -> None:
+        """Initialize storage for a user."""
+        # Set repository path
         self.repo_path = self.base_path / f"{user.id}_journal"
         
-        # Create base directories
-        logger.debug(f"Creating repository structure at {self.repo_path}")
+        # Create repository directory
         self.repo_path.mkdir(parents=True, exist_ok=True)
-        topics_dir = self.repo_path / "topics"
-        topics_dir.mkdir(exist_ok=True)
-        logger.debug(f"Created base directories: {self.repo_path}, {topics_dir}")
-        
-        # Initialize metadata file
-        metadata_path = self.repo_path / "metadata.yaml"
-        if not metadata_path.exists():
-            logger.debug("Creating initial metadata.yaml file")
+
+        # Initialize git repository if not already initialized
+        if not self.is_initialized():
+            self._repo = Repo.init(str(self.repo_path))
+            
+            # Create initial metadata
+            metadata = {
+                'user_id': user.id,
+                'topics': {}
+            }
+            
+            # Write metadata file
+            metadata_path = self.repo_path / "metadata.json"
+            metadata_path.parent.mkdir(parents=True, exist_ok=True)
             with open(metadata_path, 'w') as f:
-                yaml.dump({
-                    'user_id': user.id,
-                    'topics': {}
-                }, f)
-        
-        # Initialize git repo
-        if not (self.repo_path / ".git").exists():
-            logger.info("Initializing new git repository")
-            self._repo = Repo.init(self.repo_path, initial_branch='main')
-            self._repo.index.add(['topics', 'metadata.yaml'])
-            self._repo.index.commit("Initial repository structure")
-            logger.debug("Created initial commit with repository structure")
-        else:
-            logger.info("Using existing git repository")
-            self._repo = Repo(self.repo_path)
-        
+                json.dump(metadata, f)
+            
+            # Add and commit metadata file
+            self._repo.index.add(['.'])
+            self._repo.index.commit("Initialize repository")
+
         self._initialized = True
-        logger.info(f"Storage initialization complete for user {user.id}")
-        return self
     
     @trace_operation('storage.git')
-    async def create_topic(self, topic: Topic, ignore_exists: bool = False) -> None:
-        """Create a new topic directory with basic structure"""
-        logger.info(f"Creating topic {topic.id} with name '{topic.name}'")
+    async def create_topic(self, topic: Topic) -> None:
+        """Create a new topic."""
+        if not self.is_initialized():
+            raise RuntimeError("Must initialize repository first")
+        
+        # Validate topic name
         if '/' in topic.name:
-            logger.error(f"Invalid topic name '{topic.name}': contains '/'")
             raise ValueError("Topic name cannot contain '/'")
         
-        # Determine directory structure based on source
-        if topic.metadata:
-            if 'chat_id' in topic.metadata and 'source' not in topic.metadata:
-                logger.error(f"Topic {topic.id} has chat_id but no source specified")
-                raise ValueError("Source must be specified when chat_id is present")
-            
-            source = topic.metadata.get('source', 'default')
-            group_id = topic.metadata.get('chat_id', 'default')
-            topic_path = self.repo_path / source / str(group_id) / str(topic.id)
-            logger.debug(f"Using transport path: {topic_path}")
-            logger.debug(f"Source: {source}, Group ID: {group_id}, Topic ID: {topic.id}")
-        else:
-            # Default path: topics/topic_id
-            topic_path = self.repo_path / "topics" / str(topic.id)
-            logger.debug(f"Using default topics path: {topic_path}")
+        # Read current metadata
+        metadata = await self._read_metadata()
         
-        if topic_path.exists() and not ignore_exists:
-            logger.error(f"Topic {topic.id} already exists at {topic_path}")
+        # Check if topic already exists
+        if topic.id in metadata['topics']:
             raise ValueError(f"Topic {topic.id} already exists")
         
-        try:
-            # Create topic directory
-            topic_path.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created topic directory at {topic_path}")
-            
-            # Create messages file
-            messages_file = topic_path / self.MESSAGES_FILE
-            messages_file.parent.mkdir(parents=True, exist_ok=True)
-            messages_file.touch()
-            logger.debug(f"Created messages file at {messages_file}")
-            
-            # Create attachments directory
-            attachments_dir = topic_path / "attachments"
-            attachments_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created attachments directory at {attachments_dir}")
-            
-            # Update metadata
-            metadata_path = self.repo_path / "metadata.yaml"
-            logger.debug(f"Updating metadata at {metadata_path}")
-            if metadata_path.exists():
-                with open(metadata_path) as f:
-                    metadata = yaml.safe_load(f) or {}
-            else:
-                metadata = {}
-            
-            # Initialize sources section if needed
-            if 'sources' not in metadata:
-                metadata['sources'] = {}
-            
-            # Update group and topic mappings for sourced topics
-            if topic.metadata:
-                source = topic.metadata.get('source', 'default')
-                group_id = str(topic.metadata.get('chat_id', 'default'))
-                group_name = topic.metadata.get('chat_title', 'default')
-                logger.debug(f"Updating source metadata - Source: {source}, Group: {group_name} ({group_id})")
-                
-                # Initialize source if needed
-                if source not in metadata['sources']:
-                    metadata['sources'][source] = {'groups': {}}
-                
-                # Update or create group entry
-                if group_id not in metadata['sources'][source]['groups']:
-                    metadata['sources'][source]['groups'][group_id] = {
-                        'name': group_name,
-                        'topics': {}
-                    }
-                
-                # Add topic to group
-                metadata['sources'][source]['groups'][group_id]['topics'][str(topic.id)] = {
-                    'name': topic.name,
-                    'created_at': datetime.utcnow().isoformat(),
-                    'metadata': topic.metadata
-                }
-            else:
-                logger.debug(f"Updating standard topic metadata for topic {topic.id}")
-                # For non-sourced topics, store in root topics section
-                if 'topics' not in metadata:
-                    metadata['topics'] = {}
-                metadata['topics'][str(topic.id)] = {
-                    'name': topic.name,
-                    'created_at': datetime.utcnow().isoformat(),
-                    'metadata': topic.metadata
-                }
-            
-            # Save updated metadata
-            with open(metadata_path, 'w') as f:
-                yaml.dump(metadata, f)
-            logger.debug("Metadata file updated successfully")
-            
-            # Stage changes
-            if topic.metadata:
-                # Create directories if they don't exist
-                source_dir = self.repo_path / source
-                if not source_dir.exists():
-                    source_dir.mkdir(parents=True, exist_ok=True)
-                
-                group_dir = source_dir / str(group_id)
-                if not group_dir.exists():
-                    group_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Stage each path separately
-                self._repo.index.add([source])
-                self._repo.index.add([f'{source}/{group_id}'])
-                self._repo.index.add([str(topic_path.relative_to(self.repo_path))])
-                self._repo.index.add(['metadata.yaml'])
-                logger.debug("Staged all files")
-            else:
-                # For non-sourced topics, add everything at once
-                self._repo.index.add([
-                    str(topic_path.relative_to(self.repo_path)),
-                    'metadata.yaml'
-                ])
-                logger.debug("Staged topic files and metadata")
-            
-            # Commit changes
-            self._repo.index.commit(f"Created topic: {topic.name}")
-            logger.info(f"Successfully created topic {topic.id} at {topic_path}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create topic {topic.id}: {e}", exc_info=True)
-            raise
+        # Validate source if chat_id present
+        if topic.metadata and 'chat_id' in topic.metadata and 'source' not in topic.metadata:
+            raise ValueError("Source must be specified when chat_id is present")
+        
+        # Create topic directory
+        topic_dir = self.repo_path / topic.id
+        topic_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create messages file
+        messages_file = topic_dir / self.MESSAGES_FILE
+        with open(messages_file, 'w') as f:
+            f.write('')
+        
+        # Update metadata
+        metadata['topics'][topic.id] = {
+            'name': topic.name,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'path': str(topic_dir.relative_to(self.repo_path))
+        }
+        if topic.metadata:
+            metadata['topics'][topic.id].update(topic.metadata)
+        
+        # Write metadata and commit changes
+        await self._write_metadata(metadata)
+        
+        # Add and commit topic files
+        self._repo.index.add(['.'])
+        self._repo.index.commit(f"Created topic {topic.name}")
     
     @trace_operation('storage.git')
     async def save_message(self, topic_id: str, message: Message) -> None:
-        """Save a message to a topic's messages.jsonl file"""
-        logger.info(f"Saving message to topic {topic_id}")
-        logger.debug(f"Message content length: {len(message.content)} chars")
-        logger.debug(f"Message has {len(message.attachments) if message.attachments else 0} attachments")
-        
-        try:
-            # Get topic info from metadata
-            metadata_path = self.repo_path / "metadata.yaml"
-            logger.debug(f"Reading metadata from {metadata_path}")
-            with open(metadata_path) as f:
-                metadata = yaml.safe_load(f) or {}
-            
-            # Find topic in metadata structure
-            topic_info = None
-            if message.metadata:
-                if 'chat_id' in message.metadata and 'source' not in message.metadata:
-                    logger.error(f"Message for topic {topic_id} has chat_id but no source specified")
-                    raise ValueError("Source must be specified when chat_id is present")
-                
-                source = message.metadata.get('source')
-                if source:
-                    # Use the source as is, don't split by underscore
-                    group_id = str(message.metadata.get('chat_id', 'default'))
-                    logger.debug(f"Processing {source} message for group {group_id}")
-                    if ('sources' in metadata and 
-                        source in metadata['sources'] and
-                        'groups' in metadata['sources'][source] and
-                        group_id in metadata['sources'][source]['groups'] and
-                        'topics' in metadata['sources'][source]['groups'][group_id] and
-                        str(topic_id) in metadata['sources'][source]['groups'][group_id]['topics']):
-                        topic_info = metadata['sources'][source]['groups'][group_id]['topics'][str(topic_id)]
-                        topic_path = self.repo_path / source / group_id / str(topic_id)
-                        logger.debug(f"Found {source} topic at {topic_path}")
-            
-            if not topic_info:
-                # Non-sourced topic or not found in sources
-                logger.debug("Processing non-sourced message")
-                if 'topics' in metadata and str(topic_id) in metadata['topics']:
-                    topic_info = metadata['topics'][str(topic_id)]
-                    topic_path = self.repo_path / "topics" / str(topic_id)
-                    logger.debug(f"Found topic at {topic_path}")
-            
-            if not topic_info:
-                logger.error(f"Topic {topic_id} does not exist")
-                raise ValueError(f"Topic {topic_id} does not exist")
-            
-            if not topic_path.exists():
-                logger.error(f"Topic directory {topic_path} does not exist")
-                raise ValueError(f"Topic directory {topic_path} does not exist")
-            
-            # Handle attachments if present
-            attachment_paths = []
-            if message.attachments:
-                for attachment in message.attachments:
-                    # Determine media type directory
-                    media_type = attachment.type.split('/')[1]  # e.g., 'jpeg' from 'image/jpeg'
-                    if media_type == 'jpeg': media_type = 'jpg'
-                    elif media_type == 'mpeg': media_type = 'mp3'
-                    elif media_type == 'markdown': media_type = 'txt'
-                    elif media_type == 'plain': media_type = 'txt'
-                    elif media_type == 'octet-stream':
-                        # For binary files, use extension from filename or 'bin' as default
-                        ext = Path(attachment.filename).suffix.lstrip('.')
-                        media_type = ext if ext else 'bin'
-                    
-                    logger.debug(f"Processing attachment of type {media_type}")
-                    
-                    # Create type-specific directory under attachments
-                    media_dir_name = "attachments" if topic_info.get('metadata', {}).get('source') else "media"
-                    media_dir = topic_path / media_dir_name / media_type
-                    media_dir.mkdir(parents=True, exist_ok=True)
-                    logger.debug(f"Created media directory at {media_dir}")
-                    
-                    # Use file_id as filename with appropriate extension
-                    extension = Path(attachment.filename).suffix
-                    if not extension:
-                        extension = f".{media_type}"
-                    file_path = media_dir / f"{attachment.id}{extension}"
-                    logger.debug(f"Saving attachment to {file_path}")
-                    
-                    # Save attachment data
-                    with open(file_path, 'wb') as f:
-                        f.write(attachment.data)
-                    attachment_paths.append(str(file_path.relative_to(self.repo_path)))
-                    logger.debug(f"Saved attachment data to {file_path}")
-            
-            # Save message to messages.jsonl
-            messages_file = topic_path / self.MESSAGES_FILE
-            logger.debug(f"Saving message to {messages_file}")
-            message_data = {
-                'content': message.content,
-                'source': message.source,
-                'timestamp': message.timestamp.isoformat(),
-                'metadata': message.metadata
-            }
-            
-            if message.attachments:
-                message_data['attachments'] = [{
-                    'id': att.id,
-                    'type': att.type,
-                    'original_name': att.filename
-                } for att in message.attachments]
-            
-            with open(messages_file, 'a') as f:
-                f.write(json.dumps(message_data) + '\n')
-            
-            # Stage changes
-            messages_path = str(messages_file.relative_to(self.repo_path))
-            self._repo.index.add([messages_path])
-            logger.debug(f"Staged messages file: {messages_path}")
+        """Save a message to a topic."""
+        if not self.is_initialized():
+            raise RuntimeError("Must initialize repository first")
 
-            if attachment_paths:
-                for attachment_path in attachment_paths:
-                    self._repo.index.add([attachment_path])
-                    logger.debug(f"Staged attachment: {attachment_path}")
+        # Read metadata to verify topic exists
+        metadata = await self._read_metadata()
+        if topic_id not in metadata['topics']:
+            raise ValueError(f"Topic {topic_id} does not exist")
 
-            # Commit changes
-            self._repo.index.commit(f"Added message to topic: {topic_info['name']}")
-            logger.info(f"Successfully saved message to topic {topic_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to save message to topic {topic_id}: {e}", exc_info=True)
-            raise
+        # Validate message metadata
+        if message.metadata and 'chat_id' in message.metadata and 'source' not in message.metadata:
+            raise ValueError("Source must be specified when chat_id is present")
+
+        # Get topic directory
+        topic_dir = self.repo_path / topic_id
+        if not topic_dir.exists():
+            raise RuntimeError(f"Topic directory {topic_dir} does not exist")
+
+        # Save message to messages file
+        messages_file = topic_dir / self.MESSAGES_FILE
+        message_data = {
+            'id': str(uuid.uuid4()) if not hasattr(message, 'id') or not message.id else message.id,
+            'content': message.content,
+            'source': message.source,
+            'timestamp': datetime.now(timezone.utc).isoformat() if not message.timestamp else message.timestamp.isoformat(),
+            'metadata': message.metadata or {}
+        }
+
+        # Handle attachments
+        if message.attachments:
+            message_data['attachments'] = []
+            for attachment in message.attachments:
+                # Determine media type directory
+                media_type = attachment.type.split('/')[0]
+                media_dir = topic_dir / "media" / media_type
+                media_dir.mkdir(parents=True, exist_ok=True)
+
+                # Save attachment file
+                file_ext = Path(attachment.filename).suffix
+                attachment_path = media_dir / f"{attachment.id}{file_ext}"
+                with open(attachment_path, 'wb') as f:
+                    f.write(attachment.data)
+
+                # Add attachment metadata
+                message_data['attachments'].append({
+                    'id': attachment.id,
+                    'type': attachment.type,
+                    'filename': attachment.filename,
+                    'path': str(attachment_path.relative_to(topic_dir))
+                })
+
+        # Append message to messages file
+        with open(messages_file, 'a') as f:
+            f.write(json.dumps(message_data) + '\n')
+
+        # Add and commit changes
+        self._repo.index.add(['.'])
+        self._repo.index.commit(f"Added message {message_data['id']} to topic {topic_id}")
     
     @trace_operation('storage.git')
     async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None:
         """Save an attachment to the topic's attachments directory"""
-        logger.info(f"Saving attachment {attachment.filename} to topic {topic_id}")
-        
-        # Get topic info from metadata
-        metadata_path = self.repo_path / "metadata.yaml"
-        with open(metadata_path) as f:
-            metadata = yaml.safe_load(f) or {}
-        
-        # Find topic in metadata structure
-        topic_info = None
-        topic_path = None
-        
-        # First check in sources
-        if 'sources' in metadata:
-            for source, source_info in metadata['sources'].items():
-                if 'groups' in source_info:
-                    for group_id, group_info in source_info['groups'].items():
-                        if ('topics' in group_info and 
-                            str(topic_id) in group_info['topics']):
-                            topic_info = group_info['topics'][str(topic_id)]
-                            topic_path = self.repo_path / source / group_id / str(topic_id)
-                            break
-                    if topic_info:
-                        break
-        
-        # If not found in sources, check root topics
-        if not topic_info and 'topics' in metadata:
-            if str(topic_id) in metadata['topics']:
-                topic_info = metadata['topics'][str(topic_id)]
-                topic_path = self.repo_path / "topics" / str(topic_id)
-        
-        if not topic_info:
-            logger.error(f"Topic {topic_id} does not exist")
-            raise ValueError(f"Topic {topic_id} does not exist")
-        
-        if not topic_path.exists():
-            logger.error(f"Topic directory {topic_path} does not exist")
-            raise ValueError(f"Topic directory {topic_path} does not exist")
-        
-        # Determine media type directory
-        media_type = attachment.type.split('/')[1]  # e.g., 'jpeg' from 'image/jpeg'
-        if media_type == 'jpeg': media_type = 'jpg'
-        elif media_type == 'mpeg': media_type = 'mp3'
-        elif media_type == 'plain': media_type = 'txt'
-        elif media_type == 'markdown': media_type = 'txt'
-        elif media_type == 'octet-stream':
-            # For binary files, use extension from filename or 'bin' as default
-            ext = Path(attachment.filename).suffix.lstrip('.')
-            media_type = ext if ext else 'bin'
-        
-        # Create type-specific directory under attachments/media
-        metadata = topic_info.get('metadata', {})
-        if 'chat_id' in metadata and 'source' not in metadata:
-            logger.error(f"Topic {topic_id} has chat_id but no source specified")
-            raise ValueError("Source must be specified when chat_id is present")
-        
-        media_dir_name = "attachments" if metadata.get('source') else "media"
-        media_dir = topic_path / media_dir_name / media_type
-        media_dir.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Created media directory at {media_dir}")
-        
-        # Use file_id as filename with appropriate extension
-        extension = Path(attachment.filename).suffix
-        if not extension:
-            extension = f".{media_type}"
-        file_path = media_dir / f"{attachment.id}{extension}"
-        logger.debug(f"Using filename: {file_path.name}")
-        
-        # Save the file if we have data
-        if attachment.data:
-            logger.debug(f"Writing {len(attachment.data)} bytes to {file_path}")
-            with open(file_path, 'wb') as f:
-                f.write(attachment.data)
-                
-            # Stage changes
-            attachment_path = str(file_path.relative_to(self.repo_path))
-            self._repo.index.add([attachment_path])
-            logger.debug(f"Staged attachment: {attachment_path}")
+        if not self.is_initialized():
+            raise RuntimeError("Must initialize repository first")
 
-            # Commit changes
-            self._repo.index.commit(f"Added attachment to topic: {topic_info['name']}")
-            logger.info(f"Successfully saved attachment {attachment.id} to topic {topic_id}")
-        else:
-            logger.debug(f"No data to write for attachment {attachment.id}")
+        # Read metadata to verify topic exists
+        metadata = await self._read_metadata()
+        if topic_id not in metadata['topics']:
+            raise ValueError(f"Topic {topic_id} does not exist")
+
+        # Get topic directory
+        topic_dir = self.repo_path / topic_id
+        if not topic_dir.exists():
+            raise RuntimeError(f"Topic directory {topic_dir} does not exist")
+
+        # Determine media type directory
+        media_type = attachment.type.split('/')[0]
+        media_dir = topic_dir / "media" / media_type
+        media_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save attachment file
+        file_ext = Path(attachment.filename).suffix
+        attachment_path = media_dir / f"{attachment.id}{file_ext}"
+        with open(attachment_path, 'wb') as f:
+            f.write(attachment.data)
+
+        # Add and commit changes
+        self._repo.index.add(['.'])
+        self._repo.index.commit(f"Added attachment {attachment.filename} to topic {topic_id}")
     
     @trace_operation('storage.git')
     async def sync(self) -> None:
-        """Synchronize with remote"""
-        logger.info("Syncing with remote repository")
-        if not self._repo:
-            self._repo = Repo(self.repo_path)
+        """Sync changes with remote repository."""
+        if not self.is_initialized():
+            raise RuntimeError("Must initialize repository first")
         
-        # Push changes to remote if available
-        if 'origin' in self._repo.remotes:
-            try:
-                logger.debug("Pushing changes to remote")
-                self._repo.git.push('-f', 'origin', 'main')
-                logger.debug("Successfully pushed changes")
-            except Exception as e:
-                logger.error(f"Failed to sync with remote: {e}")
-                raise  # Re-raise the original exception
-
-    @trace_operation('storage.git')
-    def add_remote(self, name: str, url: str) -> None:
-        """Add a remote repository"""
-        logger.info(f"Adding remote '{name}' with URL: {url}")
-        if not self._repo:
-            self._repo = Repo(self.repo_path)
-        self._repo.create_remote(name, url)
-
+        if not self._repo.remotes:
+            raise RuntimeError("No remote repository configured")
+        
+        # Push changes to remote
+        try:
+            origin = self._repo.remotes['origin']
+            origin.push()
+        except Exception as e:
+            raise RuntimeError(f"Failed to push changes: {str(e)}")
+    
     @trace_operation('storage.git')
     async def set_github_config(self, token: str, repo: str) -> None:
-        """Set GitHub configuration"""
-        logger.info("Setting GitHub configuration")
-        if not self._repo or not self._initialized:
-            logger.error("Repository not initialized")
+        """Configure GitHub remote with token auth."""
+        if not self._initialized:
             raise RuntimeError("Must initialize repository first")
 
-        # Delete existing remote if it exists
-        if 'origin' in self._repo.remotes:
-            self._repo.delete_remote('origin')
-
-        # Update remote URL with token
-        remote_url = f"https://{token}@github.com/{repo}.git"
-        await self._repo.create_remote('origin', remote_url)
-        logger.debug("Created remote with token")
+        logger.info("Setting GitHub configuration")
         
-        # Save config in metadata
-        metadata_path = self.repo_path / "metadata.yaml"
+        remote_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+        self._repo.create_remote("origin", remote_url)
+        
+        logger.info("Successfully configured GitHub remote")
+
+    async def _read_metadata(self) -> dict:
+        """Read metadata from file."""
+        metadata_path = self.repo_path / "metadata.json"
+        if not metadata_path.exists():
+            return {'user_id': None, 'topics': {}}
         with open(metadata_path) as f:
-            metadata = yaml.safe_load(f)
-        
-        metadata['github'] = {
-            'repo': repo,
-            # Don't save token in metadata for security
-        }
-        
-        with open(metadata_path, 'w') as f:
-            yaml.dump(metadata, f)
-            
-        await self._repo.index.add(['metadata.yaml'])
-        await self._repo.index.commit("Updated GitHub configuration")
+            return json.load(f)
 
-    async def _update_metadata(self, topic: Topic) -> None:
-        """Update metadata.yaml with topic information"""
-        metadata_path = self.repo_path / "metadata.yaml"
-        logger.debug(f"Updating metadata for topic {topic.id}")
-        
-        # Load existing metadata or create new
-        if metadata_path.exists():
-            with open(metadata_path) as f:
-                metadata = yaml.safe_load(f) or {}
-        else:
-            metadata = {}
-        
-        # Ensure topics dict exists
-        if 'topics' not in metadata:
-            metadata['topics'] = {}
-        
-        # Get group name from metadata or use default
-        group_name = topic.metadata.get('group_name', 'default')
-        
-        # Update topic metadata with full path
-        metadata['topics'][topic.id] = {
-            'name': topic.name,
-            'created_at': datetime.utcnow().isoformat(),
-            'path': f"telegram/{group_name}/{topic.name}",  # Full path including telegram and group
-            **(topic.metadata or {})
-        }
-        logger.debug(f"Topic metadata: {metadata['topics'][topic.id]}")
-        
-        # Save metadata
+    async def _write_metadata(self, metadata: dict) -> None:
+        """Write metadata to file."""
+        metadata_path = self.repo_path / "metadata.json"
         with open(metadata_path, 'w') as f:
-            yaml.dump(metadata, f)
-        
-        # Stage metadata file
-        await self._repo.index.add(['metadata.yaml']) 
+            json.dump(metadata, f)
+        self._repo.index.add([str(metadata_path)])
+        self._repo.index.commit("Update metadata") 
