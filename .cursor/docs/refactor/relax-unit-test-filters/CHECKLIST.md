@@ -153,15 +153,38 @@
                        5.2.3.5.4. ✅ Test log context data
 
    5.3. Transport Components
-        5.3.1. ✅ Add telegram_transport tests (56% -> target 80%)
-               5.3.1.1. ✅ Add message handling tests
-               5.3.1.2. ✅ Add API interaction tests
-               5.3.1.3. ✅ Add error handling tests
-               5.3.1.4. ✅ Add remaining coverage:
-                       5.3.1.4.1. ✅ Add tests for user transport methods
-                       5.3.1.4.2. ✅ Add tests for bot transport methods
-                       5.3.1.4.3. ✅ Add tests for transport initialization
-                       5.3.1.4.4. ✅ Add tests for transport shutdown
+        5.3.1. 🕔 Add telegram_transport tests (56% -> target 80%)
+               5.3.1.1. ✅ Add message type handling tests
+                       5.3.1.1.1. ✅ Test text message processing
+                       5.3.1.1.2. ✅ Test photo message processing
+                       5.3.1.1.3. ✅ Test sticker message processing
+                       5.3.1.1.4. ✅ Test document message processing
+                       5.3.1.1.5. ✅ Test audio message processing
+                       5.3.1.1.6. ✅ Test voice message processing
+               5.3.1.2. ✅ Add metadata handling tests
+                       5.3.1.2.1. ✅ Test chat metadata extraction
+                       5.3.1.2.2. ✅ Test user metadata extraction
+                       5.3.1.2.3. ✅ Test message metadata extraction
+               5.3.1.3. ✅ Add forum support tests
+                       5.3.1.3.1. ✅ Test topic creation handling
+                       5.3.1.3.2. ✅ Test thread ID management
+                       5.3.1.3.3. ✅ Test topic name extraction
+               5.3.1.4. ✅ Add forward message tests
+                       5.3.1.4.1. ✅ Test forward origin extraction
+                       5.3.1.4.2. ✅ Test forward metadata handling
+                       5.3.1.4.3. ✅ Test forward date handling
+               5.3.1.5. ✅ Add web page preview tests
+                       5.3.1.5.1. ✅ Test URL extraction
+                       5.3.1.5.2. ✅ Test preview metadata handling
+                       5.3.1.5.3. ✅ Test thumbnail handling
+               5.3.1.6. ✅ Add command processing tests
+                       5.3.1.6.1. ✅ Test command recognition
+                       5.3.1.6.2. ✅ Test command argument parsing
+                       5.3.1.6.3. ✅ Test command frame creation
+               5.3.1.7. ✅ Add frame processing tests
+                       5.3.1.7.1. ✅ Test frame creation
+                       5.3.1.7.2. ✅ Test frame validation
+                       5.3.1.7.3. ✅ Test frame sending
         5.3.2. ✅ Add events tests (95% -> target 80%)
                5.3.2.1. ✅ Add event processing tests
                5.3.2.2. ✅ Add error handling tests

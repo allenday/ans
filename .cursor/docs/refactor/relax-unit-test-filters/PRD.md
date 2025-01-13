@@ -67,7 +67,14 @@
                        ✅ 2.4.2.1.8. CommandFrame parsing and validation
                🕔 2.4.2.2. Pipecat runner: Add tests for pipeline execution and error handling
         ✅ 2.4.3. Transport components:
-               ✅ 2.4.3.1. Telegram transport: Add tests for message handling and API interactions
+               🕔 2.4.3.1. Telegram transport: Add tests for message handling and API interactions
+                       🕔 2.4.3.1.1. Message type handling (text, photo, sticker, document, etc.)
+                       🕔 2.4.3.1.2. Metadata extraction and validation
+                       🕔 2.4.3.1.3. Forum and topic support
+                       🕔 2.4.3.1.4. Forward message handling
+                       🕔 2.4.3.1.5. Web page preview handling
+                       🕔 2.4.3.1.6. Command processing
+                       🕔 2.4.3.1.7. Frame processing and sending
                ✅ 2.4.3.2. Events: Add tests for event processing and error handling
 
 ✅ 3. Test Discovery

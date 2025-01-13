@@ -1,4 +1,16 @@
-"""Crystalline logging configuration."""
+"""Crystalline logging configuration.
+
+This module provides a comprehensive logging system with the following features:
+- Structured JSON logging with consistent formatting
+- Operation tracing with correlation IDs
+- Performance metrics tracking (duration and memory usage)
+- Component-based logging with context propagation
+- Error tracking with full stack traces
+- Async operation support
+
+The logging system is designed to be used across all components of the application
+to provide consistent, traceable, and measurable operations.
+"""
 import logging
 import logging.config
 import json
@@ -48,15 +60,41 @@ def get_logger(name: str, component: Optional[str] = None) -> logging.Logger:
     return logger
 
 class CrystallineFormatter(logging.Formatter):
-    """A formatter that outputs logs in a crystalline JSON format."""
+    """A formatter that outputs logs in a crystalline JSON format.
+    
+    The formatter produces JSON-structured logs with the following fields:
+    - timestamp: ISO format UTC timestamp
+    - level: Log level (INFO, ERROR, etc.)
+    - message: Log message
+    - location: Source location (module:file:line)
+    - component: Component identifier
+    - context: Contextual information including correlation_id and operation_id
+    - performance: Performance metrics if available
+    - error: Error information if an exception occurred
+    """
 
     def format(self, record):
-        """Format the log record into crystalline JSON."""
+        """Format the log record into crystalline JSON.
+        
+        Args:
+            record: The LogRecord to format
+            
+        Returns:
+            str: JSON-formatted log entry
+        """
         crystal = _get_crystal_log(record)
         return json.dumps(crystal)
 
 def configure_logging(level='INFO'):
-    """Configure logging with crystalline formatter."""
+    """Configure logging with crystalline formatter.
+    
+    Sets up the root logger with two handlers:
+    1. JSON handler outputting to stdout for structured logging
+    2. Standard handler outputting to stderr for caplog compatibility
+    
+    Args:
+        level: The logging level to set (default: 'INFO')
+    """
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
@@ -74,7 +112,28 @@ def configure_logging(level='INFO'):
     root_logger.addHandler(standard_handler)
 
 def trace_operation(component: str):
-    """Decorator that traces an operation, propagating correlation ID and component."""
+    """Decorator that traces an operation, propagating correlation ID and component.
+    
+    This decorator provides:
+    - Correlation ID generation and propagation
+    - Component context tracking
+    - Operation ID generation
+    - Performance metrics (duration and memory usage)
+    - Automatic error logging with stack traces
+    - Support for both sync and async functions
+    
+    Args:
+        component: The component identifier for the operation
+        
+    Returns:
+        A decorator function that wraps the target function with tracing
+        
+    Example:
+        @trace_operation('storage')
+        async def store_data(data):
+            # Function will be automatically traced
+            pass
+    """
     def decorator(func):
         logger = get_logger(func.__module__, component)
 
@@ -177,7 +236,18 @@ def trace_operation(component: str):
     return decorator
 
 def _get_performance_metrics():
-    """Get performance metrics from the current context."""
+    """Get performance metrics from the current context.
+    
+    Calculates:
+    - Operation duration in milliseconds
+    - Memory usage delta in kilobytes
+    
+    Returns:
+        dict: Performance metrics with keys:
+            - duration_ms: Operation duration in milliseconds
+            - memory_delta_kb: Memory usage change in kilobytes
+            Returns empty dict if no metrics available
+    """
     start_time = OPERATION_START_TIME.get()
     start_memory = OPERATION_START_MEMORY.get()
     if start_time is None or start_memory is None:
@@ -199,7 +269,21 @@ def _get_performance_metrics():
     return metrics
 
 def _get_crystal_log(record: logging.LogRecord) -> dict:
-    """Get the log record in Crystal format."""
+    """Convert a LogRecord into the crystal log format.
+    
+    Structures the log record into a standardized format with:
+    - Basic log information (timestamp, level, message, location)
+    - Component and correlation tracking
+    - Performance metrics
+    - Error information if present
+    - Additional context from the record
+    
+    Args:
+        record: The LogRecord to convert
+        
+    Returns:
+        dict: The structured log data in crystal format
+    """
     try:
         message = record.getMessage()
     except (TypeError, ValueError) as e:

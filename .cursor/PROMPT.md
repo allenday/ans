@@ -171,7 +171,8 @@ VIOLATION -> REVERT AND REPORT
 
 ### 3. Status Tracking
 🔒 STATUS MARKERS
-1. 🕔 In Progress/Pending
+1. 🕔 Pending
+2. 👷 In Progress
 2. ✅ Complete/Verified
 3. 🛑 Blocked/Error
 4. 🔒 Locked/Protected

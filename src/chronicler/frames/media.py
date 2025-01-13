@@ -117,5 +117,5 @@ class StickerFrame(Frame):
             raise TypeError("emoji must be a string")
         if not isinstance(self.set_name, str):
             raise TypeError("set_name must be a string")
-        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set={self.set_name}")
+        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set_name={self.set_name}")
         super().__post_init__() 
