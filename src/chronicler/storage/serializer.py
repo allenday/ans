@@ -68,6 +68,14 @@ class MessageSerializer:
         try:
             logger.info(f"SER - Writing metadata to: {path}")
             logger.debug(f"SER - Metadata has {len(metadata)} top-level keys")
+            
+            # Check for circular references
+            try:
+                json.dumps(metadata)  # This will fail on circular references
+            except (TypeError, ValueError) as e:
+                logger.error(f"SER - Invalid metadata structure: {e}")
+                raise ValueError(f"Invalid metadata structure: {e}")
+                
             with open(path, 'w') as f:
                 yaml.dump(metadata, f)
             logger.debug(f"SER - Successfully wrote metadata to {path}")
