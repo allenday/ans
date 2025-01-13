@@ -43,9 +43,9 @@ class FileSystemStorage:
         except Exception as e:
             logger.error(f"FS - Failed to create attachment path {path}: {e}", exc_info=True)
             raise
-        
+
     @trace_operation('storage.filesystem')
-    async def save_file(self, path: Path, content: bytes) -> None:
+    def save_file(self, path: Path, content: bytes) -> None:
         """Save file to disk."""
         try:
             logger.info(f"FS - Saving file: {path}")
@@ -58,7 +58,7 @@ class FileSystemStorage:
             raise
             
     @trace_operation('storage.filesystem')
-    async def append_jsonl(self, path: Path, content: str) -> None:
+    def append_jsonl(self, path: Path, content: str) -> None:
         """Append line to JSONL file."""
         try:
             logger.info(f"FS - Appending to JSONL: {path}")

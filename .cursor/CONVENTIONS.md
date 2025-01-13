@@ -127,3 +127,81 @@
    2. Single responsibility
    3. Clear interfaces
    4. Complete error handling 
+
+## Logging Conventions
+
+### Logger Acquisition
+- Always use `get_logger` from `chronicler.logging` to acquire loggers
+- Name loggers after their module: `__name__`
+- Add component context when relevant: `get_logger(__name__, component="storage")`
+
+### Log Levels
+- ERROR: Operation failures that require attention
+- WARNING: Recoverable issues or edge cases
+- INFO: Important state changes and operations
+- DEBUG: Detailed flow information for troubleshooting
+
+### Operation Tracing
+- Decorate public methods with `@trace_operation`
+- Specify component for correlation: `@trace_operation('storage.git')`
+- Ensure correlation IDs propagate through async boundaries
+- Add performance metrics for key operations
+
+### Log Messages
+- Use structured format with context in `extra` parameter
+- Include relevant identifiers (user_id, chat_id, etc.)
+- Add error details with `exc_info=True` for exceptions
+- Avoid string interpolation in log messages
+
+### Example Usage
+```python
+from chronicler.logging import get_logger, trace_operation
+
+logger = get_logger(__name__, component="storage.git")
+
+@trace_operation('storage.git')
+async def save_message(self, topic_id: str, message: Message) -> None:
+    try:
+        logger.info("Saving message", extra={
+            'topic_id': topic_id,
+            'message_size': len(message.content)
+        })
+        # ... operation code ...
+    except Exception as e:
+        logger.error("Failed to save message", exc_info=True, extra={
+            'error': str(e),
+            'topic_id': topic_id
+        })
+        raise
+
+### Log Format
+All logs follow this JSON structure:
+```json
+{
+    "timestamp": "2024-01-12T08:45:23.456Z",
+    "level": "INFO",
+    "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+    "component": "storage.git",
+    "operation": "save_message",
+    "message": "Message saved successfully",
+    "location": "git.py:127",
+    "performance": {
+        "duration_ms": 45.3,
+        "memory_delta_kb": 128
+    },
+    "context": {
+        "topic_id": "123",
+        "message_size": 1024
+    }
+}
+```
+
+### Development Checklist
+- [ ] Use `get_logger` for logger acquisition
+- [ ] Add `@trace_operation` to public methods
+- [ ] Include relevant context in `extra`
+- [ ] Add error handling with proper logging
+- [ ] Verify correlation ID propagation
+- [ ] Check performance metrics collection
+- [ ] Review log levels and messages
+- [ ] Run logging-specific tests 

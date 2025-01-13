@@ -1,7 +1,7 @@
 """Telegram transport factory and implementations."""
 from abc import ABC, abstractmethod
 import re
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 import time
 
 from telegram import Update
@@ -156,6 +156,7 @@ class TelegramUserTransport(TelegramTransportBase):
                 self.logger.debug("Registered global command event handler")
             
             logger.info("Telegram user transport started successfully")
+            self._initialized = True
         except Exception as e:
             self._error_count += 1
             logger.error("Failed to start transport", exc_info=True)
@@ -167,6 +168,7 @@ class TelegramUserTransport(TelegramTransportBase):
         await super().stop()
         logger.info("Stopping Telegram user transport")
         await self.client.disconnect()
+        self._initialized = False
         logger.info("Telegram user transport stopped")
     
     @trace_operation('transport.telegram.user')
@@ -183,7 +185,7 @@ class TelegramUserTransport(TelegramTransportBase):
         
         try:
             if isinstance(frame, TextFrame):
-                await self.client.send_message(chat_id, frame.text)
+                await self.client.send_message(chat_id, frame.content)
                 self._message_count += 1
             elif isinstance(frame, ImageFrame):
                 await self.client.send_file(
@@ -227,7 +229,10 @@ class TelegramUserTransport(TelegramTransportBase):
         
         try:
             if isinstance(frame, TextFrame):
-                message = await self.client.send_message(chat_id, frame.text)
+                message = await self.client.send_message(
+                    chat_id=chat_id,
+                    text=frame.content
+                )
                 frame.metadata = EventMetadata(
                     chat_id=chat_id,
                     chat_title=frame.metadata.chat_title,
@@ -282,285 +287,173 @@ class TelegramUserTransport(TelegramTransportBase):
             raise
     
     @trace_operation('transport.telegram.user')
-    async def register_command(self, command: str, handler: callable):
+    async def register_command(self, command: str, handler: Callable[[CommandFrame], Awaitable[None]]):
         """Register a command handler.
         
         Args:
-            command: Command string without leading slash (e.g. "start" for /start)
-            handler: Async callback function that takes (frame: CommandFrame) as argument
+            command: Command to register (with or without leading slash)
+            handler: Async function to handle the command
         """
-        command_str = f"/{command}"
-        self._command_handlers[command_str] = handler
-        self.logger.debug(f"Registered handler for command: {command_str}")
+        # Ensure command starts with single slash
+        command = '/' + command.lstrip('/')
+        self._command_handlers[command] = handler
+        logger.debug(f"Registered handler for command: {command}")
+
+    async def _handle_command(self, frame: CommandFrame):
+        """Handle a command frame.
         
-        # Register event handler if not already registered
-        if not self._event_handler:
-            async def command_handler(event):
-                wrapped_event = TelethonEvent(event)
-                command = wrapped_event.get_command()
-                
-                self.logger.debug(f"Received command: {command} with args: {wrapped_event.get_command_args()}")
-                handler = self._command_handlers.get(command)
-                if handler:
-                    self.logger.debug(f"Found handler for command: {command}")
-                    metadata = wrapped_event.get_metadata()
-                    frame = CommandFrame(
-                        command=command,
-                        args=wrapped_event.get_command_args(),
-                        metadata=metadata
-                    )
-                    self.logger.debug(f"Executing handler for command: {command} with frame: {frame}")
-                    try:
-                        await handler(frame)
-                        self._command_count += 1
-                        self.logger.debug(f"Handler execution completed for command: {command}")
-                    except Exception as e:
-                        self._error_count += 1
-                        self.logger.error(f"Error executing handler for command {command}", exc_info=True)
-                        raise
-                else:
-                    self.logger.debug(f"No handler found for command: {command}")
+        Args:
+            frame: Command frame to handle
             
-            self._event_handler = self.client.on(events.NewMessage(pattern=r'^/[a-zA-Z]+'))(command_handler)
-            self.logger.debug("Registered global command event handler")
+        Raises:
+            ValueError: If command is not registered
+        """
+        if frame.command in self._command_handlers:
+            await self._command_handlers[frame.command](frame)
+        else:
+            logger.warning(f"Unknown command: {frame.command}")
+            raise ValueError(f"Unknown command: {frame.command}")
+
+    async def process_frame(self, frame: Frame):
+        """Process a frame.
+        
+        Args:
+            frame: Frame to process
+            
+        Raises:
+            ValueError: If frame type is not supported or frame metadata is invalid
+        """
+        if not isinstance(frame.metadata, EventMetadata):
+            raise ValueError("Frame must have EventMetadata")
+
+        try:
+            if isinstance(frame, CommandFrame):
+                await self._handle_command(frame)
+            elif isinstance(frame, (TextFrame, ImageFrame)):
+                await self.send(frame)
+            else:
+                raise ValueError(f"Unsupported frame type: {type(frame)}")
+        except Exception as e:
+            logger.error(f"Failed to process frame: {e}")
+            raise
 
 class TelegramBotTransport(TelegramTransportBase):
-    """Transport implementation for Telegram bot accounts using python-telegram-bot."""
+    """Transport implementation for Telegram Bot API."""
 
     def __init__(self, token: str):
-        """Initialize the transport with python-telegram-bot application."""
-        super().__init__()
-        logger.info("Initializing Telegram bot transport")
-        
-        if not token:
-            logger.error("Failed to initialize: empty token")
-            raise InvalidToken("You must pass the token you received from https://t.me/Botfather!")
-        
-        self.token = token
-        self.app = Application.builder().token(token).build()
-        self._command_handlers = {}  # Map of command -> handler function
-        logger.debug("Bot application initialized")
-    
-    async def start(self):
-        """Start the bot application."""
-        await super().start()
-        logger.info("Starting Telegram bot transport")
-        try:
-            await self.app.initialize()
-            await self.app.start()
-            
-            # Register command handlers if not already registered
-            for command, handler in self._command_handlers.items():
-                if not self.app.running:
-                    command_name = command.lstrip('/')
-                    self.app.add_handler(CommandHandler(command_name, handler))
-                    logger.debug(f"Registered handler for command: {command}")
-            
-            await self.app.updater.start_polling(
-                drop_pending_updates=False,
-                allowed_updates=['message']
-            )
-            logger.info("Telegram bot transport started successfully")
-        except Exception as e:
-            self._error_count += 1
-            logger.error("Failed to start transport", exc_info=True)
-            raise
-    
-    async def stop(self):
-        """Stop the bot application."""
-        await super().stop()
-        logger.info("Stopping Telegram bot transport")
-        if self.app.running:
-            logger.debug("Stopping updater")
-            await self.app.updater.stop()
-            logger.debug("Stopping application")
-            await self.app.stop()
-            logger.info("Telegram bot transport stopped")
-        else:
-            logger.warning("Attempted to stop non-running application")
-    
-    async def process_frame(self, frame: Frame):
-        """Process a frame using python-telegram-bot."""
-        logger.debug("Processing frame", extra={"type": type(frame).__name__})
-        
-        if not hasattr(frame, 'metadata') or not isinstance(frame.metadata, EventMetadata):
-            logger.error("Failed to process frame: missing EventMetadata")
-            self._error_count += 1
-            raise ValueError("Frame must have EventMetadata")
-        
-        chat_id = frame.metadata.chat_id
-        
-        try:
-            if isinstance(frame, TextFrame):
-                await self.app.bot.send_message(
-                    chat_id=chat_id,
-                    text=frame.text
-                )
-                self._message_count += 1
-            elif isinstance(frame, ImageFrame):
-                caption = frame.caption if hasattr(frame, 'caption') else None
-                message = await self.app.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=frame.content,
-                    caption=caption
-                )
-                frame.metadata = EventMetadata(
-                    chat_id=chat_id,
-                    chat_title=frame.metadata.chat_title,
-                    sender_id=frame.metadata.sender_id,
-                    sender_name=frame.metadata.sender_name,
-                    message_id=message.message_id
-                )
-                self._message_count += 1
-                return frame
-            elif isinstance(frame, DocumentFrame):
-                message = await self.app.bot.send_document(
-                    chat_id=chat_id,
-                    document=frame.content,
-                    caption=frame.caption
-                )
-                frame.metadata = EventMetadata(
-                    chat_id=chat_id,
-                    chat_title=frame.metadata.chat_title,
-                    sender_id=frame.metadata.sender_id,
-                    sender_name=frame.metadata.sender_name,
-                    message_id=message.message_id
-                )
-                self._message_count += 1
-                return frame
-            else:
-                logger.warning("Unsupported frame type", extra={"type": type(frame).__name__})
-                self._error_count += 1
-                raise ValueError(f"Unsupported frame type: {type(frame).__name__}")
-        except Exception as e:
-            self._error_count += 1
-            logger.error("Failed to process frame", exc_info=True, extra={
-                'error': str(e),
-                'frame_type': type(frame).__name__,
-                'transport': 'bot'
-            })
-            raise
-    
-    async def send(self, frame: Frame) -> Optional[Frame]:
-        """Send a frame using python-telegram-bot and return updated frame with message ID."""
-        logger.debug("Sending frame", extra={"type": type(frame).__name__})
-        
-        if not hasattr(frame, 'metadata') or not isinstance(frame.metadata, EventMetadata):
-            logger.error("Failed to send frame: missing EventMetadata")
-            self._error_count += 1
-            raise ValueError("Frame must have EventMetadata")
-        
-        chat_id = frame.metadata.chat_id
-        
-        try:
-            if isinstance(frame, TextFrame):
-                message = await self.app.bot.send_message(
-                    chat_id=chat_id,
-                    text=frame.text
-                )
-                frame.metadata = EventMetadata(
-                    chat_id=chat_id,
-                    chat_title=frame.metadata.chat_title,
-                    sender_id=frame.metadata.sender_id,
-                    sender_name=frame.metadata.sender_name,
-                    message_id=message.message_id
-                )
-                self._message_count += 1
-                return frame
-            elif isinstance(frame, ImageFrame):
-                caption = frame.caption if hasattr(frame, 'caption') else None
-                message = await self.app.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=frame.content,
-                    caption=caption
-                )
-                frame.metadata = EventMetadata(
-                    chat_id=chat_id,
-                    chat_title=frame.metadata.chat_title,
-                    sender_id=frame.metadata.sender_id,
-                    sender_name=frame.metadata.sender_name,
-                    message_id=message.message_id
-                )
-                self._message_count += 1
-                return frame
-            elif isinstance(frame, DocumentFrame):
-                message = await self.app.bot.send_document(
-                    chat_id=chat_id,
-                    document=frame.content,
-                    caption=frame.caption
-                )
-                frame.metadata = EventMetadata(
-                    chat_id=chat_id,
-                    chat_title=frame.metadata.chat_title,
-                    sender_id=frame.metadata.sender_id,
-                    sender_name=frame.metadata.sender_name,
-                    message_id=message.message_id
-                )
-                self._message_count += 1
-                return frame
-            else:
-                logger.warning("Unsupported frame type", extra={"type": type(frame).__name__})
-                self._error_count += 1
-                raise ValueError(f"Unsupported frame type: {type(frame).__name__}")
-        except ValueError as e:
-            self._error_count += 1
-            logger.warning("Unsupported frame type", extra={
-                'frame_type': type(frame).__name__,
-                'transport': 'bot'
-            })
-            raise
-        except Exception as e:
-            self._error_count += 1
-            logger.error("Failed to send frame", exc_info=True, extra={
-                'error': str(e),
-                'frame_type': type(frame).__name__,
-                'transport': 'bot'
-            })
-            raise
-    
-    async def register_command(self, command: str, handler: callable):
-        """Register a command handler."""
-        if not command:
-            logger.error("Failed to register command: empty command")
-            raise ValueError("Command must not be empty")
-        if not callable(handler):
-            logger.error("Failed to register command: handler is not callable")
-            raise ValueError("Handler must be callable")
-        
-        command = command.lower()
-        command_str = f"/{command}"
-        
-        async def command_wrapper(update, context):
-            wrapped_event = TelegramBotEvent(update, context)
-            received_command = wrapped_event.get_command()
-            
-            # Strip the slash for comparison since python-telegram-bot uses commands without slash
-            received_command_no_slash = received_command.lstrip('/')
-            if received_command_no_slash != command:
-                logger.debug(f"Ignoring unmatched command: {received_command} != /{command}")
-                return
-            
-            logger.debug(f"Received command: {received_command} with args: {wrapped_event.get_command_args()}")
-            metadata = wrapped_event.get_metadata()
-            frame = CommandFrame(
-                command=received_command,
-                args=wrapped_event.get_command_args(),
-                metadata=metadata
-            )
-            logger.debug(f"Executing handler for command: {received_command} with frame: {frame}")
-            try:
-                await handler(frame)
-                self._command_count += 1
-                logger.debug(f"Handler execution completed for command: {received_command}")
-            except Exception as e:
-                self._error_count += 1
-                logger.error(f"Error executing handler for command {received_command}", exc_info=True)
-                raise
+        """Initialize the transport.
 
-        self._command_handlers[command_str] = handler
-        if self.app.running:
-            self.app.add_handler(CommandHandler(command, command_wrapper))
-        logger.debug(f"Registered handler for command: {command_str}")
+        Args:
+            token: Bot token from BotFather
+        """
+        super().__init__()
+        if not token or not isinstance(token, str):
+            raise InvalidToken("You must pass the token you received from https://t.me/Botfather!")
+        self._token = token
+        self._app = None
+        self._command_handlers = {}
+        self._initialized = False
+
+    @property
+    def token(self) -> str:
+        """Get the bot token."""
+        return self._token
+
+    async def register_command(self, command: str, handler: Callable[[CommandFrame], Awaitable[None]]) -> None:
+        """Register a command handler.
+
+        Args:
+            command: Command to register (without leading slash)
+            handler: Handler function to call when command is received
+        """
+        if not command.startswith('/'):
+            command = f'/{command}'
+        self._command_handlers[command] = handler
+        self.logger.debug(f"Registered command handler for {command}")
+
+    async def start(self) -> None:
+        """Start the transport."""
+        await super().start()
+        builder = Application.builder().token(self._token)
+        self._app = await builder.build()
+        await self._app.initialize()
+        await self._app.start()
+        self._initialized = True
+        self.logger.info("Bot transport started")
+
+    async def stop(self) -> None:
+        """Stop the transport."""
+        if self._initialized:
+            await self._app.stop()
+            await self._app.shutdown()
+            self._initialized = False
+        await super().stop()
+        self.logger.info("Bot transport stopped")
+
+    async def process_frame(self, frame: Frame) -> Frame:
+        """Process a frame.
+
+        Args:
+            frame: Frame to process
+
+        Returns:
+            Processed frame
+
+        Raises:
+            ValueError: If frame type is not supported
+            RuntimeError: If transport is not initialized
+        """
+        if not self._initialized:
+            await self.start()
+
+        if isinstance(frame, CommandFrame):
+            command = frame.command
+            if command not in self._command_handlers:
+                raise ValueError(f"Command not found: {command}")
+            await self._command_handlers[command](frame)
+            return frame
+
+        raise ValueError(f"Unsupported frame type: {type(frame).__name__}")
+
+    async def send(self, frame: Frame) -> Frame:
+        """Send a frame.
+
+        Args:
+            frame: Frame to send
+
+        Returns:
+            Frame with updated metadata
+
+        Raises:
+            ValueError: If frame type is not supported
+            RuntimeError: If transport is not initialized
+        """
+        if not self._initialized:
+            await self.start()
+
+        try:
+            if isinstance(frame, TextFrame):
+                message = await self._app.bot.send_message(
+                    chat_id=frame.metadata.chat_id,
+                    text=frame.content
+                )
+                frame.metadata.message_id = message.message_id
+                return frame
+
+            if isinstance(frame, ImageFrame):
+                message = await self._app.bot.send_photo(
+                    chat_id=frame.metadata.chat_id,
+                    photo=frame.content,
+                    caption=frame.caption
+                )
+                frame.metadata.message_id = message.message_id
+                return frame
+
+            raise ValueError(f"Unsupported frame type: {type(frame).__name__}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to send message: {str(e)}")
+            raise e
 
 class TelegramTransportFactory:
     """Factory for creating Telegram transports."""

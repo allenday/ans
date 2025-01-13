@@ -10,31 +10,37 @@ logger = get_logger(__name__)
 @dataclass
 class TextFrame(Frame):
     """A frame containing text data."""
-    text: str
+    content: str
     
     def __post_init__(self):
         """Log text frame initialization."""
-        if not isinstance(self.text, str):
-            raise TypeError("text must be a string")
-        logger.debug(f"FRAME - Initializing TextFrame with {len(self.text)} chars")
+        if not isinstance(self.content, str):
+            raise TypeError("content must be a string")
+        logger.debug(f"FRAME - Initializing TextFrame with {len(self.content)} chars")
         super().__post_init__()
 
 @dataclass
 class ImageFrame(Frame):
-    """A frame containing image data."""
+    """Frame containing image data."""
+
     content: bytes
-    size: Tuple[int, int]
-    format: str
-    
+    size: Optional[Tuple[int, int]] = None
+    format: Optional[str] = None
+    caption: Optional[str] = None
+
     def __post_init__(self):
-        """Log image frame initialization."""
+        """Validate the frame data."""
         if not isinstance(self.content, bytes):
             raise TypeError("content must be bytes")
-        if not isinstance(self.size, tuple) or len(self.size) != 2 or not all(isinstance(x, int) for x in self.size):
+        if self.size is not None and (not isinstance(self.size, tuple) or len(self.size) != 2 or not all(isinstance(x, int) for x in self.size)):
             raise TypeError("size must be a tuple of two integers")
-        if not isinstance(self.format, str):
+        if self.format is not None and not isinstance(self.format, str):
             raise TypeError("format must be a string")
+        if self.caption is not None and not isinstance(self.caption, str):
+            raise TypeError("caption must be a string")
         logger.debug(f"FRAME - Initializing ImageFrame: size={self.size}, format={self.format}")
+        if self.caption:
+            self.text = self.caption
         super().__post_init__()
 
 @dataclass
@@ -111,5 +117,5 @@ class StickerFrame(Frame):
             raise TypeError("emoji must be a string")
         if not isinstance(self.set_name, str):
             raise TypeError("set_name must be a string")
-        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set={self.set_name}")
+        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set_name={self.set_name}")
         super().__post_init__() 

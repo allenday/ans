@@ -13,7 +13,7 @@ from chronicler.frames.media import TextFrame
 from chronicler.commands.processor import CommandProcessor
 from chronicler.commands.handlers import StartCommandHandler
 from chronicler.storage.interface import User
-from chronicler.transports.telegram_transport import TelegramTransport
+from chronicler.transports.telegram_transport import TelegramBotTransport
 from chronicler.logging import configure_logging, get_logger
 
 from tests.mocks.storage import MockStorageCoordinator
@@ -32,7 +32,7 @@ async def test_correlation_flow(tmp_path, caplog, capsys):
         processor = CommandProcessor()
         processor.register_handler('/start', StartCommandHandler(storage))
         
-        transport = TelegramTransport(token='dummy')
+        transport = TelegramBotTransport(token='dummy')
         transport.processor = processor
         
         # Clear stdout before processing frame

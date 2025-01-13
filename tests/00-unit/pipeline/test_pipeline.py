@@ -10,7 +10,7 @@ def processor_mock():
     """Create a mock processor factory."""
     def create_mock():
         processor = create_autospec(BaseProcessor)
-        processor.process = AsyncMock(return_value=TextFrame(text="mock_processed", metadata={}))
+        processor.process = AsyncMock(return_value=TextFrame(content="mock_processed", metadata={}))
         return processor
     return create_mock
 
@@ -29,7 +29,7 @@ async def test_pipeline_processing(processor_mock):
     pipeline.add_processor(processor1)
     pipeline.add_processor(processor2)
 
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     result = await pipeline.process(frame)
 
     processor1.process.assert_called_once_with(frame)
@@ -40,7 +40,7 @@ async def test_pipeline_processing(processor_mock):
 async def test_empty_pipeline():
     """Test processing through an empty pipeline."""
     pipeline = Pipeline()
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     result = await pipeline.process(frame)
     assert result == frame
 
@@ -59,7 +59,7 @@ async def test_processor_error(processor_mock):
     processor.process.side_effect = RuntimeError("Test error")
     pipeline.add_processor(processor)
 
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     with pytest.raises(RuntimeError):
         await pipeline.process(frame)
 
@@ -71,7 +71,7 @@ async def test_processor_returns_none(processor_mock):
     processor.process.return_value = None
     pipeline.add_processor(processor)
 
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     result = await pipeline.process(frame)
     assert result == frame  # Should return original frame if processor returns None
 
@@ -82,7 +82,7 @@ async def test_pipeline_logging(processor_mock, caplog):
     processor = processor_mock()
     pipeline.add_processor(processor)
 
-    frame = TextFrame(text="test", metadata={})
+    frame = TextFrame(content="test", metadata={})
     await pipeline.process(frame)
 
     assert "PIPELINE - Processing frame of type TextFrame" in caplog.text

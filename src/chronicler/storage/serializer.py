@@ -48,9 +48,13 @@ class MessageSerializer:
             logger.info(f"SER - Reading metadata from: {path}")
             try:
                 with open(path) as f:
-                    metadata = yaml.safe_load(f) or {}
-                logger.debug(f"SER - Read metadata with {len(metadata)} top-level keys")
-                return metadata
+                    try:
+                        metadata = yaml.safe_load(f) or {}
+                        logger.debug(f"SER - Read metadata with {len(metadata)} top-level keys")
+                        return metadata
+                    except yaml.YAMLError as e:
+                        logger.warning(f"SER - Invalid YAML in metadata file: {e}")
+                        return {}
             except FileNotFoundError:
                 logger.debug("SER - No existing metadata file, returning empty dict")
                 return {}
@@ -64,6 +68,14 @@ class MessageSerializer:
         try:
             logger.info(f"SER - Writing metadata to: {path}")
             logger.debug(f"SER - Metadata has {len(metadata)} top-level keys")
+            
+            # Check for circular references
+            try:
+                json.dumps(metadata)  # This will fail on circular references
+            except (TypeError, ValueError) as e:
+                logger.error(f"SER - Invalid metadata structure: {e}")
+                raise ValueError(f"Invalid metadata structure: {e}")
+                
             with open(path, 'w') as f:
                 yaml.dump(metadata, f)
             logger.debug(f"SER - Successfully wrote metadata to {path}")
