@@ -21,7 +21,7 @@
    ✅ 4.2. Storage components:
         ✅ 4.2.1. Serializer: 98%
         ✅ 4.2.2. Git storage: 77%
-        ✅ 4.2.3. Coordinator: 29%
+        ✅ 4.2.3. Coordinator: 100%
         ✅ 4.2.4. Filesystem: 100%
    ✅ 4.3. Pipeline components:
         ✅ 4.3.1. Frames: 100%
