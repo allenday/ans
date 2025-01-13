@@ -16,6 +16,7 @@ class BaseTransport(ABC):
         self._message_count = 0
         self._command_count = 0
         self._error_count = 0
+        self._initialized = False
     
     @abstractmethod
     async def start(self) -> None:
