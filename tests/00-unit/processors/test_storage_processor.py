@@ -294,23 +294,22 @@ async def test_process_unsupported_frame(storage_mock):
         mock_coordinator.return_value = storage_mock
         processor = StorageProcessor(Path("/test/path"))
         processor._initialized = True
-        
+
         class UnsupportedFrame:
             metadata = {
                 "chat_id": 123,
                 "thread_id": 456,
                 "chat_title": "Test Chat"
             }
-        
+
         frame = UnsupportedFrame()
+
+        # Verify error is raised
+        with pytest.raises(ValueError, match="Unsupported frame type: UnsupportedFrame"):
+            await processor.process_frame(frame)
         
-        # Execute
-        await processor.process_frame(frame)
-        
-        # Verify topic was still created
-        storage_mock.create_topic.assert_called_once()
-        
-        # Verify no message was saved
+        # Verify no topic was created
+        storage_mock.create_topic.assert_not_called()
         storage_mock.save_message.assert_not_called()
 
 @pytest.mark.asyncio
@@ -337,3 +336,124 @@ async def test_error_handling(storage_mock):
         # Execute and verify error is propagated
         with pytest.raises(RuntimeError, match="Test error"):
             await processor.process_frame(frame) 
+
+@pytest.mark.asyncio
+async def test_process_frame_missing_thread_id(storage_mock):
+    """Test processing a frame with missing thread_id."""
+    # Setup
+    with patch('chronicler.processors.storage_processor.StorageCoordinator') as mock_coordinator:
+        mock_coordinator.return_value = storage_mock
+        processor = StorageProcessor(Path("/test/path"))
+        processor._initialized = True
+        
+        frame = TextFrame(
+            text="test message",
+            metadata={
+                "chat_id": 123,  # Missing thread_id
+                "chat_title": "Test Chat"
+            }
+        )
+        
+        # Verify error is raised
+        with pytest.raises(ValueError, match="Message metadata must include thread_id"):
+            await processor.process_frame(frame)
+        
+        # Verify no topic was created
+        storage_mock.create_topic.assert_not_called()
+        storage_mock.save_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_process_frame_missing_chat_id(storage_mock):
+    """Test processing a frame with missing chat_id."""
+    # Setup
+    with patch('chronicler.processors.storage_processor.StorageCoordinator') as mock_coordinator:
+        mock_coordinator.return_value = storage_mock
+        processor = StorageProcessor(Path("/test/path"))
+        processor._initialized = True
+        
+        frame = TextFrame(
+            text="test message",
+            metadata={
+                "thread_id": 456,  # Missing chat_id
+                "chat_title": "Test Chat"
+            }
+        )
+        
+        # Verify error is raised
+        with pytest.raises(ValueError, match="Message metadata must include chat_id"):
+            await processor.process_frame(frame)
+        
+        # Verify no topic was created
+        storage_mock.create_topic.assert_not_called()
+        storage_mock.save_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_process_frame_invalid_metadata_type(storage_mock):
+    """Test processing a frame with invalid metadata type."""
+    # Setup
+    with patch('chronicler.processors.storage_processor.StorageCoordinator') as mock_coordinator:
+        mock_coordinator.return_value = storage_mock
+        processor = StorageProcessor(Path("/test/path"))
+        processor._initialized = True
+        
+        frame = TextFrame(
+            text="test message",
+            metadata={
+                "chat_id": "invalid",  # Should be integer
+                "thread_id": 456,
+                "chat_title": "Test Chat"
+            }
+        )
+        
+        # Verify error is raised
+        with pytest.raises(TypeError, match="chat_id must be an integer"):
+            await processor.process_frame(frame)
+        
+        # Verify no topic was created
+        storage_mock.create_topic.assert_not_called()
+        storage_mock.save_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_process_frame_metadata_propagation(storage_mock):
+    """Test metadata is correctly propagated to topic and message."""
+    # Setup
+    with patch('chronicler.processors.storage_processor.StorageCoordinator') as mock_coordinator:
+        mock_coordinator.return_value = storage_mock
+        processor = StorageProcessor(Path("/test/path"))
+        processor._initialized = True
+        
+        test_metadata = {
+            "chat_id": 123,
+            "thread_id": 456,
+            "chat_title": "Test Chat",
+            "message_id": 789,
+            "from_user": "test_user",
+            "custom_field": "custom_value"
+        }
+        
+        frame = TextFrame(
+            text="test message",
+            metadata=test_metadata
+        )
+        
+        # Execute
+        await processor.process_frame(frame)
+        
+        # Verify topic creation with metadata
+        storage_mock.create_topic.assert_called_once()
+        topic_call = storage_mock.create_topic.call_args[0][0]
+        assert isinstance(topic_call, Topic)
+        assert topic_call.metadata["chat_id"] == 123
+        assert topic_call.metadata["thread_id"] == 456
+        assert topic_call.metadata["source"] == "telegram"
+        
+        # Verify message creation with metadata
+        storage_mock.save_message.assert_called_once()
+        message_call = storage_mock.save_message.call_args[0][1]
+        assert isinstance(message_call, Message)
+        assert message_call.metadata["chat_id"] == 123
+        assert message_call.metadata["thread_id"] == 456
+        assert message_call.metadata["message_id"] == 789
+        assert message_call.metadata["from_user"] == "test_user"
+        assert message_call.metadata["custom_field"] == "custom_value"
+        assert message_call.metadata["source"] == "telegram" 

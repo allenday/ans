@@ -95,9 +95,31 @@
                5.2.2.2. Add error handling tests
                5.2.2.3. Add state management tests
         5.2.3. 🕔 Add storage_processor tests (15% -> target 80%)
-               5.2.3.1. Add message processing tests
-               5.2.3.2. Add storage operations tests
-               5.2.3.3. Add error handling tests
+               5.2.3.1. ✅ Add metadata validation tests:
+                       5.2.3.1.1. ✅ Test missing required metadata fields
+                       5.2.3.1.2. ✅ Test invalid metadata values
+                       5.2.3.1.3. ✅ Test metadata field propagation
+                       5.2.3.1.4. ✅ Test error handling for invalid metadata
+               5.2.3.2. 🕔 Add topic creation tests:
+                       5.2.3.2.1. Test duplicate topic handling
+                       5.2.3.2.2. Test invalid topic names
+                       5.2.3.2.3. Test missing chat title
+                       5.2.3.2.4. Test topic metadata validation
+               5.2.3.3. 🕔 Add frame processing tests:
+                       5.2.3.3.1. Test unsupported frame types
+                       5.2.3.3.2. Test frame content validation
+                       5.2.3.3.3. Test frame processing errors
+                       5.2.3.3.4. Test concurrent frame processing
+               5.2.3.4. 🕔 Add attachment tests:
+                       5.2.3.4.1. Test missing attachment data
+                       5.2.3.4.2. Test invalid MIME types
+                       5.2.3.4.3. Test large attachments
+                       5.2.3.4.4. Test multiple attachments
+               5.2.3.5. 🕔 Add logging tests:
+                       5.2.3.5.1. Test error logging
+                       5.2.3.5.2. Test debug logging
+                       5.2.3.5.3. Test info logging
+                       5.2.3.5.4. Test log context data
 
    5.3. Transport Components
         5.3.1. 🕔 Add telegram_transport tests (13% -> target 80%)

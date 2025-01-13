@@ -40,12 +40,47 @@ class StorageProcessor(BaseProcessor):
             except Exception as e:
                 logger.error("Failed to initialize storage", exc_info=True)
                 raise
+                
+    def _validate_metadata(self, metadata: dict) -> None:
+        """Validate frame metadata."""
+        # Check required fields
+        if 'thread_id' not in metadata:
+            logger.error("Missing required metadata field: thread_id")
+            raise ValueError("Message metadata must include thread_id")
+            
+        if 'chat_id' not in metadata:
+            logger.error("Missing required metadata field: chat_id")
+            raise ValueError("Message metadata must include chat_id")
+            
+        # Validate field types
+        if not isinstance(metadata['chat_id'], int):
+            logger.error("Invalid metadata field type: chat_id must be integer")
+            raise TypeError("chat_id must be an integer")
+            
+        if not isinstance(metadata['thread_id'], int):
+            logger.error("Invalid metadata field type: thread_id must be integer")
+            raise TypeError("thread_id must be an integer")
         
     async def process_frame(self, frame: Frame) -> None:
         """Process a frame by saving it to storage."""
         try:
             logger.debug("Processing frame", extra={"frame_type": type(frame).__name__})
             await self._ensure_initialized()
+            
+            # Check if frame type is supported
+            frame_processors = {
+                TextFrame: self._process_text_frame,
+                ImageFrame: self._process_image_frame,
+                DocumentFrame: self._process_document_frame,
+                AudioFrame: self._process_audio_frame,
+                VoiceFrame: self._process_voice_frame,
+                StickerFrame: self._process_sticker_frame
+            }
+            
+            processor = frame_processors.get(type(frame))
+            if not processor:
+                logger.warning("Unsupported frame type", extra={"frame_type": type(frame)})
+                raise ValueError(f"Unsupported frame type: {type(frame).__name__}")
             
             # Extract common metadata
             metadata = {
@@ -57,27 +92,17 @@ class StorageProcessor(BaseProcessor):
             if hasattr(frame, 'metadata'):
                 metadata.update(frame.metadata)
             
+            # Validate metadata
+            self._validate_metadata(metadata)
+            
             # Generate topic key
             topic_key = f"{metadata['chat_id']}:{metadata['thread_id']}"
             
             # Ensure topic exists
             topic_id = await self._ensure_topic_exists(metadata)
             
-            # Process frame based on type
-            frame_processors = {
-                TextFrame: self._process_text_frame,
-                ImageFrame: self._process_image_frame,
-                DocumentFrame: self._process_document_frame,
-                AudioFrame: self._process_audio_frame,
-                VoiceFrame: self._process_voice_frame,
-                StickerFrame: self._process_sticker_frame
-            }
-            
-            processor = frame_processors.get(type(frame))
-            if processor:
-                await processor(topic_id, frame, metadata)
-            else:
-                logger.warning("Unsupported frame type", extra={"frame_type": type(frame)})
+            # Process frame
+            await processor(topic_id, frame, metadata)
                 
         except Exception as e:
             logger.error("Failed to process frame", exc_info=True, extra={
