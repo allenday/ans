@@ -19,13 +19,13 @@ Refine the `.cursor/` documents to ensure they support operational consistency a
 ## 3. Requirements
 
 ### 3.1. Core Updates
-3.1.1. 🕔 Ensure `PROMPT.md` aligns with the process goals and provides clear guidance.
-3.1.2. 🕔 Verify linked documents support operational flow and are consistent with the process.
-3.1.3. 🕔 Ensure all documents are MECE, providing a comprehensive and non-overlapping framework.
+3.1.1. ✅ Ensure `PROMPT.md` aligns with the process goals and provides clear guidance.
+3.1.2. ✅ Verify linked documents support operational flow and are consistent with the process.
+3.1.3. ✅ Ensure all documents are MECE, providing a comprehensive and non-overlapping framework.
 3.1.4. ✅ Rename `CHECKLIST.template.md` to `CHECKLIST.md` and update documentation to reflect this change.
 3.1.5. ✅ Update `PRD.template.md` to reflect the development loop outlined in `NOTES.md`.
 3.1.6. ✅ Update `CONVENTIONS.md` to align with the conventions in `NOTES.md`.
-3.1.7. 🕔 Review and align `PROMPT.md` to support the process goals.
+3.1.7. ✅ Review and align `PROMPT.md` to support the process goals.
 3.1.8. ✅ Implement feedback loop:
    3.1.8.1. ✅ Add STOP conditions to CHECKLIST.md
    3.1.8.2. ✅ Define BACKLOG.md usage conventions
@@ -40,3 +40,22 @@ Refine the `.cursor/` documents to ensure they support operational consistency a
    3.2.2.1. ✅ Structured BACKLOG.md entries
    3.2.2.2. ✅ Referenced PRD items in deferrals
    3.2.2.3. ✅ Priority tracking for improvements
+
+### 3.3. Process Control Commands
+3.3.1. 🕔 Implement slash commands for process control:
+   3.3.1.1. 🕔 `/init` - Initialize new feature development
+      - Create branch
+      - Set up docs directory
+      - Copy templates
+   3.3.1.2. 🕔 `/align` - Force realignment with process
+      - Check current state
+      - Reset to last known good state
+      - Resume from checklist
+   3.3.1.3. 🕔 `/stop` - Trigger explicit process stop
+      - Record current state
+      - Choose: branch or backlog
+      - Document decision
+   3.3.1.4. 🕔 `/status` - Show current process state
+      - Active PRD item
+      - Checklist position
+      - Pending changes
