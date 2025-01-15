@@ -60,7 +60,8 @@ def test_factory_raises_error_on_partial_user_params():
     with pytest.raises(ValueError, match=r"Must provide either bot_token or \(api_id, api_hash, phone_number\)"):
         factory.create_transport(api_id="123", api_hash="abc")  # Missing phone_number
 
-def test_factory_uses_default_session_name():
+@patch('chronicler.transports.telegram_factory.TelegramClient')
+def test_factory_uses_default_session_name(mock_client):
     """Test factory uses default session name for user transport."""
     factory = TelegramTransportFactory()
     transport = factory.create_transport(
@@ -71,6 +72,7 @@ def test_factory_uses_default_session_name():
     
     assert isinstance(transport, TelegramUserTransport)
     assert transport.session_name == "chronicler"  # Default value
+    mock_client.assert_called_once_with("chronicler", "123", "abc")
 
 @patch('chronicler.transports.telegram_factory.TelegramClient')
 def test_user_transport_initialization_error(mock_client):
