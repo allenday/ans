@@ -317,11 +317,11 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Sets basis for subsequent commands
 
    3.2.2. 🕔 Command Parser Implementation
-      3.2.2.1. 🕔 Implement getopt-style parser
-      3.2.2.2. 🕔 Add combined short options support
+      3.2.2.1. ✅ Implement getopt-style parser
+      3.2.2.2. ✅ Add combined short options support
       3.2.2.3. 🕔 Handle quoted arguments
       3.2.2.4. 🕔 Support -- terminator
-      3.2.2.5. 🕔 Support command chaining
+      3.2.2.5. ✅ Support command chaining
          - Space-separated commands
          - Leading slash (/) indicates new command in chain
          - Forward slashes in arguments must be escaped
@@ -338,6 +338,8 @@ Implement a powerful meta-level command interface with getopt-style argument par
       3.2.3.1. 🕔 Hook into development workflow
       3.2.3.2. 🕔 Add command context management
       3.2.3.3. 🕔 Implement help system
+      3.2.3.4. 🕔 Integrate /b into scope definition and init
+      3.2.3.5. 🕔 Move PRD-defined commands into a dedicated markdown file, referenced from README.md etc
 
 ## 4. Technical Verification
 4.1. 🕔 Command parser handles all syntax cases correctly
