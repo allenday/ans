@@ -6,7 +6,7 @@ This directory contains development documentation for the Chronicler project.
 
 1. `ARCHITECTURE.md`: Overview of the pipeline-based architecture
 2. `BACKLOG.md`: Development roadmap and known issues
-3. `CHECKLIST.md`: Static development checklist (must follow for all changes)
+3. `CHECKLIST.template.md`: Template for development checklist (must follow for all changes)
 4. `CONVENTIONS.md`: Code style, workflow, and development conventions
 5. `IMPLEMENTATION.md`: Detailed documentation of components and APIs
 6. `PRD.template.md`: Template for Product Requirements Document
@@ -53,9 +53,9 @@ This directory contains development documentation for the Chronicler project.
    mkdir -p .cursor/scratch/feature/your-feature-name
    # Use git commands to maintain history
    git mv .cursor/PRD.template.md .cursor/scratch/feature/your-feature-name/PRD.md
-   git mv .cursor/CHECKLIST.md .cursor/scratch/feature/your-feature-name/CHECKLIST.md
+   git mv .cursor/CHECKLIST.template.md .cursor/scratch/feature/your-feature-name/CHECKLIST.md
    # Restore the templates
-   git checkout HEAD .cursor/PRD.template.md .cursor/CHECKLIST.md
+   git checkout HEAD .cursor/PRD.template.md .cursor/CHECKLIST.template.md
    ```
 3. Write tests first (TDD)
 4. Implement changes following [CONVENTIONS.md](CONVENTIONS.md) with:
