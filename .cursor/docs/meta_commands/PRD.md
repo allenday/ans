@@ -272,75 +272,158 @@ Implement a powerful meta-level command interface with getopt-style argument par
            /rr -d N             # Set max articulation depth
            /rr -i              # Include implementation details
            /rr -s              # Generate SWE handoff
+           /rr -p              # Generate product spec
+           /rr -t              # Generate technical spec
+           /rr -v              # Verify articulation completeness
 
          Options:
            -d, --depth=N        Maximum articulation depth (default: unlimited)
            -i, --impl          Include implementation suggestions
            -s, --swe           Generate SWE-ready specification
+           -p, --product       Generate detailed product spec
+           -t, --technical     Generate technical architecture spec
+           -v, --verify        Verify articulation completeness
            -j, --json          Output in JSON format
 
          Examples:
            /rr                # "Articulating 3.2.1 in feature/meta-commands..."
-                             # "Product Requirements:"
-                             # "1. Command Parser Interface"
-                             # "  - Must handle all syntax cases"
-                             # "  - Must support command chaining"
-                             # "  - Must maintain context"
-                             # "2. Error Handling"
-                             # "  - Must provide clear messages"
-                             # "  - Must suggest corrections"
-                             # "3. Integration Points"
-                             # "  - Must hook into git workflow"
-                             # "  - Must preserve documentation state"
-                             # "Continue with /rr -i for implementation details"
+                             # "Product Analysis:"
+                             # "1. User Stories"
+                             # "  - As a PM, I need to break down complex features"
+                             # "  - As a SWE, I need clear implementation guidance"
+                             # "  - As a user, I need consistent command behavior"
+                             # "2. Requirements"
+                             # "  Functional:"
+                             # "  - Must support recursive breakdown"
+                             # "  - Must maintain context between levels"
+                             # "  - Must track articulation progress"
+                             # "  Non-functional:"
+                             # "  - Response time < 2s"
+                             # "  - Clear error messages"
+                             # "  - Consistent output format"
+                             # "Continue with /rr -p for product spec"
+
+           /rr -p            # "Generating product specification..."
+                             # "# Product Specification"
+                             # "## Problem Statement"
+                             # "PMs need to efficiently articulate product requirements"
+                             # "## User Personas"
+                             # "1. Product Manager (Primary)"
+                             # "2. Software Engineer (Secondary)"
+                             # "## Feature Requirements"
+                             # "1. Command Interface"
+                             # "2. Articulation Process"
+                             # "3. Output Formats"
+                             # "## Success Metrics"
+                             # "1. Implementation Time"
+                             # "2. Engineer Satisfaction"
+                             # "Continue with /rr -t for technical spec"
+
+           /rr -t            # "Generating technical specification..."
+                             # "# Technical Specification"
+                             # "## System Architecture"
+                             # "1. Command Parser"
+                             # "2. Articulation Engine"
+                             # "3. Output Formatter"
+                             # "## Data Models"
+                             # "1. Requirement Tree"
+                             # "2. Context State"
+                             # "3. Output Templates"
+                             # "## Integration Points"
+                             # "1. Command System"
+                             # "2. Documentation System"
+                             # "Continue with /rr -i for implementation"
 
            /rr -i            # "Generating implementation details..."
-                             # "1. Command Parser Interface"
-                             # "  Implementation Approach:"
-                             # "  - Use getopt-style parsing"
-                             # "  - Maintain command state machine"
-                             # "  - Handle escaped sequences"
-                             # "2. Error Handling"
-                             # "  Implementation Approach:"
-                             # "  - Define error message templates"
-                             # "  - Create correction suggestion system"
+                             # "# Implementation Guide"
+                             # "## Component Design"
+                             # "1. Command Parser"
+                             # "  - Use getopt for options"
+                             # "  - Maintain command state"
+                             # "2. Articulation Engine"
+                             # "  - Tree-based breakdown"
+                             # "  - Context preservation"
+                             # "3. Output Formatter"
+                             # "  - Template system"
+                             # "  - Multiple formats"
                              # "Continue with /rr -s for SWE handoff"
 
            /rr -s            # "Generating SWE specification..."
                              # "# Engineering Implementation Guide"
-                             # "## Architecture"
-                             # "- Command Parser: getopt-based state machine"
-                             # "- Error Handler: template-based message system"
-                             # "- Integration: git hooks and doc watchers"
-                             # "## Implementation Steps"
-                             # "1. Set up parser framework"
-                             # "2. Implement core command loop"
-                             # "3. Add error handling"
-                             # "4. Integrate with git/docs"
+                             # "## Development Approach"
+                             # "1. Component Implementation"
+                             # "  - Start with command parser"
+                             # "  - Build articulation engine"
+                             # "  - Add output formatter"
+                             # "2. Integration Strategy"
+                             # "  - Hook into command system"
+                             # "  - Connect to doc system"
+                             # "3. Testing Strategy"
+                             # "  - Unit tests per component"
+                             # "  - Integration test suite"
                              # "## Acceptance Criteria"
-                             # "- All test cases pass"
-                             # "- Error messages are clear"
-                             # "- Git integration works"
+                             # "1. Functional Requirements"
+                             # "2. Performance Requirements"
+                             # "3. Quality Requirements"
                              # "Ready for engineering handoff"
 
+           /rr -v            # "Verifying articulation completeness..."
+                             # "✅ User stories defined"
+                             # "✅ Product requirements clear"
+                             # "✅ Technical architecture specified"
+                             # "✅ Implementation approach detailed"
+                             # "❌ Performance metrics missing"
+                             # "❌ Error handling incomplete"
+
          Behavior:
-           - Recursively articulates product requirements
-           - Breaks down complex items into implementable units
-           - Provides increasing levels of detail:
-             1. Product requirements (default)
-             2. Implementation suggestions (-i)
-             3. Engineering specifications (-s)
-           - Coordinates with examine command:
-             - Uses examination results as input
-             - Maintains product context
-             - Tracks articulation progress
+           - Recursively articulates product requirements through stages:
+             1. Initial Analysis
+                - User stories
+                - Requirements (functional/non-functional)
+                - Dependencies and constraints
+             2. Product Specification (-p)
+                - Problem statement
+                - User personas
+                - Feature requirements
+                - Success metrics
+             3. Technical Specification (-t)
+                - System architecture
+                - Data models
+                - Integration points
+                - Performance requirements
+             4. Implementation Details (-i)
+                - Component design
+                - Development approach
+                - Testing strategy
+                - Error handling
+             5. SWE Handoff (-s)
+                - Development guide
+                - Integration strategy
+                - Testing requirements
+                - Acceptance criteria
+           - Maintains articulation context:
+             - Preserves relationships between levels
+             - Tracks dependencies
+             - Ensures consistency
+           - Verification process (-v):
+             - Checks completeness at each level
+             - Validates relationships
+             - Identifies gaps
+             - Suggests improvements
            - Error handling:
              - "No focus item" when no item specified
-             - "Too abstract" when item needs more breakdown
-             - "Implementation gap" when details missing
-             - "Incomplete context" when deps unclear
-           - Sets focus for subsequent commands
-           - Generates SWE-ready specifications
+             - "Incomplete analysis" with missing elements
+             - "Invalid progression" when skipping stages
+             - "Context gap" when dependencies unclear
+             - "Verification failed" with specific issues
+           - Integration:
+             - Uses examination results as input
+             - Coordinates with status tracking
+             - Maintains documentation context
+           - Output Management:
+             - Generates structured documentation
+             - Supports multiple formats (text, JSON)
+             - Maintains consistent terminology
            - No side effects beyond documentation
 
       3.2.1.8. ✅ /git, /g - Git operations
@@ -415,6 +498,94 @@ Implement a powerful meta-level command interface with getopt-style argument par
       3.2.3.3. 🕔 Implement help system
       3.2.3.4. 🕔 Integrate /b into scope definition and init
       3.2.3.5. 🕔 Move PRD-defined commands into a dedicated markdown file, referenced from README.md etc
+
+   3.2.4. 🕔 Aspect-Based Command Architecture
+      3.2.4.1. 🕔 Command Organization
+         - Common command set (shared across aspects)
+           - Status tracking base functionality
+           - Branch operations
+           - Git operations
+           - Proposal handling
+           - Context refresh
+         - Aspect-specific command sets
+           - Product Management (PM)
+             - Product examination
+             - Requirement articulation
+             - Product verification
+           - Software Engineering (SWE)
+             - Code/architecture examination
+             - Technical breakdown
+             - Implementation verification
+         - File Structure:
+           .cursor/
+             commands/
+               common/        # Shared command definitions
+               pm/           # PM-specific commands
+               swe/          # SWE-specific commands
+             prompts/
+               PM.md        # PM aspect prompt
+               SWE.md       # SWE aspect prompt
+             PROMPT.md      # Core prompt loader
+
+      3.2.4.2. 🕔 /aspect, /a - Aspect switching
+         Usage:
+           /a                  # Show current aspect
+           /a ROLE            # Switch to ROLE aspect
+           /a -l              # List available aspects
+           /a -v              # Verify aspect requirements
+
+         Options:
+           -l, --list         List available aspects
+           -v, --verify       Verify aspect requirements
+           -j, --json         Output in JSON format
+
+         Examples:
+           /a                # "Current aspect: PM"
+           /a swe           # "Switching to SWE aspect..."
+           /a -l            # "Available aspects:"
+                           # "- PM (default)"
+                           # "- SWE"
+
+         Behavior:
+           - Manages active agent aspect
+           - Loads aspect-specific prompt
+           - Loads common commands
+           - Overlays aspect-specific commands
+           - Maintains consistent command structure
+           - Preserves context across switches
+           - Error handling:
+             - "Invalid aspect" with available list
+             - "Context switch failed" with reason
+             - "Verification failed" with requirements
+
+      3.2.4.3. 🕔 Command Interpretation
+         - Common behaviors:
+           - Basic command structure
+           - Option parsing
+           - Git operations
+           - Branch management
+           - Context tracking
+         - Aspect-specific behaviors:
+           - Status verification criteria
+           - Examination categories
+           - Refinement processes
+           - Documentation focus
+         - Context preservation:
+           - Branch state
+           - Current focus
+           - Documentation state
+           - Verification status
+
+      3.2.4.4. 🕔 Prompt Architecture
+         - Core prompt loader (PROMPT.md)
+           - Basic agent capabilities
+           - Command processing
+           - Context management
+         - Aspect-specific prompts
+           - Role-specific behaviors
+           - Command interpretation
+           - Success criteria
+           - Output formatting
 
 ## 4. Technical Verification
 4.1. 🕔 Command parser handles all syntax cases correctly
