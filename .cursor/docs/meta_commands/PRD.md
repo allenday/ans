@@ -163,7 +163,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Sets context for subsequent commands
            - No side effects beyond git/doc operations
 
-      3.2.1.5. ✅ /done, /d - Completion workflow
+      3.2.1.4. ✅ /done, /d - Completion workflow
          Usage:
            /d [ITEM]          # Complete specific item, defaults to current focus
            /d -p              # Complete and push changes
@@ -202,7 +202,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Sets focus for subsequent commands
            - No side effects beyond git operations
 
-      3.2.1.6. ✅ /continue, /c - Response to companion proposals
+      3.2.1.5. ✅ /continue, /c - Response to companion proposals
          Usage:
            /c                  # Accept first/default proposal (usually completion)
            /c N                # Accept proposal number N
@@ -233,7 +233,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
              - "Invalid option N, valid options are 1-K"
              - "No active proposals, try /x first"
 
-      3.2.1.7. ✅ /examine, /x - Examine item
+      3.2.1.6. ✅ /examine, /x - Examine item
          Usage:
            /x                  # Examine current focus
            /x ITEM             # Examine specific item
@@ -265,8 +265,8 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Provides basis for /c proposals
            - No side effects
 
-      3.2.1.8. 🕔 /refine, /rr - Recursively refine item
-      3.2.1.9. ✅ /git, /g - Git operations
+      3.2.1.7. 🕔 /refine, /rr - Recursively refine item
+      3.2.1.8. ✅ /git, /g - Git operations
          Usage:
            /g                  # Show git status
            /g -a [FILES]       # Stage files (all if no FILES given)
