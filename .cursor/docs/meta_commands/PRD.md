@@ -122,25 +122,45 @@ Implement a powerful meta-level command interface with getopt-style argument par
          - --type=TYPE, -t: File type filter
          - --regex, -r: Use regex pattern
 
-      3.2.1.5. 🕔 /done, /d - Completion workflow
-         - No args: Complete current focused item
-         - --item=ITEM, -i: Item to mark as complete
-         - --files=GLOB, -f: Additional files to stage
-         - --push, -p: Push changes after commit
-         - --no-verify, -n: Skip verification
-         - Behavior:
+      3.2.1.5. ✅ /done, /d - Completion workflow
+         Usage:
+           /d [ITEM]          # Complete specific item, defaults to current focus
+           /d -p              # Complete and push changes
+           /d -n              # Skip verification checks
+
+         Options:
+           -p, --push          Push changes after commit
+           -n, --no-verify     Skip verification
+           -j, --json          Output in JSON format
+
+         Examples:
+           /d                # "Completing 3.1.9 in feature/meta-commands..."
+                             # "✅ All requirements met"
+                             # "Staged: PRD.md, CHECKLIST.md"
+                             # "[feature/meta-commands abc123] docs: complete item 3.1.9 ✅"
+
+           /d 3.2.1          # "Completing 3.2.1 in feature/meta-commands..."
+                             # "❌ Error: Children incomplete (3.2.1.3, 3.2.1.4)"
+           
+
+         Behavior:
            - Uses current focused item if no item specified
-           - Verifies item requirements are met
+           - Verifies all requirements are met:
+             - All child items complete (if any)
+             - Required files exist and are valid
+             - No pending changes in required files
            - Updates status in PRD and CHECKLIST
-           - Stages specified files
+           - Stages specified files or defaults
            - Generates conventional commit
            - Optionally pushes changes
-           - Example usage:
-             /s              # Shows "3.1.9"
-             /d             # Completes 3.1.9
-             
-             # Or with explicit item:
-             /d -i 3.1.9
+           - Error handling:
+             - "No focus item" when no item specified/focused
+             - "Requirements not met" with specific failures
+             - "Invalid files" when glob matches nothing
+             - "Push failed" with fetch/merge suggestion
+           - Sets focus for subsequent commands
+           - No side effects beyond git operations
+
       3.2.1.6. ✅ /continue, /c - Response to companion proposals
          Usage:
            /c                  # Accept first/default proposal (usually completion)
