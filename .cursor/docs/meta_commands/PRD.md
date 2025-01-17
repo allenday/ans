@@ -122,11 +122,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
          - --type=TYPE, -t: File type filter
          - --regex, -r: Use regex pattern
 
-      3.2.1.5. 🕔 /debug, /g - Debug mode
-         - --verbose, -v: Verbose debug output
-         - --trace, -t: Enable tracing
-
-      3.2.1.6. 🕔 /done, /d - Completion workflow
+      3.2.1.5. 🕔 /done, /d - Completion workflow
          - No args: Complete current focused item
          - --item=ITEM, -i: Item to mark as complete
          - --files=GLOB, -f: Additional files to stage
@@ -145,7 +141,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
              
              # Or with explicit item:
              /d -i 3.1.9
-      3.2.1.7. 🕔 /continue, /c - Response to companion proposals
+      3.2.1.6. ✅ /continue, /c - Response to companion proposals
          Usage:
            /c                  # Accept first/default proposal (usually completion)
            /c N                # Accept proposal number N
@@ -176,7 +172,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
              - "Invalid option N, valid options are 1-K"
              - "No active proposals, try /x first"
 
-      3.2.1.8. ✅ /examine, /x - Examine item
+      3.2.1.7. ✅ /examine, /x - Examine item
          Usage:
            /x                  # Examine current focus
            /x ITEM             # Examine specific item
@@ -208,7 +204,16 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Provides basis for /c proposals
            - No side effects
 
-      3.2.1.9. 🕔 /refine, /rr - Recursively refine item
+      3.2.1.8. 🕔 /refine, /rr - Recursively refine item
+      3.2.1.9. 🕔 /git, /g - Git operations
+         Usage:
+           /g                  # Accept first/default proposal (usually completion)
+           /g -a                # git add
+           /g -c                # git commit
+           /g -p                # git push
+
+         Options:
+           -j, --json          Output proposal set in JSON format        
 
    3.2.2. 🕔 Command Parser Implementation
       3.2.2.1. 🕔 Implement getopt-style parser
