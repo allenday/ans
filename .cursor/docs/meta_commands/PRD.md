@@ -265,7 +265,54 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Provides basis for /c proposals
            - No side effects
 
-      3.2.1.7. 🕔 /refine, /rr - Recursively refine item
+      3.2.1.7. ⚡ /refine, /rr - Recursively refine item
+         Usage:
+           /rr                  # Recursively refine current focus
+           /rr ITEM             # Recursively refine specific item
+           /rr -d N             # Set max refinement depth
+           /rr -f              # Force refinement of complete items
+
+         Options:
+           -d, --depth=N        Maximum refinement depth (default: unlimited)
+           -f, --force          Allow refinement of complete items
+           -j, --json          Output in JSON format
+
+         Examples:
+           /rr                # "Refining 3.2.1 in feature/meta-commands..."
+                             # "Found 3 items to refine:"
+                             # "3.2.1.3: Branch operations incomplete"
+                             # "3.2.1.4: Search operations missing"
+                             # "3.2.1.8: Refinement command needs details"
+                             # "Begin with /x 3.2.1.3"
+
+           /rr -d 1          # "Refining 3.2.1 (depth 1)..."
+                             # "Found 2 direct children to refine:"
+                             # "3.2.1.3: Branch operations incomplete"
+                             # "3.2.1.4: Search operations missing"
+
+           /rr -f 3.2        # "Force refining 3.2..."
+                             # "Found 4 items to refine:"
+                             # "3.2.1: Core commands need review"
+                             # "3.2.2: Parser implementation complete ✅"
+                             # "3.2.3: Integration pending"
+                             # "Begin with /x 3.2.1"
+
+         Behavior:
+           - Recursively examines items in current branch scope
+           - Identifies incomplete or problematic items
+           - Suggests next items to examine
+           - Coordinates with examine command:
+             - Sets up examination sequence
+             - Maintains focus chain
+             - Tracks refinement progress
+           - Error handling:
+             - "No focus item" when no item specified/focused
+             - "Invalid depth" for non-positive numbers
+             - "Nothing to refine" when all items complete
+             - "Max depth exceeded" with depth suggestion
+           - Sets focus for subsequent commands
+           - No side effects beyond examination
+
       3.2.1.8. ✅ /git, /g - Git operations
          Usage:
            /g                  # Show git status
