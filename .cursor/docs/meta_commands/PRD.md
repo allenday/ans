@@ -267,51 +267,81 @@ Implement a powerful meta-level command interface with getopt-style argument par
 
       3.2.1.7. ⚡ /refine, /rr - Recursively refine item
          Usage:
-           /rr                  # Recursively refine current focus
-           /rr ITEM             # Recursively refine specific item
-           /rr -d N             # Set max refinement depth
-           /rr -f              # Force refinement of complete items
+           /rr                  # Recursively articulate current focus
+           /rr ITEM             # Recursively articulate specific item
+           /rr -d N             # Set max articulation depth
+           /rr -i              # Include implementation details
+           /rr -s              # Generate SWE handoff
 
          Options:
-           -d, --depth=N        Maximum refinement depth (default: unlimited)
-           -f, --force          Allow refinement of complete items
+           -d, --depth=N        Maximum articulation depth (default: unlimited)
+           -i, --impl          Include implementation suggestions
+           -s, --swe           Generate SWE-ready specification
            -j, --json          Output in JSON format
 
          Examples:
-           /rr                # "Refining 3.2.1 in feature/meta-commands..."
-                             # "Found 3 items to refine:"
-                             # "3.2.1.3: Branch operations incomplete"
-                             # "3.2.1.4: Search operations missing"
-                             # "3.2.1.8: Refinement command needs details"
-                             # "Begin with /x 3.2.1.3"
+           /rr                # "Articulating 3.2.1 in feature/meta-commands..."
+                             # "Product Requirements:"
+                             # "1. Command Parser Interface"
+                             # "  - Must handle all syntax cases"
+                             # "  - Must support command chaining"
+                             # "  - Must maintain context"
+                             # "2. Error Handling"
+                             # "  - Must provide clear messages"
+                             # "  - Must suggest corrections"
+                             # "3. Integration Points"
+                             # "  - Must hook into git workflow"
+                             # "  - Must preserve documentation state"
+                             # "Continue with /rr -i for implementation details"
 
-           /rr -d 1          # "Refining 3.2.1 (depth 1)..."
-                             # "Found 2 direct children to refine:"
-                             # "3.2.1.3: Branch operations incomplete"
-                             # "3.2.1.4: Search operations missing"
+           /rr -i            # "Generating implementation details..."
+                             # "1. Command Parser Interface"
+                             # "  Implementation Approach:"
+                             # "  - Use getopt-style parsing"
+                             # "  - Maintain command state machine"
+                             # "  - Handle escaped sequences"
+                             # "2. Error Handling"
+                             # "  Implementation Approach:"
+                             # "  - Define error message templates"
+                             # "  - Create correction suggestion system"
+                             # "Continue with /rr -s for SWE handoff"
 
-           /rr -f 3.2        # "Force refining 3.2..."
-                             # "Found 4 items to refine:"
-                             # "3.2.1: Core commands need review"
-                             # "3.2.2: Parser implementation complete ✅"
-                             # "3.2.3: Integration pending"
-                             # "Begin with /x 3.2.1"
+           /rr -s            # "Generating SWE specification..."
+                             # "# Engineering Implementation Guide"
+                             # "## Architecture"
+                             # "- Command Parser: getopt-based state machine"
+                             # "- Error Handler: template-based message system"
+                             # "- Integration: git hooks and doc watchers"
+                             # "## Implementation Steps"
+                             # "1. Set up parser framework"
+                             # "2. Implement core command loop"
+                             # "3. Add error handling"
+                             # "4. Integrate with git/docs"
+                             # "## Acceptance Criteria"
+                             # "- All test cases pass"
+                             # "- Error messages are clear"
+                             # "- Git integration works"
+                             # "Ready for engineering handoff"
 
          Behavior:
-           - Recursively examines items in current branch scope
-           - Identifies incomplete or problematic items
-           - Suggests next items to examine
+           - Recursively articulates product requirements
+           - Breaks down complex items into implementable units
+           - Provides increasing levels of detail:
+             1. Product requirements (default)
+             2. Implementation suggestions (-i)
+             3. Engineering specifications (-s)
            - Coordinates with examine command:
-             - Sets up examination sequence
-             - Maintains focus chain
-             - Tracks refinement progress
+             - Uses examination results as input
+             - Maintains product context
+             - Tracks articulation progress
            - Error handling:
-             - "No focus item" when no item specified/focused
-             - "Invalid depth" for non-positive numbers
-             - "Nothing to refine" when all items complete
-             - "Max depth exceeded" with depth suggestion
+             - "No focus item" when no item specified
+             - "Too abstract" when item needs more breakdown
+             - "Implementation gap" when details missing
+             - "Incomplete context" when deps unclear
            - Sets focus for subsequent commands
-           - No side effects beyond examination
+           - Generates SWE-ready specifications
+           - No side effects beyond documentation
 
       3.2.1.8. ✅ /git, /g - Git operations
          Usage:
