@@ -5,10 +5,10 @@ Implement a powerful meta-level command interface with getopt-style argument par
 
 ## 2. Mission
 
-### 2.1. Current State
-2.1.1. 🕔 Commands are currently free-form text requests
-2.1.2. 🕔 No standardized command syntax or argument parsing
-2.1.3. 🕔 Interaction efficiency limited by natural language overhead
+### 2.1. ✅ Current State
+2.1.1. ✅ Commands are currently free-form text requests
+2.1.2. ✅ No standardized command syntax or argument parsing
+2.1.3. ✅ Interaction efficiency limited by natural language overhead
 
 ### 2.2. Required Changes
 2.2.1. 🕔 Implement slash command processor with aliases
@@ -110,17 +110,58 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - No side effects beyond context update
 
       3.2.1.3. 🕔 /branch, /b - Branch operations
-         - --new=NAME, -n: Create new branch
-         - --list, -l: List branches
-         - --current, -c: Show current branch
-         - --switch=NAME, -s: Switch to branch
-         - --delete=NAME, -d: Delete branch
-         - --base=NAME, -b: Set base branch for new branch
+         Usage:
+           /b                  # Show current branch
+           /b -n NAME          # Create new branch
+           /b -l              # List branches
+           /b -s NAME         # Switch to branch
+           /b -d NAME         # Delete branch
+           /b -b NAME         # Set base branch for new branch
+           /bn NAME           # Alias for /b -n
+           /bs NAME           # Alias for /b -s
+           /bd NAME           # Alias for /b -d
 
-      3.2.1.4. 🕔 /search, /f - Find/search operations
-         - --path=PATH, -p: Search path
-         - --type=TYPE, -t: File type filter
-         - --regex, -r: Use regex pattern
+         Options:
+           -n, --new=NAME      Create new branch from current base
+           -l, --list          List all branches
+           -c, --current       Show current branch (default)
+           -s, --switch=NAME   Switch to branch
+           -d, --delete=NAME   Delete branch
+           -b, --base=NAME     Set base branch for new branch
+           -j, --json          Output in JSON format
+
+         Examples:
+           /b                 # "On branch feature/meta-commands"
+                             # "Base: main"
+
+           /b -l             # "Branches:"
+                             # "* feature/meta-commands"
+                             # "  main"
+                             # "  feature/logging"
+
+           /bn auth          # "Creating branch feature/auth from main..."
+                             # "Switched to branch 'feature/auth'"
+
+           /bs main          # "Switched to branch 'main'"
+                             # "Your branch is up to date with 'origin/main'"
+
+         Behavior:
+           - Manages git branches with documentation context
+           - Maintains branch naming conventions:
+             - feature/* for feature branches
+             - fix/* for bug fixes
+             - docs/* for documentation
+           - Coordinates with git operations:
+             - Verifies clean working tree before switch
+             - Updates documentation context after switch
+             - Preserves uncommitted changes if possible
+           - Error handling:
+             - "Dirty working tree" with save/stash suggestion
+             - "Branch exists" with switch suggestion
+             - "Protected branch" for delete operations
+             - "Invalid branch name" with naming guide
+           - Sets context for subsequent commands
+           - No side effects beyond git/doc operations
 
       3.2.1.5. ✅ /done, /d - Completion workflow
          Usage:
