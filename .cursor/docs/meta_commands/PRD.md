@@ -205,15 +205,55 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - No side effects
 
       3.2.1.8. 🕔 /refine, /rr - Recursively refine item
-      3.2.1.9. 🕔 /git, /g - Git operations
+      3.2.1.9. ✅ /git, /g - Git operations
          Usage:
-           /g                  # Accept first/default proposal (usually completion)
-           /g -a                # git add
-           /g -c                # git commit
-           /g -p                # git push
+           /g                  # Show git status
+           /g -a [FILES]       # Stage files (all if no FILES given)
+           /g -c [MSG]         # Commit (uses conventional format if no MSG)
+           /g -p              # Push to current branch
+           /g -d              # Show diff
+           /g -l              # Show log
+           /g -s              # Show status
+           /ga [FILES]        # Alias for /g -a
+           /gc [MSG]          # Alias for /g -c
+           /gp                # Alias for /g -p
 
          Options:
-           -j, --json          Output proposal set in JSON format        
+           -a, --add [FILES]   Stage files (all if no FILES given)
+           -c, --commit [MSG]  Commit changes (uses conventional format if no MSG)
+           -p, --push         Push to current branch
+           -d, --diff         Show changes
+           -l, --log          Show commit history
+           -j, --json         Output in JSON format
+           -v, --verify       Verify commit message format
+
+         Examples:
+           /g                 # "On branch feature/meta-commands"
+                             # "Changes not staged for commit:"
+                             # "  modified: .cursor/docs/meta_commands/PRD.md"
+
+           /ga PRD.md        # "Staged .cursor/docs/meta_commands/PRD.md"
+           
+           /gc               # "Commit message (conventional format):"
+                             # "docs(meta-commands): update git command section ✨"
+                             # "[feature/meta-commands abc123] 1 file changed"
+
+           /gp               # "Pushing to origin/feature/meta-commands..."
+                             # "Done: abc123..def456"
+
+         Behavior:
+           - Integrates with git workflow in current branch
+           - Maintains conventional commit format
+           - Coordinates with status tracking system
+           - Auto-formats commit messages when no message given
+           - Verifies staged files match current focus
+           - Reports all operations with clear status
+           - Handles errors with helpful messages:
+             - "Nothing to commit" when no changes staged
+             - "Invalid commit message format" with format guide
+             - "Push failed" with fetch/merge suggestion
+           - No side effects beyond git operations
+           - Sets basis for subsequent commands
 
    3.2.2. 🕔 Command Parser Implementation
       3.2.2.1. 🕔 Implement getopt-style parser
