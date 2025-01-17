@@ -79,7 +79,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
                - Example: /ss 3.2.1 done -mr (marks parent and children)
                - Example: /ss 3.2.1 done -m (marks only parent, fails if children incomplete)
 
-      3.2.1.2. 🕔 /rehash, /r - Documentation context refresh
+      3.2.1.2. ✅ /rehash, /r - Documentation context refresh
          Usage:
            /r                  # Refresh with confirmation
            /r -q              # Quiet refresh
@@ -91,22 +91,23 @@ Implement a powerful meta-level command interface with getopt-style argument par
            -j, --json          Output in JSON format
 
          Examples:
-           /r                 # "Refreshing docs... Done."
+           /r                 # "Refreshing docs in feature/meta-commands..."
+                             # "Done: README.md, PRD.md updated"
+           
            /r -q              # (silently refreshes)
-           /rv                # "Verifying docs... All OK."
+           
+           /rv                # "Verifying docs in feature/meta-commands..."
+                             # "✅ All checks pass"
 
          Behavior:
-           - Always reads:
-             - .cursor/*.md
-             - .cursor/docs/<current_branch>/PRD.md
-           - Maintains cached state between reloads
-           - Reports documentation inconsistencies
+           - Refreshes documentation context in current branch
+           - Reads all .cursor/*.md files
+           - Reads branch-specific PRD.md
            - Updates internal command context
-           - Verification checks:
-             - File existence
-             - Status emoji validity
-             - Item numbering consistency
-             - Cross-references
+           - Maintains cached state between reloads
+           - Reports inconsistencies if found
+           - Sets basis for subsequent commands
+           - No side effects beyond context update
 
       3.2.1.3. 🕔 /branch, /b - Branch operations
          - --new=NAME, -n: Create new branch
