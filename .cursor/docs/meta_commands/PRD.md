@@ -499,8 +499,8 @@ Implement a powerful meta-level command interface with getopt-style argument par
       3.2.3.4. 🕔 Integrate /b into scope definition and init
       3.2.3.5. 🕔 Move PRD-defined commands into a dedicated markdown file, referenced from README.md etc
 
-   3.2.4. 🕔 Aspect-Based Command Architecture
-      3.2.4.1. 🕔 Command Organization
+   3.2.4. ⚡ Aspect-Based Command Architecture
+      3.2.4.1. ⚡ Command Organization
          - Common command set (shared across aspects)
            - Status tracking base functionality
            - Branch operations
