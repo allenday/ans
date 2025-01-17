@@ -38,20 +38,53 @@
    3. Refine steps until actionable
    4. Use CHECKLIST.md for execution
 
-### Exception Handling
-1. **STOP Conditions**
-   1. Scope STOP 🛑
-      - IF scope exceeds PRD item
-      - THEN choose:
-         1. Create new branch
-         2. Add to BACKLOG.md
-   
-   2. Process STOP 🛑
-      - IF steps out of order
-      - OR IF state tracking lost
-      - THEN realign with checklist
+### Development Loop
+1. **Mission Definition**
+   ```
+   🔒 MISSION PHASE
+   - Define current state
+   - Specify required changes
+   - Set acceptance criteria
+   VIOLATION -> STOP 🛑
+   ```
 
-2. **Feedback Loop**
+2. **Implementation Plan**
+   ```
+   🔒 PLAN PHASE
+   - Break down into steps
+   - Recursively refine
+   - Reference CHECKLIST.md
+   VIOLATION -> STOP 🛑
+   ```
+
+3. **Development Cycle**
+   ```
+   🔒 DEV PHASE
+   - Test First (red)
+   - Implement (green)
+   - Document
+   - Verify
+   VIOLATION -> STOP 🛑
+   ```
+
+### Exception Handling
+1. **Scope STOP** 🛑
+   ```
+   IF scope exceeds PRD item:
+   - Pause development
+   - Choose: new branch OR backlog
+   - Document in BACKLOG.md
+   ```
+
+2. **Process STOP** 🛑
+   ```
+   IF process broken:
+   - Steps out of order
+   - State tracking lost
+   - Realign with checklist
+   ```
+
+3. **Feedback Loop**
    1. Use BACKLOG.md for:
       - Capturing scope changes
       - Recording discovered improvements
