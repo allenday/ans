@@ -79,17 +79,34 @@ Implement a powerful meta-level command interface with getopt-style argument par
                - Example: /ss 3.2.1 done -mr (marks parent and children)
                - Example: /ss 3.2.1 done -m (marks only parent, fails if children incomplete)
 
-      3.2.1.2. 🕔 /rehash, /rh - Documentation context refresh
-         - --force, -f: Force reload all docs
-         - --quiet, -q: Suppress reload confirmation
-         - --dry-run, -d: Show what would be reloaded
-         - --verify, -v: Verify documentation consistency
-         - Behavior:
-           - Always reads: .cursor/*.md
-           - Always reads: .cursor/docs/<current_branch>/PRD.md
+      3.2.1.2. 🕔 /rehash, /r - Documentation context refresh
+         Usage:
+           /r                  # Refresh with confirmation
+           /r -q              # Quiet refresh
+           /rv                # Verify docs consistency
+
+         Options:
+           -q, --quiet         Suppress reload confirmation
+           -v, --verify        Verify documentation consistency
+           -j, --json          Output in JSON format
+
+         Examples:
+           /r                 # "Refreshing docs... Done."
+           /r -q              # (silently refreshes)
+           /rv                # "Verifying docs... All OK."
+
+         Behavior:
+           - Always reads:
+             - .cursor/*.md
+             - .cursor/docs/<current_branch>/PRD.md
            - Maintains cached state between reloads
            - Reports documentation inconsistencies
            - Updates internal command context
+           - Verification checks:
+             - File existence
+             - Status emoji validity
+             - Item numbering consistency
+             - Cross-references
 
       3.2.1.3. 🕔 /branch, /b - Branch operations
          - --new=NAME, -n: Create new branch
@@ -127,6 +144,70 @@ Implement a powerful meta-level command interface with getopt-style argument par
              
              # Or with explicit item:
              /d -i 3.1.9
+      3.2.1.7. 🕔 /continue, /c - Response to companion proposals
+         Usage:
+           /c                  # Accept first/default proposal (usually completion)
+           /c N                # Accept proposal number N
+           /c ?                # Request more specific proposals
+
+         Options:
+           -j, --json          Output proposal set in JSON format
+
+         Examples:
+           Companion: "Would you like me to:
+           1. Mark this as complete
+           2. Further refine aspects
+           3. Something else?"
+
+           /c                 # Same as /c 1 (mark as complete)
+           /c 2               # Begin refinement process
+           /c ?               # "Please propose specific refinements"
+
+         Behavior:
+           - Responds to companion's most recent proposal set
+           - No args implies accepting first/primary proposal
+           - Numbers select specific proposals (1-based)
+           - Question mark or "something else" option requests elaboration
+           - Invalid numbers show error and restate proposals
+           - Maintains conversation context for proposal chains
+           - Can trigger automatic actions (like completion)
+           - Error messages:
+             - "Invalid option N, valid options are 1-K"
+             - "No active proposals, try /x first"
+
+      3.2.1.8. ✅ /examine, /x - Examine item
+         Usage:
+           /x                  # Examine current focus
+           /x ITEM             # Examine specific item
+
+         Options:
+           -j, --json          Output in JSON format
+
+         Examples:
+           /x                 # "Examining 3.2.1.8 in feature/meta-commands:"
+                             # "❌ Structure: Component relationships unclear"
+                             # "❌ Completeness: Missing required elements"
+                             # "✅ Consistency"
+                             # "❌ Context: External dependencies undefined"
+           
+           /x 3.2.1         # "Examining 3.2.1 in feature/meta-commands:"
+                             # "✅ All categories pass"
+           
+           /x invalid        # "❌ Item 'invalid' not found in feature/meta-commands"
+
+         Behavior:
+           - Examines single item in current branch scope
+           - Analyzes and reports in order:
+             1. structure
+             2. completeness
+             3. consistency 
+             4. context
+           - Reports pass/fail with explanations
+           - Sets focus for subsequent commands
+           - Provides basis for /c proposals
+           - No side effects
+
+      3.2.1.9. 🕔 /refine, /rr - Recursively refine item
 
    3.2.2. 🕔 Command Parser Implementation
       3.2.2.1. 🕔 Implement getopt-style parser
