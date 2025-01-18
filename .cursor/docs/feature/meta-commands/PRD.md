@@ -265,7 +265,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Provides basis for /c proposals
            - No side effects
 
-      3.2.1.7. ⚡ /refine, /rr - Recursively refine item
+      3.2.1.7. ✅ /refine, /rr - Recursively refine item
          Usage:
            /rr                  # Recursively articulate current focus
            /rr ITEM             # Recursively articulate specific item
@@ -499,8 +499,8 @@ Implement a powerful meta-level command interface with getopt-style argument par
       3.2.3.4. 🕔 Integrate /b into scope definition and init
       3.2.3.5. 🕔 Move PRD-defined commands into a dedicated markdown file, referenced from README.md etc
 
-   3.2.4. ⚡ Aspect-Based Command Architecture
-      3.2.4.1. ⚡ Command Organization
+   3.2.4. ✅ Aspect-Based Command Architecture
+      3.2.4.1. ✅ Command Organization
          - Common command set (shared across aspects)
            - Status tracking base functionality
            - Branch operations
@@ -527,7 +527,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
                SWE.md       # SWE aspect prompt
              PROMPT.md      # Core prompt loader
 
-      3.2.4.2. 🕔 /aspect, /a - Aspect switching
+      3.2.4.2. ✅ /aspect, /a - Aspect switching
          Usage:
            /a                  # Show current aspect
            /a ROLE            # Switch to ROLE aspect
@@ -558,7 +558,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
              - "Context switch failed" with reason
              - "Verification failed" with requirements
 
-      3.2.4.3. 🕔 Command Interpretation
+      3.2.4.3. ✅ Command Interpretation
          - Common behaviors:
            - Basic command structure
            - Option parsing
@@ -576,7 +576,7 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Documentation state
            - Verification status
 
-      3.2.4.4. 🕔 Prompt Architecture
+      3.2.4.4. ✅ Prompt Architecture
          - Core prompt loader (PROMPT.md)
            - Basic agent capabilities
            - Command processing
@@ -587,8 +587,176 @@ Implement a powerful meta-level command interface with getopt-style argument par
            - Success criteria
            - Output formatting
 
+### 3.2.4 Aspect System Architecture
+
+#### 3.2.4.1 Prompt Architecture
+1. **Core Prompt (PROMPT.md)**
+   - Basic agent capabilities
+   - Command processing
+   - Context management
+   - Extension points
+
+2. **Aspect Prompts**
+   - Role-specific behaviors
+   - Command interpretation
+   - Success criteria
+   - Output formatting
+
+3. **Initialization Flow**
+   ```
+   /a new-aspect -i     # Create aspect structure
+   ✅ Templates copied
+   ✅ Extension points added
+   
+   /r new-aspect        # Load configuration
+   ✅ Behaviors registered
+   ✅ Commands initialized
+   ```
+
+4. **Verification**
+   ```
+   /x -v prompt         # Verify prompt structure
+   ✅ Core capabilities
+   ✅ Command handlers
+   ✅ Extension points
+   ```
+
 ## 4. Technical Verification
-4.1. 🕔 Command parser handles all syntax cases correctly
-4.2. 🕔 All commands function as specified
-4.3. 🕔 Help system provides clear documentation
-4.4. 🕔 Error handling produces useful messages 
+
+### 4.1 Command Analysis
+
+#### 4.1.1 Base Commands
+1. **Aspect (/a)**
+   ```
+   /a [aspect]          # Switch aspect
+   /a [aspect] -i       # Initialize aspect
+   /a [aspect] -d       # Dry-run validation
+   /a -p               # Show current prompt
+   ```
+
+2. **Rehash (/r)**
+   ```
+   /r                  # Reload current
+   /r [aspect]         # Reload specific
+   /r -v              # Validate config
+   /r -p              # Persist status
+   ```
+
+3. **Handoff (/h)**
+   ```
+   /h [aspect]         # Full handoff
+   /h [aspect] -p      # Partial handoff
+   /h [aspect] -r      # Set rollback
+   /h -s              # Show status
+   ```
+
+#### 4.1.2 Aspect Commands
+1. **Product Management**
+   ```
+   /x [item]           # Examine requirements
+   /x [item] -t        # Hide technical
+   /x [item] -b        # Business view
+   ```
+
+2. **Software Engineering**
+   ```
+   /x [item]           # Examine implementation
+   /x [item] -c        # Show requirements
+   /x [item] -i        # Show impact
+   ```
+
+### 4.2 Handoff Protocol
+
+#### 4.2.1 PM to SWE
+1. **Pre-handoff**
+   ```
+   /x -v                # Verify requirements
+   ✅ Completeness
+   ✅ Success criteria
+   ✅ Dependencies
+   ✅ Technical feasibility
+   ```
+
+2. **During Handoff**
+   ```
+   /h swe -p           # Allow partial progress
+   ✅ State preserved
+   ✅ Context transferred
+   ✅ Commands reinterpreted
+   ```
+
+3. **Post-handoff**
+   ```
+   /x -v               # Verify handoff
+   ✅ Implementation ready
+   ✅ Context verified
+   ✅ Requirements traced
+   ```
+
+#### 4.2.2 SWE to PM
+1. **Pre-handoff**
+   ```
+   /x -v               # Verify implementation
+   ✅ Completeness
+   ✅ Test coverage
+   ✅ Documentation
+   ✅ Product alignment
+   ```
+
+2. **During Handoff**
+   ```
+   /h pm -w           # Allow work-in-progress
+   ✅ State preserved
+   ✅ Context transferred
+   ✅ Commands reinterpreted
+   ```
+
+3. **Post-handoff**
+   ```
+   /x -v              # Verify handoff
+   ✅ Requirements met
+   ✅ Product aligned
+   ✅ Impact analyzed
+   ```
+
+### 4.3 State Management
+
+#### 4.3.1 Focus Stack
+```
+# Preservation
+/a swe -p           # Preserve partial stack
+/a swe -f           # Force clear stack
+/s                  # Show stack state
+
+# Recovery
+/r -c              # Create checkpoint
+/r -v              # Verify recovery
+```
+
+#### 4.3.2 Active Operations
+```
+# Handling
+/h swe -s          # Suspend operation
+/h swe -r          # Resume operation
+/s -o              # Show operations
+
+# State Transfer
+/h swe -p          # Partial transfer
+/h swe -d          # Show state diff
+```
+
+### 4.4 Integration Requirements
+1. **Command Parser**
+   - ✅ All syntax cases handled
+   - ✅ Consistent error messages
+   - ✅ Clear help documentation
+
+2. **Command Execution**
+   - ✅ Functions as specified
+   - ✅ State preserved correctly
+   - ✅ Errors handled gracefully
+
+3. **Documentation**
+   - ✅ Clear command reference
+   - ✅ Example workflows
+   - ✅ Error recovery guides 
