@@ -14,23 +14,64 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [
+    "tests/00-unit",
+    "tests/01-live"
+]
 python_files = ["test_*.py"]
-addopts = """
-    --import-mode=importlib
-    --log-cli-level=DEBUG
-    --log-cli-format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    --log-cli-date-format='%Y-%m-%d %H:%M:%S'
-"""
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=src/chronicler",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-branch",
+    "--cov-fail-under=80",
+    "--cov-config=pyproject.toml"
+]
 markers = [
     "unit: marks tests as unit tests",
     "integration: marks tests as integration tests",
-    "live: marks tests as live integration tests",
-    "slow: marks tests as slow running",
-    "fs: marks tests that depend on filesystem features"
+    "scribe: mark test as scribe test",
+    "storage: mark test as storage test",
+    "slow: marks tests as slow running"
 ]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+log_cli = true
+log_cli_level = "DEBUG"
+
+[tool.coverage.run]
+branch = true
+source = ["chronicler"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    "setup.py"
+]
+
+[tool.coverage.paths]
+source = ["src/chronicler"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError"
+]
+fail_under = 80
+show_missing = true
+
+[tool.coverage.html]
+directory = "coverage_html"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [project.optional-dependencies]
 test = [
