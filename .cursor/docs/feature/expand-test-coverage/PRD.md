@@ -60,7 +60,9 @@ Enhance test coverage validation by including both unit and integration tests in
    3.2.5.4. Include maintenance guidelines
 
 ## 4. Technical Verification
-4.1. 🕔 All tests pass with coverage above 80%
+4.1. ⚡ All tests pass with coverage above 80%
+   4.1.1. ⚡ Unit tests pass with coverage above 80%
+   4.1.2. ⚡ Integration tests pass with coverage above 80%
 4.2. 🕔 Documentation is complete in tests/README.md
 4.3. 🕔 Pre-push hook successfully validates test suite
 4.4. 🕔 Test organization follows project conventions

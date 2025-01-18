@@ -4,11 +4,13 @@ import sys
 import pytest
 import logging
 import pytest_asyncio
+import shutil
+from pathlib import Path
 from chronicler.storage.interface import User
+from chronicler.storage.git import GitStorageAdapter
 from chronicler.transports.telegram_factory import TelegramTransportFactory
 from chronicler.logging import get_logger, configure_logging
 import asyncio
-from pathlib import Path
 
 # Import centralized fixtures
 from tests.mocks.fixtures import mock_session_path, mock_telethon, mock_telegram_bot
@@ -119,3 +121,20 @@ async def test_cleanup():
                 await task
             except asyncio.CancelledError:
                 pass 
+
+# Storage test fixtures
+
+@pytest_asyncio.fixture
+async def git_adapter_live(tmp_path):
+    """Create a real GitStorageAdapter with a real git repo"""
+    # Clean up any existing test data
+    test_path = tmp_path / "test_user_journal"
+    if test_path.exists():
+        shutil.rmtree(test_path)
+    
+    # Create storage adapter
+    storage = GitStorageAdapter(tmp_path)
+    user = User(id="test_user", name="Test User")
+    await storage.init_storage(user)
+    
+    return storage 
