@@ -1,35 +1,37 @@
 """Mock implementations for storage adapters."""
 from pathlib import Path
-from chronicler.storage.interface import User, StorageAdapter
-from chronicler.storage.filesystem import FileSystemStorage
-from chronicler.storage.serializer import MessageSerializer
-from chronicler.storage.coordinator import StorageCoordinator
+from chronicler.storage.git import GitStorageAdapter
 
-class MockGitAdapter(StorageAdapter):
+class MockGitAdapter(GitStorageAdapter):
     """Mock implementation of Git storage adapter."""
-    def __init__(self, storage_path: Path):
-        self.storage_path = storage_path
-
-    async def init_storage(self, user: User) -> None:
+    def __init__(self, base_path: str | Path):
+        """Initialize mock git storage."""
+        super().__init__(base_path)
+        
+    def init_storage(self, user_id: int) -> None:
         """Mock initialization."""
         pass
-
-    async def create_topic(self, user: User, topic: str) -> None:
+        
+    def create_topic(self, user_id: int, topic_name: str) -> None:
         """Mock topic creation."""
         pass
-
-    async def save_message(self, user: User, topic: str, message: dict) -> None:
+        
+    def save_message(self, user_id: int, topic_name: str, message: dict) -> None:
         """Mock message saving."""
         pass
-
-    async def save_attachment(self, user: User, topic: str, attachment_info: dict, file_data: bytes) -> None:
+        
+    def save_attachment(self, user_id: int, topic_name: str, file_path: str | Path, attachment_name: str) -> None:
         """Mock attachment saving."""
         pass
-
-    async def set_github_config(self, user: User, repo_url: str, token: str) -> None:
+        
+    def set_github_config(self, token: str, repo: str) -> None:
         """Mock GitHub config setting."""
         pass
-
-    async def sync(self, user: User) -> None:
+        
+    def sync(self, user_id: int) -> None:
         """Mock sync operation."""
-        pass 
+        pass
+        
+    def topic_exists(self, user_id: int, topic_name: str) -> bool:
+        """Mock topic existence check."""
+        return True 

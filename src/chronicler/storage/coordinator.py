@@ -1,114 +1,80 @@
-"""Storage coordination."""
+"""Coordinates storage operations across multiple backends."""
+import asyncio
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+import sqlite3
+from functools import wraps
+from typing import Union, Optional
+import time
 
-from chronicler.storage.interface import User, Topic, Message, Attachment, StorageAdapter
 from chronicler.storage.git import GitStorageAdapter
-from chronicler.storage.filesystem import FileSystemStorage
-from chronicler.storage.serializer import MessageSerializer
-from chronicler.storage.telegram import TelegramAttachmentHandler
-from chronicler.logging import trace_operation, get_logger
+from chronicler.logging import get_logger, trace_operation
 
-logger = get_logger("storage.coordinator")
+logger = get_logger(__name__)
 
-class StorageCoordinator(StorageAdapter):
-    """Coordinates storage operations across multiple backends."""
-    
-    def __init__(self, storage_path: Path):
-        """Initialize storage coordinator."""
-        self.storage_path = storage_path
-        self.git_storage = GitStorageAdapter(storage_path)
-        self.file_storage = FileSystemStorage(storage_path)
-        self.serializer = MessageSerializer()
-        self.attachment_handler = TelegramAttachmentHandler()
-        self._initialized = False
-        logger.debug("COORD - Initialized StorageCoordinator", extra={
-            'context': {'storage_path': str(storage_path)}
-        })
+def retry_on_db_locked(max_retries=3, delay=0.1):
+    """Retry an operation if the database is locked."""
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(self, *args, **kwargs)
+                except Exception as e:
+                    if "database is locked" in str(e) and attempt < max_retries - 1:
+                        logger.warning(f"Database locked, retrying in {delay}s")
+                        time.sleep(delay)
+                        continue
+                    raise
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
+
+class StorageCoordinator:
+    def __init__(self, base_path: str | Path):
+        self.base_path = Path(base_path)
+        self.git_storage = GitStorageAdapter(self.base_path)
+        self.logger = logger.getChild(self.__class__.__name__)
 
     @trace_operation('storage.coordinator')
-    async def init_storage(self, user: User) -> 'StorageAdapter':
+    @retry_on_db_locked()
+    def init_storage(self, user_id: int) -> None:
         """Initialize storage for a user."""
-        try:
-            await self.git_storage.init_storage(user)
-            await self.file_storage.init_storage(user)
-            self._initialized = True
-            return self
-        except Exception as e:
-            logger.error(f"COORD - Failed to initialize storage: {e}", exc_info=True)
-            raise
-
-    def is_initialized(self) -> bool:
-        """Check if storage is initialized."""
-        return self._initialized
+        self.git_storage.init_storage(user_id)
 
     @trace_operation('storage.coordinator')
-    async def create_topic(self, topic: Topic, ignore_exists: bool = False) -> str:
-        """Create a new topic."""
-        try:
-            # Create topic in git storage
-            await self.git_storage.create_topic(topic, ignore_exists)
-            
-            # Create topic directory in file storage
-            await self.file_storage.create_topic(topic, ignore_exists)
-            
-            return topic.id
-            
-        except Exception as e:
-            logger.error(f"COORD - Failed to create topic: {e}", exc_info=True)
-            raise
+    @retry_on_db_locked()
+    def create_topic(self, user_id: int, topic_name: str) -> None:
+        """Create a new topic for a user."""
+        self.git_storage.create_topic(user_id, topic_name)
 
     @trace_operation('storage.coordinator')
-    async def save_message(self, topic_id: str, message: Message) -> None:
-        """Save a message and its attachments."""
-        try:
-            # Process attachments first
-            if message.attachments:
-                processed_attachments = []
-                for attachment in message.attachments:
-                    processed = await self.attachment_handler.process(attachment)
-                    processed_attachments.append(processed)
-                message.attachments = processed_attachments
-
-                # Save attachments to filesystem before saving message
-                for attachment in message.attachments:
-                    await self.file_storage.save_attachment(topic_id, message.id, attachment)
-
-            # Only save message content if all attachments were saved successfully
-            await self.git_storage.save_message(topic_id, message)
-                    
-        except Exception as e:
-            logger.error(f"COORD - Failed to save message: {e}", exc_info=True)
-            raise
+    @retry_on_db_locked()
+    def save_message(self, user_id: int, topic_name: str, message: dict) -> None:
+        """Save a message to a topic."""
+        self.git_storage.save_message(user_id, topic_name, message)
 
     @trace_operation('storage.coordinator')
-    async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None:
-        """Save an attachment."""
-        try:
-            # Process attachment
-            processed = await self.attachment_handler.process(attachment)
-            
-            # Save to filesystem
-            await self.file_storage.save_attachment(topic_id, message_id, processed)
-            
-        except Exception as e:
-            logger.error(f"COORD - Failed to save attachment: {e}", exc_info=True)
-            raise
+    @retry_on_db_locked()
+    def save_attachment(self, user_id: int, topic_name: str, file_path: str | Path, attachment_name: str) -> None:
+        """Save an attachment to a topic."""
+        self.git_storage.save_attachment(user_id, topic_name, file_path, attachment_name)
 
     @trace_operation('storage.coordinator')
-    async def sync(self) -> None:
-        """Sync with remote storage."""
-        try:
-            await self.git_storage.sync()
-        except Exception as e:
-            logger.error(f"COORD - Failed to sync: {e}", exc_info=True)
-            raise
+    @retry_on_db_locked()
+    def sync(self, user_id: int) -> None:
+        """Sync changes with remote storage."""
+        self.git_storage.sync(user_id)
 
     @trace_operation('storage.coordinator')
-    async def set_github_config(self, token: str, repo: str) -> None:
-        """Set GitHub configuration."""
-        try:
-            await self.git_storage.set_github_config(token, repo)
-        except Exception as e:
-            logger.error(f"COORD - Failed to set GitHub config: {e}", exc_info=True)
-            raise 
+    def set_github_config(self, token: str, repo: str) -> None:
+        """Set GitHub configuration for Git storage."""
+        self.git_storage.set_github_config(token, repo)
+
+    @trace_operation('storage.coordinator')
+    def stop(self) -> None:
+        """Stop all storage operations."""
+        pass
+
+    @trace_operation('storage.coordinator')
+    def topic_exists(self, user_id: int, topic_name: str) -> bool:
+        """Check if a topic exists."""
+        return self.git_storage.topic_exists(user_id, topic_name) 

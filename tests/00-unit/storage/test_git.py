@@ -1,489 +1,312 @@
 """Tests for git storage adapter."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import patch, MagicMock, PropertyMock
 from pathlib import Path
-import yaml
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from git import Repo, InvalidGitRepositoryError
 
-from git import Repo
-from chronicler.storage.git import GitStorageAdapter
-from chronicler.storage.interface import User, Topic, Message, Attachment
+from chronicler.storage.git import GitStorageAdapter, EntityType
 
 @pytest.fixture
 def base_path(tmp_path):
     """Create a temporary base path for testing."""
-    return tmp_path
+    path = tmp_path / "test_storage"
+    path.mkdir(parents=True)
+    return path
 
 @pytest.fixture
-def user():
-    """Create a test user."""
-    return User(
-        id="test_user",
-        name="Test User",
-        metadata={"key": "value"}
-    )
-
-@pytest.fixture
-def repo_mock(monkeypatch):
-    """Create a mock git repo."""
-    mock = MagicMock(spec=Repo)
-    mock.working_dir = None  # Will be set by the adapter
+def mock_repo(base_path):
+    """Mock git repository."""
+    mock = MagicMock()
+    mock.head.is_valid.return_value = True  # Changed to True since we want to simulate an initialized repo
+    mock.git = MagicMock()
     mock.index = MagicMock()
-    mock.index.add = MagicMock()
-    mock.index.commit = MagicMock()
-    mock.remotes = {}
+    type(mock).working_dir = PropertyMock(return_value=str(base_path))
     
-    def mock_init(*args, **kwargs):
-        return mock
-        
-    monkeypatch.setattr(Repo, 'init', mock_init)
+    # Mock heads and active_branch
+    mock_main_branch = MagicMock()
+    mock_main_branch.name = 'main'
+    mock.heads = {'main': mock_main_branch}
+    type(mock).active_branch = PropertyMock(return_value=mock_main_branch)
+    
+    # Mock commits
+    mock_commit = MagicMock()
+    mock.iter_commits.return_value = [mock_commit]
+    
     return mock
 
 @pytest.fixture
-def git_adapter(base_path, repo_mock):
-    """Create a git storage adapter with a mock repository."""
-    with patch('chronicler.storage.git.Repo', autospec=True) as repo_cls_mock:
-        repo_cls_mock.init = MagicMock(return_value=repo_mock)
+def git_adapter(base_path, mock_repo):
+    """Create a GitStorageAdapter instance with mocked Git operations."""
+    with patch('git.Repo', return_value=mock_repo) as mock_repo_class:
+        mock_repo_class.init = MagicMock(return_value=mock_repo)
         adapter = GitStorageAdapter(base_path)
-        adapter.repo_path = base_path / "test_user_journal"
+        adapter.repo = mock_repo  # Ensure we use our mock
         return adapter
 
-@pytest.mark.asyncio
-async def test_initialization(git_adapter, user, repo_mock):
-    """Test initializing storage."""
-    # Execute
-    await git_adapter.init_storage(user)
-
-    # Verify
-    repo_mock.index.add.assert_called_with(['.'])
-    repo_mock.index.commit.assert_called_with("Initialize repository")
-
-@pytest.mark.asyncio
-async def test_initialization_existing_repo(git_adapter, base_path, user, repo_mock):
-    """Test initializing with an existing repository."""
-    # Create existing repository structure
-    repo_path = base_path / f"{user.id}_journal"
-    repo_path.mkdir(parents=True)
-    (repo_path / ".git").mkdir()
-    (repo_path / "topics").mkdir()
+def test_initialization(base_path, git_adapter):
+    """Test initialization of GitStorageAdapter."""
+    # Verify that repo is initialized
+    assert git_adapter.repo is not None
+    assert git_adapter.repo.working_dir == str(base_path)
     
-    with open(repo_path / "metadata.yaml", 'w') as f:
-        yaml.dump({
-            'user_id': user.id,
-            'topics': {'existing': {'name': 'Existing Topic'}},
-            'sources': {}
-        }, f)
+    # Verify that main branch exists and is the current branch
+    assert 'main' in git_adapter.repo.heads
+    assert git_adapter.repo.active_branch.name == 'main'
     
-    # Execute
-    with patch('chronicler.storage.git.Repo', autospec=True) as repo_cls_mock:
-        repo_cls_mock.return_value = repo_mock
-        await git_adapter.init_storage(user)
+    # Verify that initial commit exists
+    assert git_adapter.repo.head.is_valid()
+    assert len(list(git_adapter.repo.iter_commits())) > 0
     
-    # Verify repository was not reinitialized
-    repo_mock.index.add.assert_not_called()
-    repo_mock.index.commit.assert_not_called()
+    # Verify .gitkeep exists
+    assert (base_path / '.gitkeep').exists()
+
+def test_init_storage(git_adapter):
+    """Test initializing storage for a source."""
+    source = "telegram"
+    git_adapter.init_storage(source)
     
-    # Verify adapter state
-    assert git_adapter.is_initialized()
-
-@pytest.mark.asyncio
-async def test_create_topic(git_adapter, user, repo_mock):
-    """Test creating a topic with source."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"source": "test"}
-    )
-    await git_adapter.create_topic(topic)
-
-    # Verify topic was created correctly
-    repo_mock.index.add.assert_called_with(['.'])
-    repo_mock.index.commit.assert_called_with("Created topic Test Topic")
-
-@pytest.mark.asyncio
-async def test_create_topic_no_source(git_adapter, user, repo_mock):
-    """Test creating a topic without a source."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic"
-    )
-    await git_adapter.create_topic(topic)
-
-    # Verify
-    repo_mock.index.add.assert_called_with(['.'])
-    repo_mock.index.commit.assert_called_with("Created topic Test Topic")
-
-@pytest.mark.asyncio
-async def test_create_topic_invalid_name(git_adapter, user):
-    """Test creating a topic with an invalid name."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
+    # Verify source structure was created
+    source_path = git_adapter.base_path / source
+    assert source_path.exists()
+    assert (source_path / "metadata.json").exists()
+    assert (source_path / "users").exists()
+    assert (source_path / "groups").exists()
+    assert (source_path / "supergroups").exists()
     
-    # Create test topic with invalid name
-    topic = Topic(
-        id="test_topic",
-        name="Invalid/Name",
-        metadata={"source": "test"}
-    )
-    
-    # Verify error is raised
-    with pytest.raises(ValueError, match="Topic name cannot contain '/'"):
-        await git_adapter.create_topic(topic)
+    # Verify metadata content
+    with (source_path / "metadata.json").open() as f:
+        metadata = json.load(f)
+        assert metadata["source"] == source
+        assert "entities" in metadata
+        assert all(k in metadata["entities"] for k in ["users", "groups", "supergroups"])
 
-@pytest.mark.asyncio
-async def test_create_topic_missing_source(git_adapter, user, repo_mock):
-    """Test creating a topic with chat_id but no source."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"chat_id": "123"}
-    )
-
-    # Verify error is raised
-    with pytest.raises(ValueError, match="Source must be specified when chat_id is present"):
-        await git_adapter.create_topic(topic)
-
-@pytest.mark.asyncio
-async def test_create_topic_already_exists(git_adapter, user, repo_mock):
-    """Test creating a topic that already exists."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic"
-    )
-
-    # Create metadata file with existing topic
-    metadata_path = git_adapter.repo_path / "metadata.json"
+def test_create_user(git_adapter):
+    """Test creating a user entity."""
+    source = "telegram"
+    user_id = "123456789"
     metadata = {
-        'user_id': user.id,
-        'topics': {
-            'test_topic': {
-                'name': 'Test Topic',
-                'created_at': datetime.now().isoformat(),
-                'path': str(topic.id)
-            }
-        }
+        "username": "testuser",
+        "display_name": "Test User"
     }
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(metadata_path, 'w') as f:
-        json.dump(metadata, f)
+    
+    # Initialize storage first
+    git_adapter.init_storage(source)
+    
+    # Create user
+    git_adapter.create_entity(source, EntityType.USER, user_id, metadata)
+    
+    # Verify user was created
+    user_path = git_adapter.base_path / source / "users" / user_id
+    assert user_path.exists()
+    assert (user_path / "messages.jsonl").exists()
+    assert (user_path / "attachments").exists()
+    
+    # Verify metadata was updated
+    with (git_adapter.base_path / source / "metadata.json").open() as f:
+        source_meta = json.load(f)
+        assert user_id in source_meta["entities"]["users"]
+        assert source_meta["entities"]["users"][user_id]["username"] == "testuser"
 
-    # Verify error is raised
-    with pytest.raises(ValueError, match="Topic test_topic already exists"):
-        await git_adapter.create_topic(topic)
+def test_create_supergroup_with_topic(git_adapter):
+    """Test creating a supergroup and adding a topic."""
+    source = "telegram"
+    group_id = "-100123456789"
+    topic_id = "42"
+    group_metadata = {
+        "title": "Test Group",
+        "type": "supergroup"
+    }
+    topic_metadata = {
+        "name": "Test Topic",
+        "creator_id": "123456789"
+    }
+    
+    # Initialize storage and create supergroup
+    git_adapter.init_storage(source)
+    git_adapter.create_entity(source, EntityType.SUPERGROUP, group_id, group_metadata)
+    
+    # Create topic
+    git_adapter.create_topic(source, group_id, topic_id, topic_metadata)
+    
+    # Verify supergroup and topic structure
+    group_path = git_adapter.base_path / source / "supergroups" / group_id
+    topic_path = group_path / "topics" / topic_id
+    assert group_path.exists()
+    assert (group_path / "messages.jsonl").exists()
+    assert (group_path / "attachments").exists()
+    assert (group_path / "topics").exists()
+    assert topic_path.exists()
+    assert (topic_path / "messages.jsonl").exists()
+    assert (topic_path / "attachments").exists()
+    
+    # Verify metadata was updated
+    with (git_adapter.base_path / source / "metadata.json").open() as f:
+        source_meta = json.load(f)
+        group_data = source_meta["entities"]["supergroups"][group_id]
+        assert group_data["title"] == "Test Group"
+        assert topic_id in group_data["topics"]
+        assert group_data["topics"][topic_id]["name"] == "Test Topic"
 
-@pytest.mark.asyncio
-async def test_save_message(git_adapter, user, repo_mock):
-    """Test saving a message to a topic."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
+def test_sync_no_remote(git_adapter):
+    """Test sync fails when no remote is configured."""
+    source = "telegram"
+    git_adapter.init_storage(source)
+    
+    # Mock no remotes
+    git_adapter.repo.remotes.__iter__.return_value = iter([])
+    
+    with pytest.raises(RuntimeError, match="No remotes configured"):
+        git_adapter.sync(source)
 
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"source": "test"}
-    )
-    await git_adapter.create_topic(topic)
+def test_sync_with_remote(git_adapter):
+    """Test sync succeeds after configuring remote."""
+    source = "telegram"
+    git_adapter.init_storage(source)
+    
+    # Mock remote
+    mock_remote = MagicMock()
+    git_adapter.repo.remotes.__iter__.return_value = iter([mock_remote])
+    git_adapter.repo.remotes.__getitem__.return_value = mock_remote
+    git_adapter.repo.head.tracking_branch.return_value = None  # No tracking branch yet
+    
+    # Configure remote
+    git_adapter.set_github_config("test_token", "test/repo")
+    
+    # Should not raise
+    git_adapter.sync(source)
+    
+    # Verify remote operations
+    mock_remote.push.assert_called_once()
 
-    # Create test message
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"}
-    )
-
-    # Execute
-    await git_adapter.save_message(topic.id, message)
-
-    # Verify
-    repo_mock.index.add.assert_called_with(['.'])
-    repo_mock.index.commit.assert_called_with(f"Added message {message.id} to topic {topic.id}")
-
-@pytest.mark.asyncio
-async def test_save_message_with_attachments(git_adapter, base_path, user, repo_mock):
-    """Test saving a message with attachments."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"source": "test"}
-    )
-    await git_adapter.create_topic(topic)
-
-    # Create test message with attachment
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"},
-        attachments=[attachment]
-    )
-
-    # Execute
-    await git_adapter.save_message(topic.id, message)
-
-    # Verify
-    repo_mock.index.add.assert_called_with(['.'])
-    repo_mock.index.commit.assert_called_with(f"Added message {message.id} to topic {topic.id}")
-
-@pytest.mark.asyncio
-async def test_save_message_with_binary_attachment(git_adapter, user, repo_mock):
-    """Test saving message with binary attachment."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic"
-    )
-    await git_adapter.create_topic(topic)
-
-    # Create message with attachment
-    attachment = Attachment(
-        id="test_attachment",
-        type="application/octet-stream",
-        filename="test.bin",
-        data=b"binary data"
-    )
-    message = Message(
-        content="Test message with binary attachment",
-        source="test",
-        timestamp=datetime.now(timezone.utc),
-        attachments=[attachment]
-    )
-
-    # Execute
-    await git_adapter.save_message(str(topic.id), message)
-
-    # Verify
-    attachment_path = git_adapter.repo_path / topic.id / "media" / "application" / f"test_attachment.bin"
-    assert attachment_path.parent.exists()
-    assert attachment_path.exists()
-    assert attachment_path.read_bytes() == b"binary data"
-
-@pytest.mark.asyncio
-async def test_save_message_invalid_metadata(git_adapter, user, repo_mock):
-    """Test saving message with invalid metadata."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Create test topic
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic"
-    )
-    await git_adapter.create_topic(topic)
-
-    # Create message with invalid metadata
-    message = Message(
-        content="Test message",
-        source="test",
-        timestamp=datetime.now(timezone.utc),
-        metadata={'chat_id': '123456'}  # Missing source
-    )
-
-    # Verify error is raised
-    with pytest.raises(ValueError, match="Source must be specified when chat_id is present"):
-        await git_adapter.save_message(str(topic.id), message)
-
-@pytest.mark.asyncio
-async def test_sync_no_remote(git_adapter, user):
-    """Test sync with no remote configured."""
-    # Initialize storage
-    await git_adapter.init_storage(user)
-
-    # Verify error is raised
-    with pytest.raises(RuntimeError, match="No remote repository configured"):
-        await git_adapter.sync()
-
-@pytest.mark.asyncio
-async def test_sync_with_remote(git_adapter, repo_mock):
-    """Test syncing with remote repository."""
-    # Set up remote
-    remote_mock = MagicMock()
-    remote_mock.push = MagicMock()
-    repo_mock.remotes = {'origin': remote_mock}
-    git_adapter._repo = repo_mock
-    git_adapter._initialized = True
-
-    # Execute
-    await git_adapter.sync()
-
-    # Verify
-    remote_mock.push.assert_called_once()
-
-@pytest.mark.asyncio
-async def test_sync_error(git_adapter, repo_mock):
-    """Test error handling during sync."""
-    # Set up remote and make push fail
-    remote_mock = MagicMock()
-    remote_mock.push.side_effect = Exception("Push failed")
-    repo_mock.remotes = {'origin': remote_mock}
-    git_adapter._repo = repo_mock
-    git_adapter._initialized = True
-
-    # Verify error is propagated
-    with pytest.raises(Exception, match="Push failed"):
-        await git_adapter.sync()
-
-@pytest.mark.asyncio
-async def test_set_github_config(git_adapter, repo_mock):
+def test_set_github_config(git_adapter):
     """Test setting GitHub configuration."""
-    # Set up initialized state
-    git_adapter._initialized = True
-    git_adapter._repo = repo_mock
-
-    # Execute
-    await git_adapter.set_github_config("test_token", "test/repo")
-
-    # Verify remote was created with correct URL
-    repo_mock.create_remote.assert_called_once_with(
+    # Mock no existing remote
+    git_adapter.repo.remotes.__contains__.return_value = False
+    
+    git_adapter.set_github_config("test_token", "test/repo")
+    
+    # Verify remote was created
+    git_adapter.repo.create_remote.assert_called_once_with(
         'origin',
-        'https://x-access-token:test_token@github.com/test/repo.git'
+        'https://test_token@github.com/test/repo'
     )
 
-@pytest.mark.asyncio
-async def test_set_github_config_not_initialized(git_adapter):
-    """Test setting GitHub config before initialization."""
-    with pytest.raises(RuntimeError, match="Must initialize repository first"):
-        await git_adapter.set_github_config("test_token", "test/repo")
-
-@pytest.mark.asyncio
-async def test_await_uninitialized(git_adapter):
-    """Test awaiting uninitialized adapter."""
-    with pytest.raises(RuntimeError, match="Must call init_storage()"):
-        await git_adapter
-
-@pytest.mark.asyncio
-async def test_await_initialized(git_adapter, user):
-    """Test awaiting initialized adapter."""
-    await git_adapter.init_storage(user)
-    adapter = await git_adapter
-    assert adapter == git_adapter
-
-@pytest.mark.asyncio
-async def test_save_message_topic_not_exists(git_adapter, user):
-    """Test saving message to non-existent topic."""
-    await git_adapter.init_storage(user)
+def test_set_github_config_existing_remote(git_adapter):
+    """Test setting GitHub config with existing remote."""
+    # Mock existing remote
+    git_adapter.repo.remotes.__contains__.return_value = True
+    mock_remote = MagicMock()
+    git_adapter.repo.remotes.__getitem__.return_value = mock_remote
     
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"}
+    git_adapter.set_github_config("test_token", "test/repo")
+    
+    # Verify old remote was deleted and new one created
+    git_adapter.repo.delete_remote.assert_called_once_with('origin')
+    git_adapter.repo.create_remote.assert_called_once_with(
+        'origin',
+        'https://test_token@github.com/test/repo'
     )
-    
-    with pytest.raises(ValueError, match="Topic test_topic does not exist"):
-        await git_adapter.save_message("test_topic", message)
 
-@pytest.mark.asyncio
-async def test_save_message_missing_topic_dir(git_adapter, user, repo_mock):
-    """Test saving message when topic directory is missing."""
-    await git_adapter.init_storage(user)
-    
-    # Create topic in metadata but not on disk
-    metadata = {
-        'user_id': user.id,
-        'topics': {
-            'test_topic': {
-                'name': 'Test Topic',
-                'created_at': datetime.now().isoformat(),
-                'path': 'test_topic'
-            }
-        }
+def test_save_message_to_user(git_adapter):
+    """Test saving a message to a user."""
+    source = "telegram"
+    user_id = "123456789"
+    message = {
+        "id": "msg_1",
+        "content": "Test message",
+        "timestamp": datetime.now().isoformat(),
+        "metadata": {"reply_to": None}
     }
-    metadata_path = git_adapter.repo_path / "metadata.json"
-    with open(metadata_path, 'w') as f:
-        json.dump(metadata, f)
     
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"}
-    )
+    # Initialize storage and create user
+    git_adapter.init_storage(source)
+    git_adapter.create_entity(source, EntityType.USER, user_id, {"username": "testuser"})
     
-    with pytest.raises(RuntimeError, match="Topic directory .* does not exist"):
-        await git_adapter.save_message("test_topic", message)
+    # Save message
+    git_adapter.save_message(source, EntityType.USER, user_id, message)
+    
+    # Verify message was saved
+    messages_file = git_adapter.base_path / source / "users" / user_id / "messages.jsonl"
+    with messages_file.open() as f:
+        saved_message = json.loads(f.read().strip())
+        assert saved_message["content"] == "Test message"
+        assert saved_message["id"] == "msg_1"
 
-@pytest.mark.asyncio
-async def test_save_attachment_topic_not_exists(git_adapter, user):
-    """Test saving attachment to non-existent topic."""
-    await git_adapter.init_storage(user)
-    
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
-    
-    with pytest.raises(ValueError, match="Topic test_topic does not exist"):
-        await git_adapter.save_attachment("test_topic", "test_message", attachment)
-
-@pytest.mark.asyncio
-async def test_save_attachment_missing_topic_dir(git_adapter, user, repo_mock):
-    """Test saving attachment when topic directory is missing."""
-    await git_adapter.init_storage(user)
-    
-    # Create topic in metadata but not on disk
-    metadata = {
-        'user_id': user.id,
-        'topics': {
-            'test_topic': {
-                'name': 'Test Topic',
-                'created_at': datetime.now().isoformat(),
-                'path': 'test_topic'
-            }
-        }
+def test_save_message_to_topic(git_adapter):
+    """Test saving a message to a topic in a supergroup."""
+    source = "telegram"
+    group_id = "-100123456789"
+    topic_id = "42"
+    message = {
+        "id": "msg_1",
+        "content": "Test topic message",
+        "timestamp": datetime.now().isoformat(),
+        "metadata": {"topic_id": topic_id}
     }
-    metadata_path = git_adapter.repo_path / "metadata.json"
-    with open(metadata_path, 'w') as f:
-        json.dump(metadata, f)
     
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
+    # Initialize storage and create supergroup with topic
+    git_adapter.init_storage(source)
+    git_adapter.create_entity(source, EntityType.SUPERGROUP, group_id, {"title": "Test Group"})
+    git_adapter.create_topic(source, group_id, topic_id, {"name": "Test Topic"})
     
-    with pytest.raises(RuntimeError, match="Topic directory .* does not exist"):
-        await git_adapter.save_attachment("test_topic", "test_message", attachment)
+    # Save message
+    git_adapter.save_message(source, EntityType.SUPERGROUP, group_id, message, topic_id)
+    
+    # Verify message was saved
+    messages_file = git_adapter.base_path / source / "supergroups" / group_id / "topics" / topic_id / "messages.jsonl"
+    with messages_file.open() as f:
+        saved_message = json.loads(f.read().strip())
+        assert saved_message["content"] == "Test topic message"
+        assert saved_message["id"] == "msg_1"
 
-@pytest.mark.asyncio
-async def test_read_metadata_missing_file(git_adapter, user):
-    """Test reading metadata when file is missing."""
-    await git_adapter.init_storage(user)
+def test_save_attachment(git_adapter, tmp_path):
+    """Test saving an attachment to a user."""
+    source = "telegram"
+    user_id = "123456789"
+    file_path = tmp_path / "test.txt"
+    attachment_name = "test.txt"
     
-    # Remove metadata file
-    metadata_path = git_adapter.repo_path / "metadata.json"
-    metadata_path.unlink()
+    # Create test file
+    with file_path.open("w") as f:
+        f.write("Test content")
     
-    # Read metadata should return empty dict
-    metadata = await git_adapter._read_metadata()
-    assert metadata == {'user_id': None, 'topics': {}}
+    # Initialize storage and create user
+    git_adapter.init_storage(source)
+    git_adapter.create_entity(source, EntityType.USER, user_id, {"username": "testuser"})
+    
+    # Save attachment
+    git_adapter.save_attachment(source, EntityType.USER, user_id, file_path, attachment_name)
+    
+    # Verify attachment was saved
+    attachment_path = git_adapter.base_path / source / "users" / user_id / "attachments" / attachment_name
+    assert attachment_path.exists()
+    with attachment_path.open() as f:
+        assert f.read() == "Test content"
+
+def test_save_attachment_to_topic(git_adapter, tmp_path):
+    """Test saving an attachment to a topic."""
+    source = "telegram"
+    group_id = "-100123456789"
+    topic_id = "42"
+    file_path = tmp_path / "test.txt"
+    attachment_name = "test.txt"
+    
+    # Create test file
+    with file_path.open("w") as f:
+        f.write("Test content")
+    
+    # Initialize storage and create supergroup with topic
+    git_adapter.init_storage(source)
+    git_adapter.create_entity(source, EntityType.SUPERGROUP, group_id, {"title": "Test Group"})
+    git_adapter.create_topic(source, group_id, topic_id, {"name": "Test Topic"})
+    
+    # Save attachment
+    git_adapter.save_attachment(source, EntityType.SUPERGROUP, group_id, file_path, attachment_name, topic_id)
+    
+    # Verify attachment was saved
+    attachment_path = git_adapter.base_path / source / "supergroups" / group_id / "topics" / topic_id / "attachments" / attachment_name
+    assert attachment_path.exists()
+    with attachment_path.open() as f:
+        assert f.read() == "Test content"

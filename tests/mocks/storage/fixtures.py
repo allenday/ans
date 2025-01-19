@@ -1,6 +1,6 @@
 """Storage-related pytest fixtures."""
 import pytest
-from unittest.mock import AsyncMock, create_autospec
+from unittest.mock import MagicMock, create_autospec
 
 from chronicler.storage import StorageAdapter
 from chronicler.storage.coordinator import StorageCoordinator
@@ -11,10 +11,10 @@ def storage_mock():
     storage = create_autospec(StorageAdapter)
     storage.init_storage.return_value = storage
     storage.create_topic.return_value = None
-    storage.save_message = AsyncMock(return_value="msg_123")
-    storage.save_attachment = AsyncMock(return_value=None)
-    storage.sync = AsyncMock(return_value=None)
-    storage.set_github_config = AsyncMock(return_value=None)
+    storage.save_message = MagicMock(return_value="msg_123")
+    storage.save_attachment = MagicMock(return_value=None)
+    storage.sync = MagicMock(return_value=None)
+    storage.set_github_config = MagicMock(return_value=None)
     storage.is_initialized.return_value = True
     return storage
 
@@ -22,11 +22,11 @@ def storage_mock():
 def coordinator_mock():
     """Create a mock storage coordinator."""
     coordinator = create_autospec(StorageCoordinator)
-    coordinator.init_storage = AsyncMock()
-    coordinator.create_topic = AsyncMock()
-    coordinator.save_message = AsyncMock()
-    coordinator.save_attachment = AsyncMock()
-    coordinator.sync = AsyncMock()
-    coordinator.set_github_config = AsyncMock()
-    coordinator.is_initialized = AsyncMock(return_value=True)
+    coordinator.init_storage = create_autospec(StorageCoordinator.init_storage)
+    coordinator.create_topic = create_autospec(StorageCoordinator.create_topic)
+    coordinator.save_message = create_autospec(StorageCoordinator.save_message)
+    coordinator.save_attachment = create_autospec(StorageCoordinator.save_attachment)
+    coordinator.sync = create_autospec(StorageCoordinator.sync)
+    coordinator.set_github_config = create_autospec(StorageCoordinator.set_github_config)
+    coordinator.topic_exists = create_autospec(StorageCoordinator.topic_exists, return_value=True)
     return coordinator 
