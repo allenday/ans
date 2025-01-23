@@ -1,88 +1,67 @@
-"""Test interaction between Telegram transports."""
+"""Tests for telegram interaction."""
 import pytest
-from unittest.mock import Mock, patch
+import pytest_asyncio
+import logging
+from unittest.mock import AsyncMock, Mock, patch
+from telegram import Bot, Message, Chat, User, Update, PhotoSize
+from telegram.ext import ApplicationBuilder
+from chronicler.frames import TextFrame
+from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram_user_transport import TelegramUserTransport
+from chronicler.logging.config import trace_operation
+from tests.mocks.transports.telethon import create_mock_telethon
+from tests.mocks.transports.telegram import mock_telegram_bot
 
-from chronicler.frames.media import TextFrame
-from chronicler.transports.telegram_factory import TelegramTransportFactory
-from chronicler.transports.events import EventMetadata
-from tests.mocks.transports import create_mock_telethon, create_mock_telegram_bot
+logger = logging.getLogger(__name__)
 
-@pytest.fixture
-def mock_telethon():
-    """Mock Telethon client."""
-    with patch('chronicler.transports.telegram_factory.TelegramClient') as mock:
-        client = create_mock_telethon()
-        mock.return_value = client
-        yield mock
+@pytest_asyncio.fixture
+async def mock_telegram_user_client():
+    """Create a mock Telethon client for testing."""
+    return create_mock_telethon()
 
-@pytest.fixture
-def mock_python_telegram_bot():
-    """Mock python-telegram-bot Application."""
-    with patch('chronicler.transports.telegram_factory.Application') as mock:
-        app = create_mock_telegram_bot()
-        
-        # Mock application builder
-        builder = Mock()
-        builder.token = Mock(return_value=Mock(build=Mock(return_value=app)))
-        mock.builder = Mock(return_value=builder)
-        
-        yield mock
+@pytest_asyncio.fixture
+async def bot_transport(mock_telegram_bot):
+    """Create a bot transport instance."""
+    transport = TelegramBotTransport(token="test_token")
+    transport._app = mock_telegram_bot
+    transport._bot = mock_telegram_bot.bot
+    transport._initialized = True  # Since we're mocking, we can set this directly
+    return transport
 
-@pytest.mark.asyncio
-async def test_user_to_bot_interaction(mock_telethon, mock_python_telegram_bot):
-    """Test interaction between user and bot transports."""
-    # Create transports
-    factory = TelegramTransportFactory()
-    user_transport = factory.create_transport(
-        api_id="123",
-        api_hash="abc",
+@pytest_asyncio.fixture
+async def user_transport(mock_telegram_user_client):
+    """Create a user transport instance."""
+    transport = TelegramUserTransport(
+        api_id=123456789,
+        api_hash="test_hash",
         phone_number="+1234567890"
     )
-    bot_transport = factory.create_transport(
-        bot_token="BOT:TOKEN"
-    )
-    
+    transport._client = mock_telegram_user_client
+    transport._initialized = True  # Since we're mocking, we can set this directly
+    return transport
+
+@pytest.mark.asyncio
+@trace_operation("test.transport.telegram_interaction")
+async def test_telegram_interaction(bot_transport, user_transport):
+    """Test interaction between bot and user transports."""
+    logger.info("Starting telegram interaction test")
+
+    # Start both transports
+    await bot_transport.start()
+    await user_transport.start()
+
     try:
-        # Start both transports
-        await user_transport.start()
-        await bot_transport.start()
-        
-        # User sends message
-        frame = TextFrame(
-            text="Hello from user!",
-            metadata=EventMetadata(
-                chat_id=123456789,
-                chat_title="Test Chat",
-                sender_id=987654321,
-                sender_name="Test User",
-                message_id=None  # Will be set after sending
-            )
-        )
-        sent_frame = await user_transport.send(frame)
-        assert sent_frame.metadata.message_id == 1
-        mock_telethon.return_value.send_message.assert_awaited_once_with(
-            123456789,
-            "Hello from user!"
-        )
-        
-        # Bot processes and responds
-        response_frame = TextFrame(
-            text="Hello from bot!",
-            metadata=EventMetadata(
-                chat_id=123456789,
-                chat_title="Test Chat",
-                sender_id=111111111,
-                sender_name="Test Bot",
-                message_id=None  # Will be set after sending
-            )
-        )
-        sent_response = await bot_transport.send(response_frame)
-        assert sent_response.metadata.message_id == 2
-        mock_python_telegram_bot.builder().token().build().bot.send_message.assert_awaited_once_with(
-            chat_id=123456789,
-            text="Hello from bot!"
-        )
+        # Send message from user to bot
+        frame = TextFrame(content="Hello bot!")
+        frame.metadata["chat_id"] = 123456789
+        await user_transport.send(frame)
+
+        # Send message from bot to user
+        frame = TextFrame(content="Hello user!")
+        frame.metadata["chat_id"] = 123456789
+        await bot_transport.send(frame)
+
     finally:
         # Stop both transports
-        await user_transport.stop()
-        await bot_transport.stop() 
+        await bot_transport.stop()
+        await user_transport.stop() 

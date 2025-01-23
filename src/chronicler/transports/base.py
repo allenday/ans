@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from chronicler.logging import get_logger
-
+from chronicler.exceptions import TransportError
 from chronicler.frames.base import Frame
 
 class BaseTransport(ABC):
