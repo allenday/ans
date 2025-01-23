@@ -12,16 +12,18 @@ class TestFrame(Frame):
 
 
 def test_frame_metadata_default():
-    """Test that Frame metadata defaults to empty dict."""
+    """Test that Frame metadata defaults to empty dict with type."""
     frame = TestFrame()
-    assert frame.metadata == {}
+    assert frame.metadata == {"type": "testframe"}
 
 
 def test_frame_metadata_custom():
     """Test Frame with custom metadata."""
-    metadata = {"key": "value", "number": 42}
+    metadata = {"test": "value"}
     frame = TestFrame(metadata=metadata)
-    assert frame.metadata == metadata
+    expected = metadata.copy()
+    expected["type"] = "testframe"
+    assert frame.metadata == expected
 
 
 def test_frame_text_default():
@@ -32,7 +34,7 @@ def test_frame_text_default():
 
 def test_frame_text_custom():
     """Test Frame with custom text."""
-    text = "Test text"
+    text = "test text"
     frame = TestFrame(text=text)
     assert frame.text == text
 
@@ -40,25 +42,25 @@ def test_frame_text_custom():
 @patch('chronicler.frames.base.logger')
 def test_frame_logging(mock_logger):
     """Test that Frame creation is logged."""
-    metadata = {"test": "data"}
-    frame = TestFrame(metadata=metadata)
+    frame = TestFrame()
+    # Basic initialization should not raise any errors
     
     # Verify debug log was called with correct message
     mock_logger.debug.assert_called_once()
     log_msg = mock_logger.debug.call_args[0][0]
     assert "TestFrame" in log_msg
-    assert str(metadata) in log_msg
+    assert str(frame.metadata) in log_msg
 
 
 def test_frame_metadata_mutation():
-    """Test that Frame metadata can be modified after creation."""
+    """Test that Frame metadata can be updated."""
     frame = TestFrame()
-    frame.metadata["new_key"] = "new_value"
-    assert frame.metadata["new_key"] == "new_value"
+    frame.metadata["new_key"] = "value"
+    assert frame.metadata["new_key"] == "value"
 
 
 def test_frame_text_mutation():
-    """Test that Frame text can be modified after creation."""
+    """Test that Frame text can be updated."""
     frame = TestFrame()
-    frame.text = "New text"
-    assert frame.text == "New text" 
+    frame.text = "new text"
+    assert frame.text == "new text" 

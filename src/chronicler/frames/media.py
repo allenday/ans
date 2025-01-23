@@ -106,16 +106,19 @@ class VoiceFrame(Frame):
 class StickerFrame(Frame):
     """A frame containing sticker data."""
     content: bytes
-    emoji: str
-    set_name: str
+    emoji: Optional[str] = None
+    set_name: Optional[str] = None
+    format: Optional[str] = None
     
     def __post_init__(self):
         """Log sticker frame initialization."""
         if not isinstance(self.content, bytes):
             raise TypeError("content must be bytes")
-        if not isinstance(self.emoji, str):
+        if self.emoji is not None and not isinstance(self.emoji, str):
             raise TypeError("emoji must be a string")
-        if not isinstance(self.set_name, str):
+        if self.set_name is not None and not isinstance(self.set_name, str):
             raise TypeError("set_name must be a string")
-        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set_name={self.set_name}")
+        if self.format is not None and not isinstance(self.format, str):
+            raise TypeError("format must be a string")
+        logger.debug(f"FRAME - Initializing StickerFrame: emoji={self.emoji}, set_name={self.set_name}, format={self.format}")
         super().__post_init__() 

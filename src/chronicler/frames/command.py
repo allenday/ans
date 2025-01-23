@@ -16,6 +16,10 @@ class CommandFrame(Frame):
     def __post_init__(self):
         """Validate command frame data."""
         # Validate command
+        if self.command is None:
+            raise TypeError("command must be a string")
+        if not isinstance(self.command, str):
+            raise TypeError("command must be a string")
         if not self.command.startswith('/'):
             raise ValueError("Command must start with '/'")
         self.command = self.command.lower()  # Normalize to lowercase
