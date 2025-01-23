@@ -1,6 +1,6 @@
 """Tests for telegram bot transport using the new mock setup."""
 import pytest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from chronicler.exceptions import TransportError
 from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 from chronicler.frames.media import TextFrame, ImageFrame
@@ -739,4 +739,83 @@ async def test_error_count_tracking_without_app(mock_telegram_bot):
         await transport.process_frame(frame)
 
     # Error count should be incremented
-    assert transport._error_count == 1 
+    assert transport._error_count == 1
+
+@pytest.mark.asyncio
+async def test_authenticate_build_error():
+    """Test error handling when ApplicationBuilder.build() fails with a generic error."""
+    transport = TelegramBotTransport("test_token")
+    
+    # Mock ApplicationBuilder to raise an error during build
+    with patch('telegram.ext.ApplicationBuilder.build', side_effect=Exception("Build failed")):
+        with pytest.raises(TransportError, match="Failed to build application: Build failed"):
+            await transport.authenticate()
+    
+    assert not transport.is_running
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_authenticate_initialize_error():
+    """Test error handling when app.initialize() fails."""
+    transport = TelegramBotTransport("test_token")
+    
+    # Create mock app with failing initialize
+    mock_app = AsyncMock()
+    mock_app.initialize = AsyncMock(side_effect=Exception("Initialize failed"))
+    mock_app.bot = AsyncMock()
+    
+    with patch('telegram.ext.ApplicationBuilder.build', return_value=mock_app):
+        with pytest.raises(TransportError, match="Failed to initialize bot: Initialize failed"):
+            await transport.authenticate()
+    
+    assert not transport.is_running
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_stop_without_initialization():
+    """Test stopping a transport that was never initialized."""
+    transport = TelegramBotTransport("test_token")
+    
+    # Should not raise any errors
+    await transport.stop()
+    
+    assert not transport.is_running
+    assert transport._app is None 
+
+@pytest.mark.asyncio
+async def test_command_handler_error():
+    """Test error handling when command handler raises an exception."""
+    transport = TelegramBotTransport("test_token")
+    
+    # Mock the bot initialization
+    transport._app = MagicMock()
+    transport._app.initialize = AsyncMock()
+    transport._app.bot = MagicMock()
+    transport._app.bot.get_me = AsyncMock()
+    transport._app.add_handler = AsyncMock()  # Mock add_handler as async
+    transport._initialized = True
+    transport._bot = transport._app.bot
+    
+    # Create a command handler that raises an error
+    async def error_handler(frame):
+        raise Exception("Command handler error")
+    
+    # Register the command
+    await transport.register_command("/test", error_handler)
+    
+    # Create a mock update
+    mock_update = MagicMock()
+    mock_update.message = MagicMock()
+    mock_update.message.text = "/test arg1 arg2"
+    mock_update.message.chat = MagicMock()
+    mock_update.message.chat.id = 123456
+    mock_update.message.chat.title = "Test Chat"
+    mock_update.message.chat.type = "private"
+    mock_update.message.from_user = MagicMock()
+    mock_update.message.from_user.id = 789
+    mock_update.message.from_user.username = "test_user"
+    mock_update.message.message_id = 1
+
+    # Process command and expect error
+    with pytest.raises(TransportError, match="Failed to handle command: Command handler error"):
+        await transport._handle_command(mock_update, error_handler) 
