@@ -1,4 +1,6 @@
 import pytest
+import pytest_asyncio
+import os
 from unittest.mock import AsyncMock, Mock, call, MagicMock, patch
 from telegram.ext import ApplicationBuilder, CommandHandler, ExtBot, Application
 from telegram.error import InvalidToken
@@ -45,3 +47,22 @@ def create_mock_telethon():
     client._event_handler = event_handler
     
     return client
+
+@pytest_asyncio.fixture
+async def mock_session_path(tmp_path):
+    """Mock session path for testing."""
+    return tmp_path / "test_session"
+
+@pytest.fixture
+def mock_telethon(mock_session_path):
+    """Create a mock Telethon client."""
+    with patch('chronicler.transports.telegram_factory.TelegramClient') as mock:
+        client = create_mock_telethon()
+        
+        # Mock session with custom path
+        client.session = MagicMock()
+        client.session.save = MagicMock()
+        client.session.session_file = os.path.join(mock_session_path, "test_session.session")
+        
+        mock.return_value = client
+        yield mock
