@@ -1,20 +1,20 @@
 """Command processor implementation."""
-from chronicler.logging import get_logger
-from typing import Dict, Optional, Type
+from chronicler.logging import get_logger, trace_operation
+from typing import Dict, Type, Optional
 
 from chronicler.frames.base import Frame
-from chronicler.frames.command import CommandFrame
+from chronicler.processors.base import BaseProcessor
 from chronicler.frames.media import TextFrame
+from chronicler.frames.command import CommandFrame
+from chronicler.storage.coordinator import StorageCoordinator
 from chronicler.handlers.command import CommandHandler, StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
-from chronicler.storage import StorageAdapter
-from .base import BaseProcessor
 
 logger = get_logger(__name__)
 
 class CommandProcessor(BaseProcessor):
     """Processor for handling command frames."""
     
-    def __init__(self, storage: StorageAdapter):
+    def __init__(self, storage: StorageCoordinator):
         """Initialize command processor."""
         super().__init__()
         self.storage = storage
@@ -43,7 +43,7 @@ class CommandProcessor(BaseProcessor):
             if not handler:
                 logger.warning(f"PROC - No handler for command: {frame.command}")
                 return TextFrame(
-                    text=f"Unknown command: {frame.command}",
+                    content=f"Unknown command: {frame.command}",
                     metadata=frame.metadata
                 )
             

@@ -1,11 +1,22 @@
 """Exceptions for the chronicler package."""
 
-class TransportError(Exception):
+class ChroniclerError(Exception):
+    """Base class for all Chronicler errors."""
+    pass
+
+class TransportError(ChroniclerError):
     """Base class for transport-related errors."""
-    pass 
+    pass
 
+class TransportConnectionError(TransportError):
+    """Raised when transport connection fails."""
+    pass
 
-class CommandError(Exception):
+class TransportMessageError(TransportError):
+    """Raised when message sending/receiving fails."""
+    pass
+
+class CommandError(ChroniclerError):
     """Base exception for command-related errors."""
     pass
 
@@ -23,4 +34,32 @@ class CommandAuthorizationError(CommandError):
 
 class CommandExecutionError(CommandError):
     """Raised when command execution fails for other reasons."""
+    pass
+
+class StorageError(ChroniclerError):
+    """Base class for storage-related errors."""
+    pass
+
+class StorageInitializationError(StorageError):
+    """Raised when storage initialization fails."""
+    pass
+
+class StorageOperationError(StorageError):
+    """Raised when a storage operation fails (save, load, etc)."""
+    pass
+
+class StorageValidationError(StorageError):
+    """Raised when storage validation fails (metadata, etc)."""
+    pass
+
+class ProcessorError(ChroniclerError):
+    """Base class for processor-related errors."""
+    pass
+
+class ProcessorValidationError(ProcessorError):
+    """Raised when processor validation fails (frame type, metadata, etc)."""
+    pass
+
+class ProcessorOperationError(ProcessorError):
+    """Raised when a processor operation fails."""
     pass

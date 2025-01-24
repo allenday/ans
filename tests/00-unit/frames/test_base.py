@@ -29,14 +29,14 @@ def test_frame_metadata_custom():
 def test_frame_text_default():
     """Test that Frame text defaults to None."""
     frame = TestFrame()
-    assert frame.text is None
+    assert frame.content is None
 
 
 def test_frame_text_custom():
     """Test Frame with custom text."""
     text = "test text"
-    frame = TestFrame(text=text)
-    assert frame.text == text
+    frame = TestFrame(content=text)
+    assert frame.content == text
 
 
 @patch('chronicler.frames.base.logger')
