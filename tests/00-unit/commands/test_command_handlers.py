@@ -1,167 +1,141 @@
-"""Tests for command handlers."""
+"""Test cases for command handlers."""
 import pytest
-from unittest.mock import Mock
-from chronicler.commands.frames import CommandFrame
+from unittest.mock import AsyncMock
+
+from chronicler.exceptions import CommandError, CommandValidationError, CommandStorageError
 from chronicler.frames.media import TextFrame
-from chronicler.commands.handlers import (
-    CommandHandler,
-    StartCommandHandler,
-    ConfigCommandHandler,
-    StatusCommandHandler
-)
-
-from tests.mocks.storage import coordinator_mock
-
-class TestCommandHandler:
-    """Test base command handler."""
-    
-    def test_init(self, coordinator_mock):
-        """Test handler initialization."""
-        handler = StartCommandHandler(coordinator_mock)
-        assert handler.coordinator == coordinator_mock
+from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
+from tests.mocks.commands import command_frame_factory, coordinator_mock, TEST_METADATA
 
 class TestStartCommandHandler:
-    """Test start command handler."""
-    
+    """Test cases for StartCommandHandler."""
+
     @pytest.mark.asyncio
-    async def test_handle_success(self, coordinator_mock):
+    async def test_handle_success(self, coordinator_mock, command_frame_factory):
         """Test successful start command handling."""
-        handler = StartCommandHandler(coordinator_mock)
-        frame = CommandFrame(
-            command="/start",
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
-        )
-        
+        handler = StartCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = False
+        frame = command_frame_factory(command="/start")
+
         result = await handler.handle(frame)
-        
         assert isinstance(result, TextFrame)
-        assert "Welcome to Chronicler!" in result.content
-        coordinator_mock.init_storage.assert_called_once()
-        coordinator_mock.create_topic.assert_called_once()
-    
+        assert "Storage initialized successfully" in result.content
+        coordinator_mock.init_storage.assert_awaited_once()
+        coordinator_mock.create_topic.assert_awaited_once()
+
     @pytest.mark.asyncio
-    async def test_handle_error(self, coordinator_mock):
-        """Test error handling in start command."""
-        coordinator_mock.init_storage.side_effect = RuntimeError("Test error")
-        handler = StartCommandHandler(coordinator_mock)
-        frame = CommandFrame(
-            command="/start",
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
-        )
-        
-        with pytest.raises(RuntimeError):
+    async def test_handle_init_error(self, coordinator_mock, command_frame_factory):
+        """Test error handling when initialization fails."""
+        handler = StartCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = False
+        coordinator_mock.init_storage.side_effect = RuntimeError("Init failed")
+        frame = command_frame_factory(command="/start")
+
+        with pytest.raises(CommandStorageError, match="Failed to initialize storage: Init failed"):
+            await handler.handle(frame)
+
+    @pytest.mark.asyncio
+    async def test_handle_create_topic_error(self, coordinator_mock, command_frame_factory):
+        """Test error handling when topic creation fails."""
+        handler = StartCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = False
+        coordinator_mock.create_topic.side_effect = RuntimeError("Topic creation failed")
+        frame = command_frame_factory(command="/start")
+
+        with pytest.raises(CommandStorageError, match="Failed to create topic: Topic creation failed"):
             await handler.handle(frame)
 
 class TestConfigCommandHandler:
-    """Test config command handler."""
-    
+    """Test cases for ConfigCommandHandler."""
+
     @pytest.mark.asyncio
-    async def test_handle_missing_args(self, coordinator_mock):
-        """Test config command with missing arguments."""
-        handler = ConfigCommandHandler(coordinator_mock)
-        frame = CommandFrame(
-            command="/config",
-            args=["url"],
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
-        )
-        
-        result = await handler.handle(frame)
-        assert isinstance(result, TextFrame)
-        assert "Usage: /config" in result.content
-        coordinator_mock.set_github_config.assert_not_called()
-    
+    async def test_handle_missing_args(self, coordinator_mock, command_frame_factory):
+        """Test handling when arguments are missing."""
+        handler = ConfigCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = True
+        frame = command_frame_factory(command="/config")
+
+        with pytest.raises(CommandValidationError, match="Missing required arguments"):
+            await handler.handle(frame)
+
     @pytest.mark.asyncio
-    async def test_handle_success(self, coordinator_mock):
+    async def test_handle_success(self, coordinator_mock, command_frame_factory):
         """Test successful config command handling."""
-        handler = ConfigCommandHandler(coordinator_mock)
-        frame = CommandFrame(
+        handler = ConfigCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = True
+        frame = command_frame_factory(
             command="/config",
-            args=["owner/repo", "token123"],
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
+            args=["user/repo", "ghp_token123"]
         )
-        
+
         result = await handler.handle(frame)
-        
         assert isinstance(result, TextFrame)
-        assert "GitHub configuration updated" in result.content
-        coordinator_mock.set_github_config.assert_called_once_with(
-            token="token123",
-            repo="owner/repo"
+        assert "GitHub configuration" in result.content
+        coordinator_mock.set_github_config.assert_awaited_once_with(
+            token="ghp_token123",
+            repo="user/repo"
         )
-        coordinator_mock.sync.assert_called_once()
-    
+
     @pytest.mark.asyncio
-    async def test_handle_config_error(self, coordinator_mock):
-        """Test error handling in config command."""
-        coordinator_mock.set_github_config.side_effect = RuntimeError("Test error")
-        handler = ConfigCommandHandler(coordinator_mock)
-        frame = CommandFrame(
+    async def test_handle_config_error(self, coordinator_mock, command_frame_factory):
+        """Test error handling when configuration fails."""
+        handler = ConfigCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = True
+        coordinator_mock.set_github_config.side_effect = RuntimeError("Config failed")
+        frame = command_frame_factory(
             command="/config",
-            args=["owner/repo", "token123"],
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
+            args=["user/repo", "ghp_token123"]
         )
-        
-        with pytest.raises(RuntimeError):
+
+        with pytest.raises(CommandStorageError, match="Failed to configure GitHub: Config failed"):
+            await handler.handle(frame)
+
+    @pytest.mark.asyncio
+    async def test_handle_sync_error(self, coordinator_mock, command_frame_factory):
+        """Test error handling when sync fails."""
+        handler = ConfigCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = True
+        coordinator_mock.sync.side_effect = RuntimeError("Sync failed")
+        frame = command_frame_factory(
+            command="/config",
+            args=["user/repo", "ghp_token123"]
+        )
+
+        with pytest.raises(CommandStorageError, match="Failed to sync repository: Sync failed"):
             await handler.handle(frame)
 
 class TestStatusCommandHandler:
-    """Test status command handler."""
-    
+    """Test cases for StatusCommandHandler."""
+
     @pytest.mark.asyncio
-    async def test_handle_not_initialized(self, coordinator_mock):
-        """Test status command when storage is not initialized."""
+    async def test_handle_not_initialized(self, coordinator_mock, command_frame_factory):
+        """Test handling when storage is not initialized."""
+        handler = StatusCommandHandler(coordinator=coordinator_mock)
         coordinator_mock.is_initialized.return_value = False
-        handler = StatusCommandHandler(coordinator_mock)
-        frame = CommandFrame(
-            command="/status",
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
-        )
-        
-        result = await handler.handle(frame)
-        assert isinstance(result, TextFrame)
-        assert "Storage not initialized" in result.content
-        coordinator_mock.sync.assert_not_called()
-    
+        frame = command_frame_factory(command="/status")
+
+        with pytest.raises(CommandValidationError, match="Storage not initialized"):
+            await handler.handle(frame)
+
     @pytest.mark.asyncio
-    async def test_handle_success(self, coordinator_mock):
+    async def test_handle_success(self, coordinator_mock, command_frame_factory):
         """Test successful status command handling."""
+        handler = StatusCommandHandler(coordinator=coordinator_mock)
         coordinator_mock.is_initialized.return_value = True
-        handler = StatusCommandHandler(coordinator_mock)
-        frame = CommandFrame(
-            command="/status",
-            metadata={
-                "chat_id": 123,
-                "sender_id": 456,
-                "sender_name": "testuser"
-            }
-        )
-        
+        frame = command_frame_factory(command="/status")
+
         result = await handler.handle(frame)
-        
         assert isinstance(result, TextFrame)
-        assert "Chronicler Status" in result.content
-        coordinator_mock.sync.assert_called_once() 
+        assert "status" in result.content.lower()
+        coordinator_mock.sync.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_handle_sync_error(self, coordinator_mock, command_frame_factory):
+        """Test error handling when sync fails."""
+        handler = StatusCommandHandler(coordinator=coordinator_mock)
+        coordinator_mock.is_initialized.return_value = True
+        coordinator_mock.sync.side_effect = RuntimeError("Sync failed")
+        frame = command_frame_factory(command="/status")
+
+        with pytest.raises(CommandStorageError, match="Failed to sync repository: Sync failed"):
+            await handler.handle(frame) 

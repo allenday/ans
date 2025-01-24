@@ -1,7 +1,18 @@
-"""Unit tests for command frames."""
+"""Tests for command frames."""
 import pytest
+from chronicler.frames.base import Frame
+from chronicler.frames.command import CommandFrame
 
-from chronicler.frames import Frame, CommandFrame
+def test_command_frame_init():
+    """Test command frame initialization."""
+    frame = CommandFrame(
+        command="/test",
+        args=["arg1", "arg2"],
+        metadata={"key": "value"}
+    )
+    assert frame.command == "/test"
+    assert frame.args == ["arg1", "arg2"]
+    assert frame.metadata == {"key": "value", "type": "commandframe"}
 
 def test_command_frame_basic():
     """Test basic command frame creation."""
@@ -29,5 +40,20 @@ def test_command_frame_command_validation():
 
 def test_command_frame_args_validation():
     """Test args validation."""
-    with pytest.raises(TypeError):
-        CommandFrame(command="/test", args=[1, 2, 3], metadata={}) 
+    # Test None args
+    with pytest.raises(ValueError, match="Args must not be None"):
+        CommandFrame(command="/test", args=None)
+        
+    # Test non-string args
+    with pytest.raises(TypeError, match="All command arguments must be strings"):
+        CommandFrame(command="/test", args=[123])
+
+def test_command_frame_validation():
+    """Test command frame validation."""
+    # Test invalid command format
+    with pytest.raises(ValueError, match="Command must start with '/'"):
+        CommandFrame(command="test", args=["arg1"])
+        
+    # Test invalid args type
+    with pytest.raises(TypeError, match="All command arguments must be strings"):
+        CommandFrame(command="/test", args=[123])
