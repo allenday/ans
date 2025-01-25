@@ -85,6 +85,11 @@ class TelegramBotTransport(TelegramTransportBase):
             self._initialized = True
             self._bot = self._app.bot
             self.logger.debug("Authentication successful")
+        except InvalidToken as e:
+            self.logger.error(f"Failed to initialize bot: {e}")
+            self._initialized = False
+            self._app = None
+            raise TransportAuthenticationError("Token validation failed")
         except Exception as e:
             self.logger.error(f"Failed to initialize bot: {e}")
             self._initialized = False
@@ -98,13 +103,15 @@ class TelegramBotTransport(TelegramTransportBase):
             TransportAuthenticationError: If transport is not authenticated.
             TransportError: If transport fails to start.
         """
-        if not self._initialized:
+        if not self._app:
             raise TransportAuthenticationError("Transport must be authenticated before starting")
             
         try:
             await self._app.start()
             await self._app.add_handler(MessageHandler(filters.ALL, self._handle_message))
+            self._initialized = True  # Set initialized after successful start
         except Exception as e:
+            self._initialized = False  # Ensure initialized is False on failure
             raise TransportError(f"Failed to start bot: {str(e)}")
 
     async def stop(self):

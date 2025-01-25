@@ -1,13 +1,13 @@
 """Tests for telegram bot transport using the new mock setup."""
 import pytest
 import asyncio
+from tests.mocks.transports.telegram import mock_telegram_bot
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from chronicler.exceptions import TransportError, TransportAuthenticationError
 from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.frames.command import CommandFrame
 from telegram.ext import CommandHandler
-from tests.mocks.transports.telegram import mock_telegram_bot
 from telegram.error import InvalidToken
 from chronicler.transports.telegram_bot_update import TelegramBotUpdate
 from chronicler.frames.base import Frame
@@ -95,7 +95,6 @@ async def test_command_registration_after_auth(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_start_without_auth(mock_telegram_bot):
     """Test that starting without authentication raises error."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     
     with pytest.raises(TransportAuthenticationError, match="Transport must be authenticated before starting"):
@@ -105,7 +104,7 @@ async def test_start_without_auth(mock_telegram_bot):
 async def test_start_error_handling(mock_telegram_bot):
     """Test error handling during start."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
-    transport = TelegramBotTransport("test_token")
+    transport = mock_telegram_bot['transport']
     await transport.authenticate()
     
     # Make start() fail
@@ -180,7 +179,6 @@ async def test_send_unsupported_frame_type(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_send_uninitialized(mock_telegram_bot):
     """Test sending when transport is not initialized."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     frame = TextFrame(content="test", metadata={"chat_id": 123})
     
@@ -260,7 +258,6 @@ async def test_duplicate_command_registration(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_process_frame_without_processor(mock_telegram_bot):
     """Test processing frame without frame processor."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     frame = TextFrame(content="test", metadata={"chat_id": 123})
     
@@ -270,7 +267,6 @@ async def test_process_frame_without_processor(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_process_frame_with_processor(mock_telegram_bot):
     """Test processing frame with frame processor."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     
     # Create a processor that modifies the frame
@@ -386,7 +382,6 @@ async def test_handle_command_execution(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_authenticate_invalid_token(mock_telegram_bot):
     """Test that authenticating with invalid token raises expected error."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("invalid_token")
     expected = "Token validation failed"
     
@@ -399,7 +394,6 @@ async def test_authenticate_invalid_token(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_stop_without_auth(mock_telegram_bot):
     """Test stopping transport that wasn't authenticated."""
-    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.stop()  # Should not raise
     assert not transport._initialized 
