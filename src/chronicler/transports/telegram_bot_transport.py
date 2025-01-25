@@ -1,6 +1,6 @@
 """Telegram bot transport implementation."""
 
-from typing import Optional, Dict, Any, Callable, Awaitable
+from typing import Optional, Dict, Any, Callable, Awaitable, Union
 from telegram import Update as TelegramUpdate
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ApplicationBuilder
 from telegram.error import InvalidToken
@@ -13,7 +13,7 @@ from chronicler.transports.telegram_bot_event import TelegramBotEvent
 from chronicler.transports.telegram_bot_update import TelegramBotUpdate
 from chronicler.logging import get_logger
 from chronicler.logging.config import trace_operation
-from chronicler.exceptions import TransportError
+from chronicler.exceptions import TransportError, TransportAuthenticationError
 
 logger = get_logger(__name__)
 
@@ -43,13 +43,13 @@ class TelegramBotTransport(TelegramTransportBase):
         """Authenticate with Telegram using the provided token.
         
         Raises:
-            TransportError: If token is invalid or authentication fails.
+            TransportAuthenticationError: If token is invalid or authentication fails.
         """
         self.logger.debug("Starting authentication")
         
         if not self._token:
             self.logger.error("Empty token provided")
-            raise TransportError("Invalid token: You must pass the token you received from https://t.me/Botfather!")
+            raise TransportAuthenticationError("Invalid token: You must pass the token you received from https://t.me/Botfather!")
         
         self.logger.debug(f"Attempting to authenticate with token: {self._token}")
         
@@ -61,7 +61,7 @@ class TelegramBotTransport(TelegramTransportBase):
             self.logger.error(f"Invalid token error: {e}")
             self._initialized = False
             self._app = None
-            raise TransportError(str(e))
+            raise TransportAuthenticationError(str(e))
         
         # Step 2: Build application
         try:
@@ -70,12 +70,12 @@ class TelegramBotTransport(TelegramTransportBase):
             self.logger.error(f"Invalid token error during build: {e}")
             self._initialized = False
             self._app = None
-            raise TransportError(str(e))
+            raise TransportAuthenticationError(str(e))
         except Exception as e:
             self.logger.error(f"Failed to build application: {e}")
             self._initialized = False
             self._app = None
-            raise TransportError(f"Failed to build application: {e}")
+            raise TransportAuthenticationError(f"Failed to build application: {e}")
         
         # Step 3: Initialize and verify bot
         try:
@@ -89,16 +89,17 @@ class TelegramBotTransport(TelegramTransportBase):
             self.logger.error(f"Failed to initialize bot: {e}")
             self._initialized = False
             self._app = None
-            raise TransportError(f"Failed to initialize bot: {e}")
+            raise TransportAuthenticationError(f"Failed to initialize bot: {e}")
 
     async def start(self) -> None:
         """Start the transport.
         
         Raises:
-            TransportError: If transport is not authenticated or fails to start.
+            TransportAuthenticationError: If transport is not authenticated.
+            TransportError: If transport fails to start.
         """
         if not self._initialized:
-            raise TransportError("Transport must be authenticated before starting")
+            raise TransportAuthenticationError("Transport must be authenticated before starting")
             
         try:
             await self._app.start()
@@ -217,23 +218,27 @@ class TelegramBotTransport(TelegramTransportBase):
             logger.error(f"Failed to process message: {e}", exc_info=True)
             self._error_count += 1
 
-    async def _handle_command(self, update: TelegramUpdate, handler: Callable[[TelegramBotEvent], Awaitable[None]]):
+    async def _handle_command(self, update: Union[TelegramUpdate, CommandFrame], handler: Callable[[TelegramBotEvent], Awaitable[None]]):
         """Handle incoming command."""
         try:
-            # Create command frame from the raw update
-            frame = CommandFrame(
-                command=update.message.text.split()[0],  # First word is command
-                args=update.message.text.split()[1:],  # Rest are args
-                metadata={
-                    "chat_id": update.message.chat.id,
-                    "chat_title": update.message.chat.title,
-                    "sender_id": update.message.from_user.id,
-                    "sender_name": update.message.from_user.username,
-                    "message_id": update.message.message_id,
-                    "is_private": update.message.chat.type == "private",
-                    "is_group": update.message.chat.type in ["group", "supergroup"]
-                }
-            )
+            # If update is already a CommandFrame, use it directly
+            if isinstance(update, CommandFrame):
+                frame = update
+            else:
+                # Create command frame from the raw update
+                frame = CommandFrame(
+                    command=update.message.text.split()[0],  # First word is command
+                    args=update.message.text.split()[1:],  # Rest are args
+                    metadata={
+                        "chat_id": update.message.chat.id,
+                        "chat_title": update.message.chat.title,
+                        "sender_id": update.message.from_user.id,
+                        "sender_name": update.message.from_user.username,
+                        "message_id": update.message.message_id,
+                        "is_private": update.message.chat.type == "private",
+                        "is_group": update.message.chat.type in ["group", "supergroup"]
+                    }
+                )
             # Process frame
             processed_frame = await self.process_frame(frame)
             # Execute handler

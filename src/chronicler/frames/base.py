@@ -12,7 +12,7 @@ logger = get_logger("chronicler.frames.base")
 class Frame(ABC):
     """Base frame class."""
     _: KW_ONLY
-    text: Optional[str] = None
+    content: Optional[str] = None
     metadata: Union[Dict[str, Any], EventMetadata] = field(default_factory=dict)
     
     def __post_init__(self):

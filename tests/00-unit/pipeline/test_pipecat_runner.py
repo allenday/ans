@@ -1,86 +1,144 @@
 """Unit tests for pipecat runner."""
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+import signal
+import sys
 from pathlib import Path
 
-from chronicler.pipeline.pipecat_runner import run_bot
+from chronicler.frames.base import Frame
+from chronicler.commands.processor import CommandProcessor
+from chronicler.handlers.command import CommandHandler
+from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.processors.storage_processor import StorageProcessor
+from chronicler.pipeline.pipecat_runner import run_bot, main
+from chronicler.processors.base import BaseProcessor
+from chronicler.exceptions import TransportAuthenticationError
+
+# Import fixtures and mocks
+from tests.mocks.commands import coordinator_mock
+from tests.mocks.transports.telegram import mock_telegram_bot, MockApplicationBuilder
 
 @pytest.mark.asyncio
-async def test_run_bot_initialization():
-    pytest.skip()
-    """Test bot initialization and component setup."""
-    token = "test_token"
-    storage_path = "/tmp/test_storage"
+async def test_run_bot_initialization(mock_telegram_bot):
+    """Test successful bot initialization and shutdown sequence.
     
-    # Mock all dependencies
-    with patch('chronicler.pipeline.pipecat_runner.TelegramTransport') as mock_transport, \
-         patch('chronicler.pipeline.pipecat_runner.StorageProcessor') as mock_storage, \
-         patch('chronicler.pipeline.pipecat_runner.CommandProcessor') as mock_cmd_proc, \
-         patch('chronicler.pipeline.pipecat_runner.Pipeline') as mock_pipeline:
-        
-        # Setup mocks
-        mock_transport_inst = AsyncMock()
-        mock_transport.return_value = mock_transport_inst
-        mock_storage_inst = MagicMock()
-        mock_storage.return_value = mock_storage_inst
-        mock_cmd_proc_inst = MagicMock()
-        mock_cmd_proc.return_value = mock_cmd_proc_inst
-        mock_pipeline_inst = MagicMock()
-        mock_pipeline.return_value = mock_pipeline_inst
-        
-        # Create event to control stop signal
-        stop_event = asyncio.Event()
-        
-        # Run bot with immediate stop
-        async def stop_bot():
-            await asyncio.sleep(0.1)
-            stop_event.set()
-        
-        asyncio.create_task(stop_bot())
-        await run_bot(token, storage_path)
-        
-        # Verify component initialization
-        mock_transport.assert_called_once_with(token)
-        mock_storage.assert_called_once_with(Path(storage_path))
-        mock_cmd_proc.assert_called_once()
-        
-        # Verify command handlers registration
-        assert mock_cmd_proc_inst.register_handler.call_count == 3
-        
-        # Verify pipeline creation
-        mock_pipeline.assert_called_once()
-        pipeline_args = mock_pipeline.call_args[0][0]
-        assert len(pipeline_args) == 3
-        assert pipeline_args[0] == mock_transport_inst
-        assert pipeline_args[1] == mock_cmd_proc_inst
-        assert pipeline_args[2] == mock_storage_inst
-        
-        # Verify transport lifecycle
-        mock_transport_inst.start.assert_called_once()
-        mock_transport_inst.stop.assert_called_once()
+    This test verifies that:
+    1. Transport is created with token
+    2. Transport authenticates successfully
+    3. Application is initialized and started
+    4. Bot responds to shutdown signal
+    5. Application and transport are stopped cleanly
+    """
+    token = "test_token"
+    storage_path = Path("/tmp/test_storage")
+
+    # Start the bot - this will trigger authentication and initialization
+    run_task = asyncio.create_task(run_bot(token, str(storage_path)))
+    
+    # Give it a moment to initialize
+    await asyncio.sleep(0.1)
+    
+    # Verify initialization succeeded
+    assert mock_telegram_bot['transport']._initialized
+    assert mock_telegram_bot['transport']._app is not None
+    assert mock_telegram_bot['transport']._bot is not None
+    assert mock_telegram_bot['transport']._app.start.await_count == 1
+    
+    # Set stop event to trigger shutdown
+    mock_telegram_bot['stop_event'].set()
+    
+    # Wait for shutdown
+    await run_task
+
+    # Verify shutdown sequence
+    assert mock_telegram_bot['transport']._app.stop.await_count == 1
 
 @pytest.mark.asyncio
-async def test_run_bot_error_handling():
-    pytest.skip()
-    """Test error handling during bot execution."""
+async def test_run_bot_error_handling(mock_telegram_bot):
+    """Test error handling during bot initialization."""
+    token = "invalid_token"  # Use the special token that triggers validation failure
+    storage_path = Path("/tmp/test_storage")
+
+    # Run bot and expect authentication error
+    with pytest.raises(TransportAuthenticationError, match="Token validation failed"):
+        await run_bot(token, str(storage_path))
+
+@pytest.mark.asyncio
+async def test_signal_handling(mock_telegram_bot):
+    """Test signal handling during bot operation."""
     token = "test_token"
-    storage_path = "/tmp/test_storage"
+    storage_path = Path("/tmp/test_storage")
+
+    # Start the bot
+    run_task = asyncio.create_task(run_bot(token, str(storage_path)))
     
-    # Mock all dependencies
-    with patch('chronicler.pipeline.pipecat_runner.TelegramTransport') as mock_transport, \
-         patch('chronicler.pipeline.pipecat_runner.StorageProcessor') as mock_storage, \
-         patch('chronicler.pipeline.pipecat_runner.CommandProcessor') as mock_cmd_proc, \
-         patch('chronicler.pipeline.pipecat_runner.Pipeline') as mock_pipeline:
+    # Give it a moment to initialize
+    await asyncio.sleep(0.1)
+    
+    # Simulate SIGINT
+    for handler in mock_telegram_bot['loop'].call_args_list:
+        if handler[0][0] == signal.SIGINT:
+            handler[0][1](signal.SIGINT, None)
+            break
+    
+    # Wait for shutdown
+    await run_task
+
+    # Verify initialization and shutdown sequence
+    assert mock_telegram_bot['transport']._initialized
+    assert mock_telegram_bot['transport']._app == mock_telegram_bot['app']
+    assert mock_telegram_bot['transport']._bot == mock_telegram_bot['app'].bot
+    assert mock_telegram_bot['app'].start.await_count == 1
+    assert mock_telegram_bot['app'].stop.await_count == 1
+
+@pytest.mark.asyncio
+async def test_graceful_shutdown(mock_telegram_bot):
+    """Test graceful shutdown of bot components."""
+    token = "test_token"
+    storage_path = Path("/tmp/test_storage")
+
+    # Start the bot
+    run_task = asyncio.create_task(run_bot(token, str(storage_path)))
+    
+    # Give it a moment to initialize
+    await asyncio.sleep(0.1)
+    
+    # Set stop event to trigger shutdown
+    mock_telegram_bot['stop_event'].set()
+    
+    # Wait for shutdown
+    await run_task
+
+    # Verify initialization and shutdown sequence
+    assert mock_telegram_bot['transport']._initialized
+    assert mock_telegram_bot['transport']._app == mock_telegram_bot['app']
+    assert mock_telegram_bot['transport']._bot == mock_telegram_bot['app'].bot
+    assert mock_telegram_bot['app'].start.await_count == 1
+    assert mock_telegram_bot['app'].stop.await_count == 1
+
+@pytest.mark.asyncio
+async def test_main_function(mock_telegram_bot):
+    """Test main function with valid arguments."""
+    token = "test_token"
+    storage_path = "/tmp/test"
+
+    # Mock sys.argv
+    with patch('sys.argv', ['script.py', '--token', token, '--storage', storage_path]):
+        # Start the bot
+        run_task = asyncio.create_task(run_bot(token, storage_path))
         
-        # Setup mocks with error
-        mock_transport_inst = AsyncMock()
-        mock_transport_inst.start.side_effect = RuntimeError("Test error")
-        mock_transport.return_value = mock_transport_inst
+        # Give it a moment to initialize
+        await asyncio.sleep(0.1)
         
-        # Run bot and expect error
-        with pytest.raises(RuntimeError, match="Test error"):
-            await run_bot(token, storage_path)
+        # Set stop event to trigger shutdown
+        mock_telegram_bot['stop_event'].set()
         
-        # Verify cleanup was called even after error
-        mock_transport_inst.stop.assert_called_once() 
+        # Wait for shutdown
+        await run_task
+
+        # Verify initialization and shutdown sequence
+        assert mock_telegram_bot['transport']._initialized
+        assert mock_telegram_bot['transport']._app == mock_telegram_bot['app']
+        assert mock_telegram_bot['transport']._bot == mock_telegram_bot['app'].bot
+        assert mock_telegram_bot['app'].start.await_count == 1
+        assert mock_telegram_bot['app'].stop.await_count == 1

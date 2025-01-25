@@ -3,7 +3,7 @@ import pytest
 import pytest_asyncio
 from unittest.mock import MagicMock, AsyncMock, Mock, patch
 from datetime import datetime, timezone
-from telethon.errors import ApiIdInvalidError
+from telethon.errors.rpcerrorlist import ApiIdInvalidError
 
 from chronicler.frames.base import Frame
 from chronicler.frames.command import CommandFrame
@@ -12,7 +12,7 @@ from chronicler.transports.events import EventMetadata
 from chronicler.transports.telegram_user_transport import TelegramUserTransport
 from chronicler.transports.telegram_user_update import TelegramUserUpdate
 from chronicler.transports.telegram_user_event import TelegramUserEvent
-from chronicler.exceptions import TransportError
+from chronicler.exceptions import TransportError, TransportAuthenticationError
 from chronicler.logging import get_logger
 
 logger = get_logger(__name__, component='test.transports.telegram')
@@ -49,21 +49,21 @@ async def transport(mock_client):
 async def test_user_transport_validates_params():
     """Test parameter validation during initialization."""
     # All parameters empty
-    with pytest.raises(ValueError, match="API ID, API hash and phone number cannot be empty"):
+    with pytest.raises(TransportAuthenticationError, match="API ID, API hash and phone number cannot be empty"):
         TelegramUserTransport(api_id="", api_hash="", phone_number="")
 
     # Missing API hash
-    with pytest.raises(ValueError, match="API ID, API hash and phone number cannot be empty"):
+    with pytest.raises(TransportAuthenticationError, match="API ID, API hash and phone number cannot be empty"):
         TelegramUserTransport(api_id="123", api_hash="", phone_number="+1234567890")
 
     # Missing phone number
-    with pytest.raises(ValueError, match="API ID, API hash and phone number cannot be empty"):
+    with pytest.raises(TransportAuthenticationError, match="API ID, API hash and phone number cannot be empty"):
         TelegramUserTransport(api_id="123", api_hash="abc", phone_number="")
 
 @pytest.mark.asyncio
 @patch('chronicler.transports.telegram_user_transport.TelegramClient')
-async def test_user_transport_start_error(mock_client):
-    """Test error handling during transport start."""
+async def test_user_transport_auth_error(mock_client):
+    """Test error handling during transport authentication."""
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
@@ -71,14 +71,34 @@ async def test_user_transport_start_error(mock_client):
         session_name=":memory:"
     )
 
-    # Mock client to raise an ApiIdInvalidError
+    # Mock client to raise an authentication error
     client_instance = AsyncMock()
-    client_instance.connect = AsyncMock(side_effect=ApiIdInvalidError(Mock()))
+    client_instance.connect = AsyncMock()
+    client_instance.is_user_authorized = AsyncMock(return_value=False)
+    client_instance.send_code_request = AsyncMock()
     mock_client.return_value = client_instance
 
-    # Start should raise the ApiIdInvalidError
-    with pytest.raises(ApiIdInvalidError):
+    # Start should raise TransportAuthenticationError
+    with pytest.raises(TransportAuthenticationError, match="User not authorized"):
         await transport.start()
+
+@pytest.mark.asyncio
+async def test_user_transport_api_error():
+    """Test handling of invalid API credentials."""
+    # Mock client to raise API error
+    mock_client = AsyncMock()
+    mock_client.connect.side_effect = ApiIdInvalidError("The api_id/api_hash combination is invalid")
+    
+    with patch('chronicler.transports.telegram_user_transport.TelegramClient', return_value=mock_client):
+        transport = TelegramUserTransport(
+            api_id="123",
+            api_hash="invalid_hash",
+            phone_number="+1234567890",
+            session_name=":memory:"
+        )
+        
+        with pytest.raises(TransportError, match="The api_id/api_hash combination is invalid"):
+            await transport.start()
 
 @pytest.mark.asyncio
 async def test_user_transport_send_without_init():

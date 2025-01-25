@@ -1,22 +1,8 @@
 """Storage-related pytest fixtures."""
 import pytest
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock, create_autospec, AsyncMock
 
-from chronicler.storage import StorageAdapter
 from chronicler.storage.coordinator import StorageCoordinator
-
-@pytest.fixture
-def storage_mock():
-    """Create a mock storage adapter."""
-    storage = create_autospec(StorageAdapter)
-    storage.init_storage.return_value = storage
-    storage.create_topic.return_value = None
-    storage.save_message = MagicMock(return_value="msg_123")
-    storage.save_attachment = MagicMock(return_value=None)
-    storage.sync = MagicMock(return_value=None)
-    storage.set_github_config = MagicMock(return_value=None)
-    storage.is_initialized.return_value = True
-    return storage
 
 @pytest.fixture
 def coordinator_mock():
@@ -29,4 +15,5 @@ def coordinator_mock():
     coordinator.sync = create_autospec(StorageCoordinator.sync)
     coordinator.set_github_config = create_autospec(StorageCoordinator.set_github_config)
     coordinator.topic_exists = create_autospec(StorageCoordinator.topic_exists, return_value=True)
+    coordinator.is_initialized = AsyncMock(return_value=False)  # Mock is_initialized as an async function
     return coordinator 

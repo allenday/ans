@@ -11,8 +11,8 @@ from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.transports.telegram_transport import TelegramTransportBase
 from chronicler.transports.telegram_user_event import TelegramUserEvent
 from chronicler.transports.telegram_user_update import TelegramUserUpdate
-from chronicler.logging import get_logger
-from chronicler.exceptions import TransportError
+from chronicler.logging import get_logger, trace_operation
+from chronicler.exceptions import TransportError, TransportAuthenticationError
 
 logger = get_logger(__name__)
 
@@ -27,10 +27,13 @@ class TelegramUserTransport(TelegramTransportBase):
             api_hash: Telegram API hash
             phone_number: Phone number for authentication
             session_name: Optional session name
+            
+        Raises:
+            TransportAuthenticationError: If API credentials are invalid
         """
         super().__init__()
         if not api_id or not api_hash or not phone_number:
-            raise ValueError("API ID, API hash and phone number cannot be empty")
+            raise TransportAuthenticationError("API ID, API hash and phone number cannot be empty")
             
         self._api_id = int(api_id)  # Convert to integer
         self._api_hash = api_hash
@@ -42,7 +45,12 @@ class TelegramUserTransport(TelegramTransportBase):
         self.frame_processor = None
 
     async def start(self):
-        """Start the transport."""
+        """Start the transport.
+        
+        Raises:
+            TransportAuthenticationError: If authentication fails
+            TransportError: If transport fails to start
+        """
         if self._initialized:
             return
 
@@ -52,7 +60,7 @@ class TelegramUserTransport(TelegramTransportBase):
             
             if not await self._client.is_user_authorized():
                 await self._client.send_code_request(self._phone_number)
-                raise RuntimeError("User not authorized. Please complete authentication flow.")
+                raise TransportAuthenticationError("User not authorized. Please complete authentication flow.")
             
             self._me = await self._client.get_me()
             
@@ -73,7 +81,9 @@ class TelegramUserTransport(TelegramTransportBase):
             logger.error(f"Failed to start user transport: {e}")
             if self._client:
                 await self._client.disconnect()
-            raise
+            if "auth" in str(e).lower():
+                raise TransportAuthenticationError(str(e))
+            raise TransportError(str(e))
 
     async def stop(self):
         """Stop the transport."""

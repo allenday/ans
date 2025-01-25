@@ -5,6 +5,8 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from pathlib import Path
+import asyncio
+from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 
 # Patch httpx.AsyncClient before any imports
 class MockAsyncClient:
@@ -36,7 +38,7 @@ import httpx
 httpx.AsyncClient = MockAsyncClient
 
 from telegram.error import InvalidToken
-from chronicler.exceptions import TransportError
+from chronicler.exceptions import TransportError, TransportAuthenticationError
 
 class MockHTTPXRequest:
     async def do_request(self, url, method, **kwargs):
@@ -154,3 +156,68 @@ def assert_transport_error_async():
         if post_error_assertions:
             post_error_assertions()
     return _assert_transport_error_async 
+
+@pytest_asyncio.fixture
+async def mock_bot_runner(mock_telegram_bot, coordinator_mock):
+    """Create a mock bot runner setup with all required components."""
+    # Create mock transport
+    mock_transport = TelegramBotTransport("test_token")
+    mock_transport._app = mock_telegram_bot
+    mock_transport._bot = mock_telegram_bot.bot
+    mock_transport._initialized = True  # Set _initialized instead of is_running
+    mock_transport.authenticate = AsyncMock()  # Add authenticate method
+    mock_transport.start = AsyncMock()  # Add start method
+    mock_transport.stop = AsyncMock()  # Add stop method
+
+    # Mock storage using coordinator_mock
+    mock_storage = AsyncMock()
+    mock_storage.start = AsyncMock()
+    mock_storage.stop = AsyncMock()
+    mock_storage.coordinator = coordinator_mock
+    mock_storage.is_initialized = AsyncMock(return_value=False)  # Add is_initialized method
+    mock_storage.init_storage = AsyncMock()  # Add init_storage method
+    mock_storage.create_topic = AsyncMock()  # Add create_topic method
+    mock_storage.save_message = AsyncMock()  # Add save_message method
+
+    # Mock command processor
+    mock_cmd_proc = AsyncMock()
+    mock_cmd_proc.register_handler = MagicMock()  # Not async
+    mock_cmd_proc.start = AsyncMock()
+    mock_cmd_proc.stop = AsyncMock()
+    mock_cmd_proc.process = AsyncMock()  # Add process method
+
+    # Mock pipeline
+    mock_pipeline = AsyncMock()
+    mock_pipeline.add_processor = MagicMock()  # Not async
+    mock_pipeline.start = AsyncMock()
+    mock_pipeline.stop = AsyncMock()
+    mock_pipeline.process = AsyncMock()  # Add process method
+
+    # Create a stop event that's already set
+    stop_event = asyncio.Event()
+    stop_event.set()
+
+    # Mock event loop
+    mock_loop = MagicMock()
+    def add_signal_handler(sig, callback):
+        callback()  # Call the handler immediately
+    mock_loop.add_signal_handler = MagicMock(side_effect=add_signal_handler)
+
+    # Set up error handling for invalid token
+    async def mock_authenticate():
+        if mock_transport.token == "invalid_token":
+            mock_transport._initialized = False
+            raise TransportAuthenticationError("Token validation failed")
+        mock_transport._initialized = True
+        return None
+    mock_transport.authenticate.side_effect = mock_authenticate
+
+    # Return all mocks in a dict for easy access
+    return {
+        'transport': mock_transport,
+        'storage': mock_storage,
+        'cmd_proc': mock_cmd_proc,
+        'pipeline': mock_pipeline,
+        'stop_event': stop_event,
+        'loop': mock_loop
+    } 

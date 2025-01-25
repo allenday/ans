@@ -1,8 +1,9 @@
 """Test cases for command handlers."""
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
-from chronicler.exceptions import CommandError, CommandValidationError, CommandStorageError
+from chronicler.exceptions import CommandStorageError, CommandValidationError
+from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
 from tests.mocks.commands import command_frame_factory, coordinator_mock, TEST_METADATA

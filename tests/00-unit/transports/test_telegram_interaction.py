@@ -23,9 +23,7 @@ async def mock_telegram_user_client():
 async def bot_transport(mock_telegram_bot):
     """Create a bot transport instance."""
     transport = TelegramBotTransport(token="test_token")
-    transport._app = mock_telegram_bot
-    transport._bot = mock_telegram_bot.bot
-    transport._initialized = True  # Since we're mocking, we can set this directly
+    await transport.authenticate()  # This will initialize the bot properly
     return transport
 
 @pytest_asyncio.fixture

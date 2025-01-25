@@ -2,9 +2,9 @@
 import pytest
 from unittest.mock import AsyncMock, create_autospec
 
-from chronicler.commands.handlers import CommandHandler
-from chronicler.frames.media import TextFrame
 from chronicler.frames.command import CommandFrame
+from chronicler.frames.media import TextFrame
+from chronicler.handlers.command import CommandHandler
 from chronicler.storage.coordinator import StorageCoordinator
 
 # Test metadata used across command tests

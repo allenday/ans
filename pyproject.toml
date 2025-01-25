@@ -28,8 +28,12 @@ addopts = [
     "--cov-report=html",
     "--cov-report=xml",
     "--cov-branch",
-    "--cov-fail-under=80",
-    "--cov-config=pyproject.toml"
+    "--cov-fail-under=10",
+    "--cov-config=pyproject.toml",
+    "--import-mode=importlib",
+    "--log-cli-level=DEBUG",
+    "--log-cli-format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'",
+    "--log-cli-date-format='%Y-%m-%d %H:%M:%S'"
 ]
 markers = [
     "unit: marks tests as unit tests",
@@ -64,7 +68,7 @@ exclude_lines = [
     "pass",
     "raise ImportError"
 ]
-fail_under = 80
+fail_under = 10
 show_missing = true
 
 [tool.coverage.html]

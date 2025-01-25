@@ -31,11 +31,12 @@ class StorageProcessor(BaseProcessor):
         
         self._initialized = False
         
-    def stop(self) -> None:
+    async def stop(self) -> None:
         """Stop the storage processor and clean up resources."""
         self.logger.info("Stopping storage processor")
         if hasattr(self.coordinator, 'stop'):
-            self.coordinator.stop()
+            if callable(getattr(self.coordinator, 'stop')):
+                await self.coordinator.stop()
         self._initialized = False
         
     async def process(self, frame: Frame) -> Optional[Frame]:
@@ -64,28 +65,28 @@ class StorageProcessor(BaseProcessor):
             if field not in metadata:
                 raise StorageValidationError(f"Message metadata must include {field}")
                 
-    def _ensure_topic_exists(self, metadata: dict) -> str:
+    async def _ensure_topic_exists(self, metadata: dict) -> str:
         """Ensure topic exists and return topic ID."""
         chat_id = metadata['chat_id']
         thread_id = metadata['thread_id']
         topic_name = f"{chat_id}:{thread_id}"
         
-        if not self.coordinator.topic_exists(topic_name):
-            self.coordinator.create_topic(chat_id, topic_name)
+        if not await self.coordinator.topic_exists(topic_name):
+            await self.coordinator.create_topic(chat_id, topic_name)
             
         return topic_name
             
-    def _process_text_frame(self, frame: TextFrame, metadata: dict) -> None:
+    async def _process_text_frame(self, frame: TextFrame, metadata: dict) -> None:
         """Process a text frame."""
-        topic_name = self._ensure_topic_exists(metadata)
-        self.coordinator.save_message(topic_name, frame.content, metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
+        await self.coordinator.save_message(topic_name, frame.content, metadata)
 
-    def _process_image_frame(self, frame: ImageFrame, metadata: dict) -> None:
+    async def _process_image_frame(self, frame: ImageFrame, metadata: dict) -> None:
         """Process an image frame."""
-        topic_name = self._ensure_topic_exists(metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
         
         # Save image attachment
-        attachment_id = self.coordinator.save_attachment(
+        attachment_id = await self.coordinator.save_attachment(
             topic_name,
             frame.content,
             'image',
@@ -97,127 +98,128 @@ class StorageProcessor(BaseProcessor):
             'id': attachment_id,
             'type': f'image/{frame.format or "unknown"}'
         }]
-        self.coordinator.save_message(topic_name, frame.content or '', metadata)
+        
+        await self.coordinator.save_message(topic_name, frame.content or '', metadata)
 
-    def _process_document_frame(self, frame: DocumentFrame, metadata: dict) -> None:
+    async def _process_document_frame(self, frame: DocumentFrame, metadata: dict) -> None:
         """Process a document frame."""
-        topic_name = self._ensure_topic_exists(metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
         
         # Save document attachment
-        attachment_id = self.coordinator.save_attachment(
+        attachment_id = await self.coordinator.save_attachment(
             topic_name,
             frame.content,
             'document',
-            frame.mime_type,
-            filename=frame.filename
+            frame.mime_type or 'application/octet-stream'
         )
         
-        # Save message with attachment reference and caption
+        # Save message with attachment reference
         metadata['attachments'] = [{
             'id': attachment_id,
-            'type': frame.mime_type,
+            'type': frame.mime_type or 'application/octet-stream',
             'filename': frame.filename
         }]
-        metadata['content'] = frame.content
-        self.coordinator.save_message(topic_name, frame.content or '', metadata)
+        
+        await self.coordinator.save_message(topic_name, frame.content or '', metadata)
 
-    def _process_audio_frame(self, frame: AudioFrame, metadata: dict) -> None:
+    async def _process_audio_frame(self, frame: AudioFrame, metadata: dict) -> None:
         """Process an audio frame."""
-        topic_name = self._ensure_topic_exists(metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
         
         # Save audio attachment
-        attachment_id = self.coordinator.save_attachment(
+        attachment_id = await self.coordinator.save_attachment(
             topic_name,
             frame.content,
             'audio',
-            frame.mime_type,
-            duration=frame.duration
+            frame.mime_type or 'audio/unknown'
         )
         
         # Save message with attachment reference
         metadata['attachments'] = [{
             'id': attachment_id,
-            'type': frame.mime_type,
+            'type': frame.mime_type or 'audio/unknown',
             'duration': frame.duration
         }]
-        self.coordinator.save_message(topic_name, frame.content or '', metadata)
+        
+        await self.coordinator.save_message(topic_name, frame.content or '', metadata)
 
-    def _process_voice_frame(self, frame: VoiceFrame, metadata: dict) -> None:
+    async def _process_voice_frame(self, frame: VoiceFrame, metadata: dict) -> None:
         """Process a voice frame."""
-        topic_name = self._ensure_topic_exists(metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
         
         # Save voice attachment
-        attachment_id = self.coordinator.save_attachment(
+        attachment_id = await self.coordinator.save_attachment(
             topic_name,
             frame.content,
             'voice',
-            frame.mime_type,
-            duration=frame.duration
+            frame.mime_type or 'audio/ogg'
         )
         
         # Save message with attachment reference
         metadata['attachments'] = [{
             'id': attachment_id,
-            'type': frame.mime_type,
+            'type': frame.mime_type or 'audio/ogg',
             'duration': frame.duration
         }]
-        self.coordinator.save_message(topic_name, frame.content or '', metadata)
+        
+        await self.coordinator.save_message(topic_name, frame.content or '', metadata)
 
-    def _process_sticker_frame(self, frame: StickerFrame, metadata: dict) -> None:
+    async def _process_sticker_frame(self, frame: StickerFrame, metadata: dict) -> None:
         """Process a sticker frame."""
-        topic_name = self._ensure_topic_exists(metadata)
+        topic_name = await self._ensure_topic_exists(metadata)
         
         # Save sticker attachment
-        attachment_id = self.coordinator.save_attachment(
+        attachment_id = await self.coordinator.save_attachment(
             topic_name,
             frame.content,
             'sticker',
-            frame.format,
-            emoji=frame.emoji,
-            set_name=frame.set_name
+            frame.format or 'image/webp'
         )
         
         # Save message with attachment reference
         metadata['attachments'] = [{
             'id': attachment_id,
-            'type': f'image/{frame.format}',
+            'type': f'image/{frame.format}' if frame.format else 'image/webp',
             'emoji': frame.emoji,
             'set_name': frame.set_name
         }]
-        self.coordinator.save_message(topic_name, frame.content or '', metadata)
-            
+        
+        await self.coordinator.save_message(topic_name, frame.content or '', metadata)
+
     async def process_frame(self, frame: Frame) -> None:
-        """Process a frame by saving it to storage."""
+        """Process a frame based on its type."""
+        self.logger.debug("Processing frame")
+        
+        # Ensure storage is initialized
+        await self._ensure_initialized()
+        
+        # Validate metadata
+        if not hasattr(frame, 'metadata'):
+            raise ProcessorValidationError("Frame must have metadata")
+        if not frame.metadata:
+            raise ProcessorValidationError("Frame metadata cannot be empty")
         try:
-            logger.debug("Processing frame")
-            metadata = frame.metadata
-
-            # Validate metadata
-            self._validate_metadata(metadata)
-
-            # Ensure storage is initialized
-            await self._ensure_initialized()
-
-            # Process frame based on type
+            self._validate_metadata(frame.metadata)
+        except StorageValidationError as e:
+            raise ProcessorValidationError(str(e))
+        
+        # Process based on frame type
+        try:
             if isinstance(frame, TextFrame):
-                self._process_text_frame(frame, metadata)
+                await self._process_text_frame(frame, frame.metadata)
             elif isinstance(frame, ImageFrame):
-                self._process_image_frame(frame, metadata)
+                await self._process_image_frame(frame, frame.metadata)
             elif isinstance(frame, DocumentFrame):
-                self._process_document_frame(frame, metadata)
+                await self._process_document_frame(frame, frame.metadata)
             elif isinstance(frame, AudioFrame):
-                self._process_audio_frame(frame, metadata)
+                await self._process_audio_frame(frame, frame.metadata)
             elif isinstance(frame, VoiceFrame):
-                self._process_voice_frame(frame, metadata)
+                await self._process_voice_frame(frame, frame.metadata)
             elif isinstance(frame, StickerFrame):
-                self._process_sticker_frame(frame, metadata)
+                await self._process_sticker_frame(frame, frame.metadata)
             else:
-                logger.warning("Unsupported frame type")
-                raise ProcessorValidationError(f"Unsupported frame type: {type(frame).__name__}")
-
-        except (StorageError, ProcessorValidationError):
-            # Re-raise storage and validation errors directly
+                raise StorageValidationError(f"Unsupported frame type: {type(frame)}")
+        except StorageValidationError:
             raise
         except Exception as e:
-            logger.error(f"Failed to process frame: {str(e)}")
-            raise StorageOperationError(str(e)) 
+            raise StorageOperationError(f"Failed to save frame: {str(e)}") 

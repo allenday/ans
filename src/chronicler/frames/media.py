@@ -1,6 +1,6 @@
 """Media frame classes for the pipeline."""
 from chronicler.logging import get_logger
-from dataclasses import dataclass
+from dataclasses import dataclass, KW_ONLY
 from typing import Optional, Tuple
 
 from .base import Frame
@@ -46,22 +46,23 @@ class ImageFrame(Frame):
 @dataclass
 class DocumentFrame(Frame):
     """A frame containing a document."""
-    content: bytes
+    _: KW_ONLY
     filename: str
     mime_type: str
+    content: Optional[bytes] = None
     caption: Optional[str] = None
     
     def __post_init__(self):
         """Log document frame initialization."""
-        if not isinstance(self.content, bytes):
-            raise TypeError("content must be bytes")
         if not isinstance(self.filename, str):
             raise TypeError("filename must be a string")
         if not isinstance(self.mime_type, str):
             raise TypeError("mime_type must be a string")
+        if self.content is not None and not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         if self.caption is not None and not isinstance(self.caption, str):
-            raise TypeError("caption must be a string or None")
-        logger.debug(f"FRAME - Initializing DocumentFrame: filename={self.filename}, type={self.mime_type}")
+            raise TypeError("caption must be a string")
+        logger.debug(f"FRAME - Initializing DocumentFrame: {self.filename} ({self.mime_type})")
         if self.caption:
             self.text = self.caption
         super().__post_init__()
@@ -69,36 +70,38 @@ class DocumentFrame(Frame):
 @dataclass
 class AudioFrame(Frame):
     """A frame containing audio data."""
-    content: bytes
+    _: KW_ONLY
     duration: int  # Duration in seconds
     mime_type: str
+    content: Optional[bytes] = None
     
     def __post_init__(self):
         """Log audio frame initialization."""
-        if not isinstance(self.content, bytes):
-            raise TypeError("content must be bytes")
         if not isinstance(self.duration, int):
             raise TypeError("duration must be an integer")
         if not isinstance(self.mime_type, str):
             raise TypeError("mime_type must be a string")
+        if self.content is not None and not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         logger.debug(f"FRAME - Initializing AudioFrame: duration={self.duration}s, type={self.mime_type}")
         super().__post_init__()
 
 @dataclass
 class VoiceFrame(Frame):
     """A frame containing voice message data."""
-    content: bytes
+    _: KW_ONLY
     duration: int  # Duration in seconds
     mime_type: str
+    content: Optional[bytes] = None
     
     def __post_init__(self):
         """Log voice frame initialization."""
-        if not isinstance(self.content, bytes):
-            raise TypeError("content must be bytes")
         if not isinstance(self.duration, int):
             raise TypeError("duration must be an integer")
         if not isinstance(self.mime_type, str):
             raise TypeError("mime_type must be a string")
+        if self.content is not None and not isinstance(self.content, bytes):
+            raise TypeError("content must be bytes")
         logger.debug(f"FRAME - Initializing VoiceFrame: duration={self.duration}s, type={self.mime_type}")
         super().__post_init__()
 

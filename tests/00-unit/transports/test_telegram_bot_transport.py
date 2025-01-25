@@ -1,7 +1,7 @@
 """Tests for telegram bot transport using the new mock setup."""
 import pytest
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from chronicler.exceptions import TransportError
+from chronicler.exceptions import TransportError, TransportAuthenticationError
 from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.frames.command import CommandFrame
@@ -27,8 +27,8 @@ async def test_empty_token_raises_error(mock_telegram_bot):
     
     try:
         await transport.authenticate()
-        pytest.fail("Expected TransportError was not raised")
-    except TransportError as e:
+        pytest.fail("Expected TransportAuthenticationError was not raised")
+    except TransportAuthenticationError as e:
         assert str(e) == expected_message
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_empty_token_state_after_error(mock_telegram_bot):
     transport = TelegramBotTransport("")
     try:
         await transport.authenticate()
-    except TransportError:
+    except TransportAuthenticationError:
         pass
         
     assert not transport._initialized
@@ -91,7 +91,7 @@ async def test_start_without_auth(mock_telegram_bot):
     """Test that starting without authentication raises error."""
     transport = TelegramBotTransport("test_token")
     
-    with pytest.raises(TransportError, match="Transport must be authenticated before starting"):
+    with pytest.raises(TransportAuthenticationError, match="Transport must be authenticated before starting"):
         await transport.start()
 
 @pytest.mark.asyncio
@@ -368,7 +368,7 @@ async def test_authenticate_invalid_token(mock_telegram_bot):
     transport = TelegramBotTransport("invalid_token")
     expected = "Token validation failed"
     
-    with pytest.raises(TransportError, match=expected):
+    with pytest.raises(TransportAuthenticationError, match=expected):
         await transport.authenticate()
     
     assert not transport._initialized
@@ -765,7 +765,7 @@ async def test_authenticate_initialize_error():
     mock_app.bot = AsyncMock()
     
     with patch('telegram.ext.ApplicationBuilder.build', return_value=mock_app):
-        with pytest.raises(TransportError, match="Failed to initialize bot: Initialize failed"):
+        with pytest.raises(TransportAuthenticationError, match="Failed to initialize bot: Initialize failed"):
             await transport.authenticate()
     
     assert not transport.is_running

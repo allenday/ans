@@ -22,7 +22,11 @@ class CommandFrame(Frame):
             raise TypeError("command must be a string")
         if not self.command.startswith('/'):
             raise ValueError("Command must start with '/'")
-        self.command = self.command.lower()  # Normalize to lowercase
+            
+        # Store original command for logging
+        original_command = self.command
+        # Normalize to lowercase but preserve slash
+        self.command = self.command.lower()
         
         # Validate args
         if self.args is None:
@@ -32,5 +36,5 @@ class CommandFrame(Frame):
         if not all(isinstance(arg, str) for arg in self.args):
             raise TypeError("All command arguments must be strings")
         
-        logger.debug(f"FRAME - Created CommandFrame: {self.command} with {len(self.args)} args")
+        logger.debug(f"FRAME - Created CommandFrame: /{self.command} (from {original_command}) with {len(self.args)} args")
         super().__post_init__() 

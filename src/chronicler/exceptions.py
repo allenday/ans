@@ -16,6 +16,10 @@ class TransportMessageError(TransportError):
     """Raised when message sending/receiving fails."""
     pass
 
+class TransportAuthenticationError(TransportError):
+    """Raised when transport authentication fails or is not performed before required operations."""
+    pass
+
 class CommandError(ChroniclerError):
     """Base exception for command-related errors."""
     pass
@@ -62,4 +66,20 @@ class ProcessorValidationError(ProcessorError):
 
 class ProcessorOperationError(ProcessorError):
     """Raised when a processor operation fails."""
+    pass
+
+class PipelineError(ChroniclerError):
+    """Base class for pipeline-related errors."""
+    pass
+
+class PipelineConfigurationError(PipelineError):
+    """Raised when pipeline configuration is invalid (wrong processor types, etc)."""
+    pass
+
+class PipelineExecutionError(PipelineError):
+    """Raised when pipeline execution fails (processor errors, frame transformation errors, etc)."""
+    pass
+
+class PipelineShutdownError(PipelineError):
+    """Raised when pipeline fails to shutdown gracefully."""
     pass

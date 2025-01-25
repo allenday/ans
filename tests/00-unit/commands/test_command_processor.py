@@ -47,17 +47,17 @@ class TestCommandProcessor:
         
         with pytest.raises(ValueError, match="Handler cannot be None"):
             processor.register_handler(None)
-            
+        
         with pytest.raises(ValueError, match="Handler must be an instance of CommandHandler"):
             processor.register_handler(Mock())
-            
+        
         handler = Mock(spec=CommandHandler)
         handler.command = None
-        with pytest.raises(ValueError, match="Handler must have a command"):
+        with pytest.raises(ValueError, match="Command must be provided either as argument or as handler.command attribute"):
             processor.register_handler(handler)
-            
+        
         handler.command = "test"
-        with pytest.raises(ValueError, match="Command must start with '/'"):
+        with pytest.raises(ValueError, match="Invalid command format - must start with '/'"):
             processor.register_handler(handler)
             
     @pytest.mark.asyncio

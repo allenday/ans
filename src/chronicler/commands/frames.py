@@ -18,20 +18,33 @@ class CommandFrame(Frame):
     def __post_init__(self):
         """Validate command frame attributes."""
         super().__post_init__()
-        
-        # Validate command
+
+        # Validate command type first
         if not isinstance(self.command, str):
             raise TypeError("command must be a string")
             
+        # Parse command string if it contains spaces
+        if ' ' in self.command:
+            parts = self.command.strip().split()
+            if not parts:
+                raise ValueError("Command cannot be empty")
+            
+            # First part is the command
+            self.command = parts[0].lower()
+            
+            # Rest are args if no args were provided
+            if not self.args:
+                self.args = parts[1:] if len(parts) > 1 else []
+        else:
+            # Just normalize the command
+            self.command = self.command.strip().lower()
+        
         if not self.command:
             raise ValueError("Command cannot be empty")
             
         if not self.command.startswith('/'):
-            raise ValueError("Command must start with '/'")
+            raise ValueError("Invalid command format - must start with '/'")
             
-        # Normalize command to lowercase
-        self.command = self.command.lower()
-        
         # Initialize args if None
         if self.args is None:
             raise ValueError("Args must not be None")

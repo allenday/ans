@@ -25,7 +25,7 @@ def test_command_frame_normalization():
 def test_command_frame_validation():
     """Test command validation."""
     # Test command without leading slash
-    with pytest.raises(ValueError, match="Command must start with '/'"):
+    with pytest.raises(ValueError, match="Invalid command format - must start with '/'"):
         CommandFrame(command="test")
 
     # Test None command

@@ -1,7 +1,7 @@
 """Command handling infrastructure."""
 from .frames import CommandFrame
 from .processor import CommandProcessor
-from .handlers import (
+from chronicler.handlers.command import (
     CommandHandler,
     StartCommandHandler,
     ConfigCommandHandler,

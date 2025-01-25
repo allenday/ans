@@ -1,11 +1,13 @@
 """Test cases for command integration."""
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from chronicler.frames.base import Frame
+from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
-from chronicler.commands.processor import CommandProcessor
 from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
+from chronicler.commands.processor import CommandProcessor
 from tests.mocks.commands import command_frame_factory, coordinator_mock, TEST_METADATA
 
 @pytest.fixture

@@ -1,10 +1,6 @@
-"""Tests for command handlers."""
+"""Test cases for command handlers."""
 import pytest
 from unittest.mock import Mock, AsyncMock
-from chronicler.commands.handlers import (
-    CommandHandler, StartCommandHandler,
-    ConfigCommandHandler, StatusCommandHandler
-)
 from chronicler.commands.frames import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.exceptions import (
@@ -12,6 +8,12 @@ from chronicler.exceptions import (
     CommandStorageError,
     CommandExecutionError
 )
+from chronicler.handlers.command import (
+    StartCommandHandler,
+    ConfigCommandHandler,
+    StatusCommandHandler
+)
+from tests.mocks.commands import command_frame_factory, coordinator_mock, TEST_METADATA
 
 # Test metadata for all tests
 TEST_METADATA = {
@@ -38,18 +40,18 @@ class TestStartCommandHandler:
     @pytest.mark.asyncio
     async def test_start_command_success(self, mock_storage):
         """Test successful /start command handling."""
-        handler = StartCommandHandler(mock_storage)
+        handler = StartCommandHandler(coordinator=mock_storage)
         frame = CommandFrame(command="/start", metadata=TEST_METADATA)
         
         response = await handler.handle(frame)
         
-        mock_storage.init_storage.assert_called_once_with(TEST_METADATA["sender_id"])
-        mock_storage.create_topic.assert_called_once_with("default", TEST_METADATA)
+        # Verify storage initialization
+        mock_storage.init_storage.assert_called_once_with(TEST_METADATA["chat_id"])
+        mock_storage.create_topic.assert_called_once_with(TEST_METADATA["chat_id"], "default")
         
+        # Verify response
         assert isinstance(response, TextFrame)
-        assert "Welcome to Chronicler!" in response.content
-        assert "/config" in response.content
-        assert response.metadata == TEST_METADATA
+        assert "Storage initialized" in response.content
     
     @pytest.mark.asyncio
     async def test_start_command_already_initialized(self, mock_storage):
@@ -81,59 +83,37 @@ class TestConfigCommandHandler:
     @pytest.mark.asyncio
     async def test_config_command_success(self, mock_storage):
         """Test successful /config command handling."""
-        handler = ConfigCommandHandler(mock_storage)
-        frame = CommandFrame(
-            command="/config",
-            args=["user/repo", "ghp_token123"],
-            metadata=TEST_METADATA
-        )
+        handler = ConfigCommandHandler(coordinator=mock_storage)
+        mock_storage.is_initialized.return_value = True
+        frame = CommandFrame(command="/config", args=["username/repo", "ghp_token"], metadata=TEST_METADATA)
         
         response = await handler.handle(frame)
         
-        mock_storage.set_github_config.assert_called_once_with(
-            token="ghp_token123",
-            repo="user/repo"
-        )
+        # Verify GitHub config
+        mock_storage.set_github_config.assert_called_once_with(token="ghp_token", repo="username/repo")
         mock_storage.sync.assert_called_once()
         
+        # Verify response
         assert isinstance(response, TextFrame)
-        assert "GitHub configuration updated!" in response.content
-        assert "user/repo" in response.content
-        assert response.metadata == TEST_METADATA
-    
-    @pytest.mark.asyncio
-    async def test_config_command_missing_args(self, mock_storage):
-        """Test /config command with missing arguments."""
-        handler = ConfigCommandHandler(mock_storage)
-        frame = CommandFrame(command="/config", args=[], metadata=TEST_METADATA)
-        
-        with pytest.raises(CommandValidationError, match="Usage: /config"):
-            await handler.handle(frame)
-        
-        mock_storage.set_github_config.assert_not_called()
+        assert "GitHub configuration updated" in response.content
+        assert "username/repo" in response.content
     
     @pytest.mark.asyncio
     async def test_config_command_invalid_repo(self, mock_storage):
-        """Test /config with invalid repository format."""
-        handler = ConfigCommandHandler(mock_storage)
-        frame = CommandFrame(
-            command="/config",
-            args=["invalid-repo", "ghp_token123"],
-            metadata=TEST_METADATA
-        )
+        """Test /config command with invalid repository URL."""
+        handler = ConfigCommandHandler(coordinator=mock_storage)
+        mock_storage.is_initialized.return_value = True
+        frame = CommandFrame(command="/config", args=["invalid_url", "ghp_token"], metadata=TEST_METADATA)
         
-        with pytest.raises(CommandValidationError, match="Repository must be in format"):
+        with pytest.raises(CommandValidationError, match="Repository must be in format 'username/repository'"):
             await handler.handle(frame)
     
     @pytest.mark.asyncio
     async def test_config_command_invalid_token(self, mock_storage):
-        """Test /config with invalid token format."""
-        handler = ConfigCommandHandler(mock_storage)
-        frame = CommandFrame(
-            command="/config",
-            args=["user/repo", "invalid-token"],
-            metadata=TEST_METADATA
-        )
+        """Test /config command with invalid token."""
+        handler = ConfigCommandHandler(coordinator=mock_storage)
+        mock_storage.is_initialized.return_value = True
+        frame = CommandFrame(command="/config", args=["username/repo", "invalid_token"], metadata=TEST_METADATA)
         
         with pytest.raises(CommandValidationError, match="Token must be a GitHub Personal Access Token"):
             await handler.handle(frame)

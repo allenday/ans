@@ -12,10 +12,11 @@ from chronicler.exceptions import (
     CommandAuthorizationError
 )
 from chronicler.logging import get_logger
+from chronicler.processors.base import BaseProcessor
 
 logger = get_logger(__name__)
 
-class CommandProcessor:
+class CommandProcessor(BaseProcessor):
     """Processor for command frames."""
     
     def __init__(self, coordinator=None):
@@ -24,6 +25,7 @@ class CommandProcessor:
         Args:
             coordinator: Optional storage coordinator instance.
         """
+        super().__init__()
         self._handlers: Dict[str, CommandHandler] = {}
         self.coordinator = coordinator
         logger.info("COMMAND - Initializing command processor")
@@ -34,13 +36,12 @@ class CommandProcessor:
         """Get registered handlers."""
         return self._handlers.copy()
         
-    def register_handler(self, handler: CommandHandler, command: Optional[str] = None) -> None:
+    def register_handler(self, handler: CommandHandler, command: str = None) -> None:
         """Register a command handler.
         
         Args:
             handler: The command handler to register.
-            command: Optional command to register the handler for. If not provided,
-                    will use handler.command.
+            command: Optional command to handle. If not provided, will use handler.command.
             
         Raises:
             ValueError: If handler is not a CommandHandler instance or command is invalid.
@@ -49,72 +50,47 @@ class CommandProcessor:
             raise ValueError("Handler cannot be None")
             
         if not isinstance(handler, CommandHandler):
-            raise ValueError("Handler must be an instance of CommandHandler")
+            raise ValueError(f"Handler must be an instance of CommandHandler (got {type(handler)})")
             
-        # Use provided command or get from handler
-        cmd = command if command is not None else handler.command
+        # Get command from handler if not provided
+        cmd = command if command is not None else getattr(handler, 'command', None)
         if not cmd:
-            raise ValueError("Handler must have a command")
+            raise ValueError("Command must be provided either as argument or as handler.command attribute")
             
-        if not isinstance(cmd, str):
-            raise ValueError("Command must be a string")
+        if not isinstance(cmd, str) or not cmd.startswith('/'):
+            raise ValueError("Invalid command format - must start with '/'")
             
-        if not cmd.startswith('/'):
-            raise ValueError("Command must start with '/'")
-            
-        cmd = cmd.lower()
         if cmd in self._handlers:
             raise ValueError(f"Handler for command {cmd} already registered")
             
         self._handlers[cmd] = handler
-        logger.info(f"COMMAND - Registered handler for {cmd}")
+        logger.debug(f"COMMAND - Registered handler for {cmd}")
         
     async def process(self, frame: Frame) -> Optional[Frame]:
-        """Process a command frame.
+        """Process a frame.
         
         Args:
             frame: The frame to process.
             
         Returns:
-            Optional[Frame]: The response frame, if any.
+            The processed frame or None if the frame was handled or is not a command.
             
         Raises:
-            CommandError: If command processing fails.
-            ValueError: If no handler is registered for the command.
-            Any exception raised by the handler.
+            ValueError: If no handler is registered for a command.
         """
-        # Check if frame is a CommandFrame by checking its class name
-        # This avoids issues with module imports
-        if frame.__class__.__name__ != "CommandFrame":
-            logger.debug(f"COMMAND - Ignoring non-command frame: {type(frame)}")
-            return None
-            
-        command = frame.command.lower()
-        handler = self._handlers.get(command)
-        
-        if not handler:
-            logger.warning(f"COMMAND - No handler registered for {command}")
+        if not isinstance(frame, CommandFrame):
+            return None  # Pass through non-command frames
+
+        command = frame.command
+        if command not in self._handlers:
+            logger.error(f"COMMAND - No handler registered for command {command}")
             raise ValueError(f"No handler registered for command {command}")
-            
+
         try:
-            logger.debug(f"COMMAND - Processing {command} with {handler.__class__.__name__}")
+            handler = self._handlers[command]
             result = await handler.handle(frame)
-            
-            if result is None:
-                result = TextFrame(
-                    content=f"Command {command} executed successfully",
-                    metadata=frame.metadata
-                )
-                
+            logger.info(f"COMMAND - Successfully handled command: {command}")
             return result
-            
-        except (CommandValidationError, CommandStorageError, CommandAuthorizationError) as e:
-            logger.error(f"COMMAND - Error processing {command}: {str(e)}")
-            return TextFrame(
-                content=str(e),
-                metadata=frame.metadata
-            )
-            
         except Exception as e:
-            logger.error(f"COMMAND - Error processing {command}: {str(e)}")
-            raise 
+            logger.error(f"COMMAND - Error handling command {command}: {e}")
+            raise  # Re-raise the original exception 

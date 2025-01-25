@@ -4,7 +4,7 @@ from unittest.mock import Mock, AsyncMock
 
 from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame
-from chronicler.commands.frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 from chronicler.handlers.command import CommandHandler
 from chronicler.commands.processor import CommandProcessor
 from chronicler.exceptions import (
@@ -35,7 +35,6 @@ class TestCommandProcessor:
     def test_register_handler_valid(self, mock_handler):
         """Test valid handler registration."""
         processor = CommandProcessor()
-        mock_handler.command = "/test"
         processor.register_handler(mock_handler)
         assert "/test" in processor.handlers
         assert processor.handlers["/test"] == mock_handler
@@ -43,21 +42,21 @@ class TestCommandProcessor:
     def test_register_handler_invalid_command(self, mock_handler):
         """Test handler registration with invalid command."""
         processor = CommandProcessor()
-        with pytest.raises(ValueError, match="Command must start with '/'"):
-            processor.register_handler(command="test", handler=mock_handler)
+        with pytest.raises(ValueError, match="Invalid command format"):
+            processor.register_handler(mock_handler, "test")
             
     def test_register_handler_none(self):
         """Test handler registration with None handler."""
         processor = CommandProcessor()
         with pytest.raises(ValueError, match="Handler cannot be None"):
-            processor.register_handler(command="/test", handler=None)
+            processor.register_handler(None)
             
     def test_register_handler_invalid_type(self):
         """Test handler registration with invalid handler type."""
         processor = CommandProcessor()
         invalid_handler = object()
         with pytest.raises(ValueError, match="Handler must be an instance of CommandHandler"):
-            processor.register_handler(command="/test", handler=invalid_handler)
+            processor.register_handler(invalid_handler)
             
     def test_register_handler_duplicate(self, mock_handler):
         """Test handler registration with duplicate command."""
