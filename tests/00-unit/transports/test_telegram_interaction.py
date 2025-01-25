@@ -11,6 +11,7 @@ from chronicler.transports.telegram_user_transport import TelegramUserTransport
 from chronicler.logging.config import trace_operation
 from tests.mocks.transports.telethon import create_mock_telethon
 from tests.mocks.transports.telegram import mock_telegram_bot
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ async def mock_telegram_user_client():
 @pytest_asyncio.fixture
 async def bot_transport(mock_telegram_bot):
     """Create a bot transport instance."""
+    # Use real event loop for this test
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport(token="test_token")
     await transport.authenticate()  # This will initialize the bot properly
     return transport
