@@ -2,6 +2,7 @@
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
+import asyncio
 
 from chronicler.commands.frames import CommandFrame
 from chronicler.frames.media import TextFrame
@@ -14,6 +15,7 @@ from tests.mocks.transports.telegram import mock_telegram_bot
 @pytest.mark.asyncio
 async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
     """Test correlation ID propagation through transport -> command -> storage chain."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     with caplog.at_level('DEBUG'):
         # Configure logging
         configure_logging(level='DEBUG')

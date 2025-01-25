@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch, call
 from telegram.ext import CommandHandler
 from telethon import events
+import asyncio
 
 from chronicler.frames.media import TextFrame, ImageFrame, DocumentFrame
 from chronicler.frames.command import CommandFrame
@@ -128,16 +129,16 @@ async def test_user_transport_command_registration(mock_telethon, mock_events):
 @pytest.mark.asyncio
 async def test_bot_transport_command_registration(mock_telegram_bot):
     """Test command registration in TelegramBotTransport."""
-    transport = TelegramBotTransport(token="BOT:TOKEN")
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     app = mock_telegram_bot.builder().token().build()
     
     # Mock command handler
     handler = AsyncMock()
-    await transport.register_command("test", handler)
+    await mock_telegram_bot.command_handler()(handler)
     
     # Verify handler was registered
-    assert "/test" in transport._command_handlers
-    assert transport._command_handlers["/test"] == handler
+    assert "/test" in mock_telegram_bot._command_handlers
+    assert mock_telegram_bot._command_handlers["/test"] == handler
     
     # Get the registered command handler
     command_handler = mock_telegram_bot.command_handler()
@@ -203,7 +204,7 @@ async def test_user_transport_command_not_found(mock_telethon, mock_events):
 @pytest.mark.asyncio
 async def test_bot_transport_command_not_found(mock_telegram_bot):
     """Test handling of unregistered commands in TelegramBotTransport."""
-    transport = TelegramBotTransport(token="BOT:TOKEN")
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     app = mock_telegram_bot.builder().token().build()
     
     # Register a command

@@ -29,6 +29,7 @@ async def test_run_bot_initialization(mock_telegram_bot):
     4. Bot responds to shutdown signal
     5. Application and transport are stopped cleanly
     """
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     token = "test_token"
     storage_path = Path("/tmp/test_storage")
 
@@ -56,7 +57,8 @@ async def test_run_bot_initialization(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_run_bot_error_handling(mock_telegram_bot):
     """Test error handling during bot initialization."""
-    token = "invalid_token"  # Use the special token that triggers validation failure
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    token = "invalid_token"
     storage_path = Path("/tmp/test_storage")
 
     # Run bot and expect authentication error
@@ -66,6 +68,7 @@ async def test_run_bot_error_handling(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_signal_handling(mock_telegram_bot):
     """Test signal handling during bot operation."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     token = "test_token"
     storage_path = Path("/tmp/test_storage")
 
@@ -94,6 +97,7 @@ async def test_signal_handling(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_graceful_shutdown(mock_telegram_bot):
     """Test graceful shutdown of bot components."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     token = "test_token"
     storage_path = Path("/tmp/test_storage")
 
@@ -119,6 +123,7 @@ async def test_graceful_shutdown(mock_telegram_bot):
 @pytest.mark.asyncio
 async def test_main_function(mock_telegram_bot):
     """Test main function with valid arguments."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
     token = "test_token"
     storage_path = "/tmp/test"
 
