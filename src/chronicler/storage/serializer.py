@@ -1,12 +1,11 @@
 """Message and metadata serialization."""
 from pathlib import Path
 import json
-import yaml
 from chronicler.logging import get_logger, trace_operation
 from datetime import datetime
 from typing import Dict, Any, List
 
-from chronicler.storage.interface import Message, Attachment
+from chronicler.storage.interface import Message
 
 logger = get_logger(__name__)
 
@@ -14,12 +13,11 @@ class MessageSerializer:
     """Handles message serialization and metadata management."""
     
     @trace_operation('storage.serializer')
-    def serialize_message(self, message: Message, attachments: List[Dict[str, str]]) -> str:
+    def serialize_message(self, message: Message) -> str:
         """Convert message to JSONL format."""
         try:
             logger.info("SER - Serializing message")
             logger.debug(f"SER - Message content length: {len(message.content) if message.content else 0}")
-            logger.debug(f"SER - Attachments count: {len(attachments)}")
             
             # Create a clean copy of metadata without binary data
             message_data = {
@@ -27,7 +25,7 @@ class MessageSerializer:
                 'source': message.source,
                 'timestamp': message.timestamp.isoformat(),
                 'metadata': message.metadata,
-                'attachments': attachments  # This is already cleaned metadata from coordinator
+                'id': message.id
             }
             
             # Ensure no binary data in the message
@@ -43,17 +41,17 @@ class MessageSerializer:
         
     @trace_operation('storage.serializer')
     def read_metadata(self, path: Path) -> Dict[str, Any]:
-        """Read metadata from YAML file."""
+        """Read metadata from JSON file."""
         try:
             logger.info(f"SER - Reading metadata from: {path}")
             try:
                 with open(path) as f:
                     try:
-                        metadata = yaml.safe_load(f) or {}
+                        metadata = json.load(f) or {}
                         logger.debug(f"SER - Read metadata with {len(metadata)} top-level keys")
                         return metadata
-                    except yaml.YAMLError as e:
-                        logger.warning(f"SER - Invalid YAML in metadata file: {e}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"SER - Invalid JSON in metadata file: {e}")
                         return {}
             except FileNotFoundError:
                 logger.debug("SER - No existing metadata file, returning empty dict")
@@ -64,7 +62,7 @@ class MessageSerializer:
             
     @trace_operation('storage.serializer')
     def write_metadata(self, path: Path, metadata: Dict[str, Any]) -> None:
-        """Write metadata to YAML file."""
+        """Write metadata to JSON file."""
         try:
             logger.info(f"SER - Writing metadata to: {path}")
             logger.debug(f"SER - Metadata has {len(metadata)} top-level keys")
@@ -77,7 +75,7 @@ class MessageSerializer:
                 raise ValueError(f"Invalid metadata structure: {e}")
                 
             with open(path, 'w') as f:
-                yaml.dump(metadata, f)
+                json.dump(metadata, f, indent=2)
             logger.debug(f"SER - Successfully wrote metadata to {path}")
         except Exception as e:
             logger.error(f"SER - Failed to write metadata to {path}: {e}", exc_info=True)

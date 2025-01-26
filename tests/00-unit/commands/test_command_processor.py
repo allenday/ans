@@ -1,72 +1,88 @@
 """Tests for command processor."""
 import pytest
-from unittest.mock import AsyncMock
-from chronicler.commands.processor import CommandProcessor
-from chronicler.commands.frames import CommandFrame
+from unittest.mock import Mock, AsyncMock
+
 from chronicler.frames.media import TextFrame
+from chronicler.frames.command import CommandFrame
+from chronicler.commands.processor import CommandProcessor
+from chronicler.handlers.command import CommandHandler
+from chronicler.exceptions import CommandError
 
-from tests.mocks import command_handler_mock
+from tests.mocks.storage import coordinator_mock
 
-@pytest.mark.asyncio
-async def test_command_processor_init():
-    """Test command processor initialization."""
-    processor = CommandProcessor()
-    assert len(processor._handlers) == 0  # No default handlers
+TEST_METADATA = {"chat_id": 123}
 
-@pytest.mark.asyncio
-async def test_register_handler(command_handler_mock):
-    """Test handler registration."""
-    processor = CommandProcessor()
+class TestCommandProcessor:
+    """Test command processor."""
     
-    processor.register_handler("/test", command_handler_mock)
-    assert processor._handlers["/test"] == command_handler_mock
-
-@pytest.mark.asyncio
-async def test_register_handler_duplicate(command_handler_mock):
-    """Test registering duplicate handler."""
-    processor = CommandProcessor()
-    handler1 = command_handler_mock
-    handler2 = command_handler_mock
-    
-    processor.register_handler("/test", handler1)
-    processor.register_handler("/test", handler2)
-    assert processor._handlers["/test"] == handler2
-
-@pytest.mark.asyncio
-async def test_register_handler_validation():
-    """Test handler registration validation."""
-    processor = CommandProcessor()
-    handler = AsyncMock()  # Not a CommandHandler
-    
-    with pytest.raises(ValueError):
-        processor.register_handler("/test", handler)
-
-@pytest.mark.asyncio
-async def test_process_non_command_frame():
-    """Test processing non-command frame."""
-    processor = CommandProcessor()
-    frame = TextFrame(content="test", metadata={})
-    
-    result = await processor.process(frame)
-    assert result is None
-
-@pytest.mark.asyncio
-async def test_process_unknown_command():
-    """Test processing unknown command."""
-    processor = CommandProcessor()
-    frame = CommandFrame(command="/unknown", metadata={})
-    
-    result = await processor.process_frame(frame)
-    assert isinstance(result, TextFrame)
-    assert "Unknown command" in result.content
-
-@pytest.mark.asyncio
-async def test_handler_error(command_handler_mock):
-    """Test handler error handling."""
-    processor = CommandProcessor()
-    command_handler_mock.handle.side_effect = RuntimeError("Test error")
-    processor.register_handler("/test", command_handler_mock)
-    frame = CommandFrame(command="/test", metadata={})
-    
-    with pytest.raises(RuntimeError):
-        await processor.process_frame(frame) 
+    def test_init(self, coordinator_mock):
+        """Test initialization."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        assert processor.handlers == {}
+        
+    def test_register_handler(self, coordinator_mock):
+        """Test registering a handler."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        handler = Mock(spec=CommandHandler)
+        handler.command = "/test"
+        processor.register_handler(handler)
+        assert "/test" in processor.handlers
+        assert processor.handlers["/test"] == handler
+        
+    def test_register_handler_duplicate(self, coordinator_mock):
+        """Test registering a duplicate handler."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        handler1 = Mock(spec=CommandHandler)
+        handler1.command = "/test"
+        handler2 = Mock(spec=CommandHandler)
+        handler2.command = "/test"
+        
+        processor.register_handler(handler1)
+        with pytest.raises(ValueError, match="Handler for command /test already registered"):
+            processor.register_handler(handler2)
+            
+    def test_register_handler_validation(self, coordinator_mock):
+        """Test handler registration validation."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        
+        with pytest.raises(ValueError, match="Handler cannot be None"):
+            processor.register_handler(None)
+        
+        with pytest.raises(ValueError, match="Handler must be an instance of CommandHandler"):
+            processor.register_handler(Mock())
+        
+        handler = Mock(spec=CommandHandler)
+        handler.command = None
+        with pytest.raises(ValueError, match="Command must be provided either as argument or as handler.command attribute"):
+            processor.register_handler(handler)
+        
+        handler.command = "test"
+        with pytest.raises(ValueError, match="Invalid command format - must start with '/'"):
+            processor.register_handler(handler)
+            
+    @pytest.mark.asyncio
+    async def test_process_non_command_frame(self, coordinator_mock):
+        """Test processing a non-command frame."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        frame = TextFrame(content="test")
+        assert await processor.process(frame) is None
+        
+    @pytest.mark.asyncio
+    async def test_process_unknown_command(self, coordinator_mock):
+        """Test processing an unknown command."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        frame = CommandFrame(command="/unknown")
+        with pytest.raises(ValueError, match="No handler registered for command /unknown"):
+            await processor.process(frame)
+            
+    @pytest.mark.asyncio
+    async def test_handler_error(self, coordinator_mock):
+        """Test handler error."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        handler = Mock(spec=CommandHandler)
+        handler.command = "/test"
+        handler.handle = AsyncMock(side_effect=RuntimeError("Test error"))
+        processor.register_handler(handler)
+        frame = CommandFrame(command="/test")
+        with pytest.raises(RuntimeError, match="Test error"):
+            await processor.process(frame) 

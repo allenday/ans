@@ -1,10 +1,12 @@
 """Event abstractions for different transport implementations."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from chronicler.logging import trace_operation
+from telethon.events import NewMessage
+from telegram import Update
 
 @dataclass
 class EventMetadata:
@@ -53,78 +55,108 @@ class EventBase(ABC):
         """Get command arguments if message is a command."""
         pass
 
-class TelethonEvent(EventBase):
-    """Wrapper for Telethon events."""
-    
-    def __init__(self, event):
-        self._event = event
-    
-    @trace_operation('transport.events.telethon')
-    def get_text(self) -> str:
-        return self._event.message.text
-    
-    @trace_operation('transport.events.telethon')
-    def get_metadata(self) -> EventMetadata:
-        # Handle sender info safely
-        sender_id = self._event.sender_id if self._event.sender_id else None
-        sender_name = None
-        if self._event.sender:
-            sender_name = self._event.sender.username or self._event.sender.first_name
-        
-        return EventMetadata(
-            chat_id=self._event.chat_id,
-            chat_title=self._event.chat.title if hasattr(self._event.chat, 'title') else None,
-            sender_id=sender_id,
-            sender_name=sender_name,
-            message_id=self._event.message.id
-        )
-    
-    @trace_operation('transport.events.telethon')
-    def get_command(self) -> Optional[str]:
-        text = self.get_text()
-        if text.startswith('/'):
-            return text.split()[0].lower()
-        return None
-    
-    @trace_operation('transport.events.telethon')
-    def get_command_args(self) -> List[str]:
-        text = self.get_text()
-        parts = text.split()
-        return parts[1:] if len(parts) > 1 else []
 
-class TelegramBotEvent(EventBase):
-    """Wrapper for python-telegram-bot events."""
+"""Telegram transport events."""
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+from telethon.events import NewMessage
+from telegram import Update
+
+class Update:
+    """Base class for updates from transport libraries."""
     
-    def __init__(self, update, context):
-        self._update = update
-        self._context = context
+    def __init__(self, update_obj: Any):
+        """Initialize with update object."""
+        self._update = update_obj
     
-    @trace_operation('transport.events.telegram_bot')
-    def get_text(self) -> str:
-        return self._update.message.text
-    
-    @trace_operation('transport.events.telegram_bot')
-    def get_metadata(self) -> EventMetadata:
-        return EventMetadata(
-            chat_id=self._update.message.chat_id,
-            chat_title=self._update.message.chat.title,
-            sender_id=self._update.message.from_user.id if self._update.message.from_user else None,
-            sender_name=(self._update.message.from_user.username or self._update.message.from_user.first_name) 
-                if self._update.message.from_user else None,
-            message_id=self._update.message.message_id
-        )
-    
-    @trace_operation('transport.events.telegram_bot')
-    def get_command(self) -> Optional[str]:
-        text = self.get_text()
-        if text.startswith('/'):
-            return text.split()[0].lower()
+    @property
+    def message_text(self) -> Optional[str]:
+        """Get message text."""
+        return self._update.message.text if hasattr(self._update, "message") else None
+        
+    @property
+    def chat_id(self) -> Optional[int]:
+        """Get chat ID."""
+        return self._update.chat_id if hasattr(self._update, "chat_id") else None
+        
+    @property
+    def chat_title(self) -> Optional[str]:
+        """Get chat title."""
+        return self._update.chat.title if hasattr(self._update, "chat") else None
+        
+    @property
+    def sender_id(self) -> Optional[int]:
+        """Get sender ID."""
+        return self._update.sender_id if hasattr(self._update, "sender_id") else None
+        
+    @property
+    def sender_name(self) -> Optional[str]:
+        """Get sender name."""
+        if hasattr(self._update, "sender") and self._update.sender:
+            return self._update.sender.username or self._update.sender.first_name
         return None
-    
-    @trace_operation('transport.events.telegram_bot')
-    def get_command_args(self) -> List[str]:
-        if self._context and self._context.args:
-            return self._context.args
+        
+    @property
+    def message_id(self) -> Optional[int]:
+        """Get message ID."""
+        return self._update.message.id if hasattr(self._update, "message") else None
+        
+    @property
+    def thread_id(self) -> Optional[str]:
+        """Get thread ID."""
+        return None
+        
+    @property
+    def timestamp(self) -> Optional[float]:
+        """Get message timestamp."""
+        if hasattr(self._update, "message") and hasattr(self._update.message, "date"):
+            return self._update.message.date.timestamp()
+        return None
+
+    def get_text(self) -> Optional[str]:
+        """Get message text."""
+        return self.message_text
+
+    def get_metadata(self) -> EventMetadata:
+        """Get event metadata."""
+        return EventMetadata(
+            chat_id=self.chat_id,
+            chat_title=self.chat_title,
+            sender_id=self.sender_id,
+            sender_name=self.sender_name,
+            message_id=self.message_id,
+            platform="telegram",
+            timestamp=self.timestamp,
+            thread_id=self.thread_id
+        )
+
+    def get_command(self) -> Optional[str]:
+        """Get command from text if present."""
         text = self.get_text()
-        parts = text.split()
-        return parts[1:] if len(parts) > 1 else [] 
+        if text and text.startswith("/"):
+            return text.split()[0]
+        return None
+
+    def get_command_args(self) -> List[str]:
+        """Get command arguments if present."""
+        text = self.get_text()
+        if text and text.startswith("/"):
+            return text.split()[1:]
+        return []
+
+class EventBase:
+    """Base class for transport events."""
+
+    def get_text(self) -> Optional[str]:
+        """Get message text."""
+        raise NotImplementedError
+
+    def get_metadata(self) -> EventMetadata:
+        """Get event metadata."""
+        raise NotImplementedError
+
+    def get_command_args(self) -> list[str]:
+        """Get command arguments."""
+        raise NotImplementedError
+

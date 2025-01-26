@@ -1,15 +1,5 @@
 """Mock implementations for testing."""
 
-from .processors import processor_mock
-from .commands import command_handler_mock
-from .fixtures import mock_session_path, mock_telethon, mock_telegram_bot
-from .storage import MockStorageCoordinator
+from .transports.telethon import mock_session_path, mock_telethon, create_mock_telethon
 
-__all__ = [
-    'processor_mock',
-    'command_handler_mock',
-    'mock_session_path',
-    'mock_telethon',
-    'mock_telegram_bot',
-    'MockStorageCoordinator'
-] 
+__all__ = ['mock_session_path', 'mock_telethon', 'create_mock_telethon'] 

@@ -1,193 +1,817 @@
-"""Unit tests for telegram bot transport."""
+"""Tests for telegram bot transport using the new mock setup."""
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime, timezone
-
-from telegram import Bot, Update, Message, Chat, User, PhotoSize, File
-from telegram.ext import Application
-
-from chronicler.frames.command import CommandFrame
+import asyncio
+from tests.mocks.transports.telegram import mock_telegram_bot
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
+from chronicler.exceptions import TransportError, TransportAuthenticationError
+from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 from chronicler.frames.media import TextFrame, ImageFrame
-from chronicler.transports.telegram_transport import TelegramBotTransport
+from chronicler.frames.command import CommandFrame
+from telegram.ext import CommandHandler
+from telegram.error import InvalidToken
+from chronicler.transports.telegram_bot_update import TelegramBotUpdate
+from chronicler.frames.base import Frame
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_transport.Application')
-async def test_bot_transport_start_stop(mock_app):
-    """Test starting and stopping the bot transport."""
-    transport = TelegramBotTransport(token="test:token")
+async def test_empty_token_initial_state(mock_telegram_bot):
+    """Test initial state of transport with empty token."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("")
+    assert not transport._initialized
+    assert transport._token == ""
+    assert transport._app is None
+
+@pytest.mark.asyncio 
+async def test_empty_token_raises_error(mock_telegram_bot):
+    """Test that empty token raises expected error during authentication."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("")
+    expected_message = "Invalid token: You must pass the token you received from https://t.me/Botfather!"
     
-    # Create an AsyncMock instance for the application
-    app_instance = AsyncMock()
-    app_instance.initialize = AsyncMock()
-    app_instance.start = AsyncMock()
-    app_instance.stop = AsyncMock()
-    app_instance.updater.start_polling = AsyncMock()
-    app_instance.updater.stop = AsyncMock()
-    app_instance.bot.get_me = AsyncMock(return_value=AsyncMock(
-        id=12345,
-        first_name="Test Bot",
-        username="testbot"
-    ))
-    app_instance.running = True
+    try:
+        await transport.authenticate()
+        pytest.fail("Expected TransportAuthenticationError was not raised")
+    except TransportAuthenticationError as e:
+        assert str(e) == expected_message
+
+@pytest.mark.asyncio
+async def test_empty_token_state_after_error(mock_telegram_bot):
+    """Test transport state after authentication error with empty token."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("")
+    try:
+        await transport.authenticate()
+    except TransportAuthenticationError:
+        pass
+        
+    assert not transport._initialized
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_bot_initialization_after_auth(mock_telegram_bot):
+    """Test that bot is properly initialized after successful authentication."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
     
-    # Mock the application builder
-    mock_app.builder.return_value.token.return_value.build.return_value = app_instance
-    transport.app = app_instance  # Set the app instance directly
+    # First verify not initialized
+    assert not transport._initialized
+    assert transport._app is None
     
-    # Start transport
-    await transport.start()
+    # Authenticate
+    await transport.authenticate()
     
-    # Verify start sequence
-    app_instance.initialize.assert_awaited_once()
-    app_instance.start.assert_awaited_once()
-    app_instance.updater.start_polling.assert_awaited_once_with(drop_pending_updates=False, allowed_updates=['message'])
+    # Verify initialization state
+    assert transport._initialized
+    assert transport._app is not None
+    assert transport._app.bot is not None
+    assert transport._app.bot.token == "test_token"
+
+@pytest.mark.asyncio
+async def test_command_registration_after_auth(mock_telegram_bot):
+    """Test that commands can be registered after authentication."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()  # Start transport before registering commands
     
-    # Stop transport
+    # Register a test command
+    async def test_command(frame):
+        pass
+    
+    await transport.register_command("test", test_command)
+    
+    # Verify command was registered with leading slash in internal handlers
+    assert "/test" in transport._command_handlers
+    assert transport._command_handlers["/test"] == test_command
+    
+    # Verify command was added to application handlers without leading slash
+    assert transport._app is not None
+    assert any(isinstance(h, CommandHandler) and h.commands == frozenset(["test"])
+              for h in transport._app.handlers[0])
+    
+    # Clean up
     await transport.stop()
-    
-    # Verify stop sequence
-    app_instance.updater.stop.assert_awaited_once()
-    app_instance.stop.assert_awaited_once()
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_transport.Application')
-async def test_bot_transport_start_error(mock_app):
-    """Test error handling during bot transport start."""
-    transport = TelegramBotTransport(token="test:token")
+async def test_start_without_auth(mock_telegram_bot):
+    """Test that starting without authentication raises error."""
+    transport = TelegramBotTransport("test_token")
     
-    # Create an AsyncMock instance for the application
-    app_instance = AsyncMock()
-    app_instance.initialize = AsyncMock(side_effect=Exception("Test error"))
-    
-    # Mock the application builder
-    mock_app.builder.return_value.token.return_value.build.return_value = app_instance
-    transport.app = app_instance  # Set the app instance directly
-    
-    # Start should raise the error
-    with pytest.raises(Exception, match="Test error"):
+    with pytest.raises(TransportAuthenticationError, match="Transport must be authenticated before starting"):
         await transport.start()
 
 @pytest.mark.asyncio
-async def test_bot_handle_text_message():
-    """Test handling of text messages with various metadata."""
-    transport = TelegramBotTransport(token="test:token")
+async def test_start_error_handling(mock_telegram_bot):
+    """Test error handling during start."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = mock_telegram_bot['transport']
+    await transport.authenticate()
     
-    # Mock the message data
-    message = MagicMock(spec=Message)
-    message.text = "Test message"
-    message.message_id = 12345
-    message.date = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    message.photo = None
-    message.sticker = None
+    # Make start() fail
+    transport._app.start.side_effect = Exception("Failed to start")
     
-    # Mock chat data
-    chat = MagicMock(spec=Chat)
-    chat.id = 67890
-    chat.title = "Test Chat"
-    chat.type = "supergroup"
-    chat.is_forum = True
-    message.chat = chat
-    
-    # Mock user data
-    user = MagicMock(spec=User)
-    user.id = 11111
-    user.username = "testuser"
-    user.first_name = "Test"
-    message.from_user = user
-    
-    # Mock thread data
-    message.message_thread_id = 22222
-    forum_topic = MagicMock()
-    forum_topic.name = "Test Topic"
-    message.forum_topic_created = forum_topic
-    
-    # Create update object
-    update = MagicMock(spec=Update)
-    update.message = message
-    
-    # Mock context
-    context = MagicMock()
-    
-    # Track pushed frames
-    pushed_frames = []
-    transport.push_frame = AsyncMock(side_effect=lambda frame: pushed_frames.append(frame))
-    
-    # Handle message
-    await transport._handle_message(update, context)
-    
-    # Verify frame was pushed
-    assert len(pushed_frames) == 1
-    frame = pushed_frames[0]
-    
-    # Verify frame type and content
-    assert isinstance(frame, TextFrame)
-    assert frame.content == "Test message"
-    
-    # Verify metadata
-    metadata = frame.metadata
-    assert metadata['chat_id'] == 67890
-    assert metadata['chat_title'] == "Test Chat"
-    assert metadata['thread_id'] == 22222
-    assert metadata['thread_name'] == "Test Topic"
-    assert metadata['sender_id'] == 11111
-    assert metadata['sender_name'] == "testuser"
+    with pytest.raises(TransportError, match="Failed to start bot: Failed to start"):
+        await transport.start()
 
 @pytest.mark.asyncio
-async def test_bot_handle_command():
-    """Test handling of bot commands."""
-    transport = TelegramBotTransport(token="test:token")
+async def test_stop_after_auth(mock_telegram_bot):
+    """Test stopping transport after authentication."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
     
-    # Mock the message data
-    message = MagicMock(spec=Message)
-    message.text = "/start help"
-    message.message_id = 12345
-    message.date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    await transport.stop()
+    assert not transport._initialized
+    transport._app.stop.assert_called_once()
+    transport._app.shutdown.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_send_text_frame(mock_telegram_bot):
+    """Test sending a text frame."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
     
-    # Mock chat data
-    chat = MagicMock(spec=Chat)
-    chat.id = 67890
-    chat.title = "Test Chat"
-    chat.type = "supergroup"
-    message.chat = chat
+    # Create a text frame
+    frame = TextFrame(
+        content="test message",
+        metadata={"chat_id": 123, "thread_id": 456}
+    )
     
-    # Mock user data
-    user = MagicMock(spec=User)
-    user.id = 11111
-    user.username = "testuser"
-    message.from_user = user
+    # Mock the bot's send_message method to return a message ID
+    mock_message = AsyncMock()
+    mock_message.message_id = 789
+    transport._app.bot.send_message.return_value = mock_message
     
-    # Mock entities data
-    entity = MagicMock()
-    entity.type = "bot_command"
-    entity.offset = 0
-    entity.length = 6  # Length of "/start"
-    message.entities = [entity]
+    # Send the frame
+    result = await transport.send(frame)
     
-    # Create update object
-    update = MagicMock(spec=Update)
-    update.message = message
+    # Verify the message was sent correctly
+    transport._app.bot.send_message.assert_called_once_with(
+        chat_id=123,
+        text="test message",
+        reply_to_message_id=456
+    )
     
-    # Mock context
-    context = MagicMock()
+    # Verify frame metadata was updated
+    assert result.metadata["message_id"] == 789
+
+@pytest.mark.asyncio
+async def test_send_unsupported_frame_type(mock_telegram_bot):
+    """Test sending an unsupported frame type."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
     
-    # Track pushed frames
-    pushed_frames = []
-    transport.push_frame = AsyncMock(side_effect=lambda frame: pushed_frames.append(frame))
+    # Create a mock frame that's neither TextFrame nor ImageFrame
+    class UnsupportedFrame:
+        def __init__(self, metadata=None):
+            self.metadata = metadata or {}
     
-    # Handle command
-    await transport._handle_command(update, context)
+    frame = UnsupportedFrame(metadata={"chat_id": 123})
     
-    # Verify frame was pushed
-    assert len(pushed_frames) == 1
-    frame = pushed_frames[0]
+    with pytest.raises(TransportError, match="Unsupported frame type"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_send_uninitialized(mock_telegram_bot):
+    """Test sending when transport is not initialized."""
+    transport = TelegramBotTransport("test_token")
+    frame = TextFrame(content="test", metadata={"chat_id": 123})
     
-    # Verify frame type and content
-    assert isinstance(frame, CommandFrame)
-    assert frame.command == "/start"
-    assert frame.args == ["help"]
-    assert frame.metadata == {
-        'chat_id': 67890,
-        'chat_title': "Test Chat",
-        'sender_id': 11111,
-        'sender_name': "testuser"
-    } 
+    with pytest.raises(RuntimeError, match="Transport not initialized"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_send_missing_chat_id(mock_telegram_bot):
+    """Test sending without chat_id."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    frame = TextFrame(content="test", metadata={})
+    
+    with pytest.raises(ValueError, match="chat_id is required"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_send_error_handling(mock_telegram_bot):
+    """Test error handling during send."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    frame = TextFrame(content="test", metadata={"chat_id": 123})
+    transport._app.bot.send_message.side_effect = Exception("Send failed")
+    
+    with pytest.raises(TransportError, match="Send failed"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_invalid_command_characters(mock_telegram_bot):
+    """Test registering commands with invalid characters."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    async def test_command(frame):
+        pass
+    
+    # Test invalid characters
+    invalid_commands = ["test@command", "test#1", "test!", "test space"]
+    
+    for cmd in invalid_commands:
+        with pytest.raises(TransportError, match=f"Failed to register command: Command `{cmd}` is not a valid bot command"):
+            await transport.register_command(cmd, test_command)
+
+@pytest.mark.asyncio
+async def test_duplicate_command_registration(mock_telegram_bot):
+    """Test registering the same command multiple times."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    command_executions = []
+    
+    async def command1(frame):
+        command_executions.append("command1")
+        
+    async def command2(frame):
+        command_executions.append("command2")
+    
+    # Register first command
+    await transport.register_command("test", command1)
+    
+    # Register same command again
+    await transport.register_command("test", command2)
+    
+    # Verify only the second command is registered
+    assert transport._command_handlers["/test"] == command2 
+
+@pytest.mark.asyncio
+async def test_process_frame_without_processor(mock_telegram_bot):
+    """Test processing frame without frame processor."""
+    transport = TelegramBotTransport("test_token")
+    frame = TextFrame(content="test", metadata={"chat_id": 123})
+    
+    result = await transport.process_frame(frame)
+    assert result == frame  # Should return unmodified frame
+
+@pytest.mark.asyncio
+async def test_process_frame_with_processor(mock_telegram_bot):
+    """Test processing frame with frame processor."""
+    transport = TelegramBotTransport("test_token")
+    
+    # Create a processor that modifies the frame
+    async def processor(frame):
+        frame.content = frame.content.upper()
+        return frame
+    
+    transport.frame_processor = processor
+    frame = TextFrame(content="test", metadata={"chat_id": 123})
+    
+    result = await transport.process_frame(frame)
+    assert result.content == "TEST"
+
+@pytest.mark.asyncio
+async def test_handle_message_error(mock_telegram_bot):
+    """Test error handling in message processing."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create a mock update
+    mock_update = Mock()
+    mock_update.message = Mock()
+    mock_update.message.text = "test message"
+    mock_update.message.chat = Mock(id=123, title="Test Chat", type="private")
+    mock_update.message.from_user = Mock(id=456, username="testuser")
+    mock_update.message.message_id = 789
+    
+    # Make process_frame raise an error
+    transport.process_frame = AsyncMock(side_effect=Exception("Process error"))
+    transport.send = AsyncMock()
+    
+    # Handle message - should not raise but increment error count
+    await transport._handle_message(TelegramBotUpdate(mock_update))
+    assert transport._error_count == 1
+    transport.send.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_bot_transport_command_not_found(mock_telegram_bot):
+    """Test handling of unregistered commands in TelegramBotTransport."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Register a command
+    handler = AsyncMock()
+    await transport.register_command("test", handler)
+    
+    # Verify only the registered command has a handler
+    assert "/test" in transport._command_handlers
+    assert "/unknown" not in transport._command_handlers
+    
+    # Mock an incoming unregistered command
+    mock_update = Mock()
+    mock_update.message = Mock(
+        text="/unknown",
+        chat=Mock(id=456, title="Test Chat", type="private"),
+        from_user=Mock(id=789, username="testuser"),
+        message_id=123
+    )
+    
+    # Handle the message - should not call our test handler
+    await transport._handle_message(TelegramBotUpdate(mock_update))
+    handler.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_handle_command_execution(mock_telegram_bot):
+    """Test command execution through handler."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Track command execution
+    command_executed = False
+    
+    async def test_command(frame):
+        nonlocal command_executed
+        command_executed = True
+        assert isinstance(frame, CommandFrame)
+        assert frame.command == "/test"
+        assert frame.args == ["arg1", "arg2"]
+    
+    # Register command
+    await transport.register_command("test", test_command)
+    
+    # Create mock update for command
+    mock_update = Mock()
+    mock_update.message = Mock(
+        text="/test arg1 arg2",
+        chat=Mock(id=123, title="Test Chat", type="private"),
+        from_user=Mock(id=456, username="testuser"),
+        message_id=789
+    )
+    
+    # Find command handler
+    command_handler = next(
+        h for h in transport._app.handlers[0] 
+        if isinstance(h, CommandHandler) and "test" in h.commands
+    )
+    
+    # Create mock context
+    mock_context = Mock()
+    mock_context.args = Mock()
+    mock_context.args = ["arg1", "arg2"]
+    
+    # Execute command
+    await command_handler.callback(mock_update, mock_context)
+    
+    assert command_executed
+
+@pytest.mark.asyncio
+async def test_authenticate_invalid_token(mock_telegram_bot):
+    """Test that authenticating with invalid token raises expected error."""
+    transport = TelegramBotTransport("invalid_token")
+    expected = "Token validation failed"
+    
+    with pytest.raises(TransportAuthenticationError, match=expected):
+        await transport.authenticate()
+    
+    assert not transport._initialized
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_stop_without_auth(mock_telegram_bot):
+    """Test stopping transport that wasn't authenticated."""
+    transport = TelegramBotTransport("test_token")
+    await transport.stop()  # Should not raise
+    assert not transport._initialized 
+
+@pytest.mark.asyncio
+async def test_send_image_frame(mock_telegram_bot):
+    """Test sending an image frame with caption."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create an image frame
+    frame = ImageFrame(
+        content=b"test_image_data",
+        metadata={
+            "chat_id": 123,
+            "thread_id": 456,
+            "caption": "test caption"
+        }
+    )
+    
+    # Mock the bot's send_photo method to return a message ID
+    mock_message = AsyncMock()
+    mock_message.message_id = 789
+    send_photo = AsyncMock(return_value=mock_message)
+    transport._app.bot.send_photo = send_photo
+    
+    # Send the frame
+    result = await transport.send(frame)
+    
+    # Verify the photo was sent correctly
+    transport._app.bot.send_photo.assert_called_once_with(
+        chat_id=123,
+        photo=b"test_image_data",
+        caption=frame.metadata["caption"],
+        reply_to_message_id=456
+    )
+    
+    # Verify frame metadata was updated
+    assert result.metadata["message_id"] == 789
+
+@pytest.mark.asyncio
+async def test_send_image_frame_without_caption(mock_telegram_bot):
+    """Test sending an image frame without caption."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create an image frame without caption
+    frame = ImageFrame(
+        content=b"test_image_data",
+        metadata={"chat_id": 123}
+    )
+    
+    # Mock the bot's send_photo method to return a message ID
+    mock_message = AsyncMock()
+    mock_message.message_id = 789
+    transport._app.bot.send_photo.return_value = mock_message
+    
+    # Send the frame
+    result = await transport.send(frame)
+    
+    # Verify the photo was sent correctly
+    transport._app.bot.send_photo.assert_called_once_with(
+        chat_id=123,
+        photo=b"test_image_data",
+        caption=None,
+        reply_to_message_id=None
+    )
+    
+    # Verify frame metadata was updated
+    assert result.metadata["message_id"] == 789 
+
+@pytest.mark.asyncio
+async def test_frame_processor_returns_none(mock_telegram_bot):
+    """Test handling when frame processor returns None."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create a processor that returns None
+    async def processor(frame):
+        return None
+    
+    transport.frame_processor = processor
+    
+    # Mock an incoming message
+    mock_update = Mock()
+    mock_update.message = Mock(
+        text="test message",
+        chat=Mock(id=123, title="Test Chat", type="private"),
+        from_user=Mock(id=456, username="testuser"),
+        message_id=789
+    )
+    
+    # Handle message - should not send anything since processor returns None
+    await transport._handle_message(TelegramBotUpdate(mock_update))
+    transport._app.bot.send_message.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_frame_processor_modifies_metadata(mock_telegram_bot):
+    """Test that frame processor can modify frame metadata."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create a processor that adds metadata
+    async def processor(frame):
+        frame.metadata["processed"] = True
+        frame.metadata["timestamp"] = "test_time"
+        return frame
+    
+    transport.frame_processor = processor
+    
+    # Create a text frame
+    frame = TextFrame(
+        content="test message",
+        metadata={"chat_id": 123}
+    )
+    
+    # Process the frame
+    processed = await transport.process_frame(frame)
+    
+    # Verify metadata was added
+    assert processed.metadata["processed"] is True
+    assert processed.metadata["timestamp"] == "test_time"
+    assert processed.metadata["chat_id"] == 123  # Original metadata preserved
+
+@pytest.mark.asyncio
+async def test_frame_processor_chaining(mock_telegram_bot):
+    """Test chaining multiple frame processors."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create processors that modify content and metadata
+    async def processor1(frame):
+        frame.content = frame.content.upper()
+        frame.metadata["processor1"] = True
+        return frame
+        
+    async def processor2(frame):
+        frame.content = f"[{frame.content}]"
+        frame.metadata["processor2"] = True
+        return frame
+    
+    # Chain processors
+    async def chain_processor(frame):
+        frame = await processor1(frame)
+        frame = await processor2(frame)
+        return frame
+    
+    transport.frame_processor = chain_processor
+    
+    # Create a text frame
+    frame = TextFrame(
+        content="test",
+        metadata={"chat_id": 123}
+    )
+    
+    # Process the frame
+    processed = await transport.process_frame(frame)
+    
+    # Verify processors were applied in order
+    assert processed.content == "[TEST]"
+    assert processed.metadata["processor1"] is True
+    assert processed.metadata["processor2"] is True
+
+@pytest.mark.asyncio
+async def test_frame_processor_error_handling(mock_telegram_bot):
+    """Test error handling in frame processor."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+
+    # Create a processor that raises an error
+    async def processor(frame):
+        transport._error_count += 1  # Increment error count before raising
+        raise TransportError("Process error")
+
+    transport.frame_processor = processor
+
+    # Create a text frame
+    frame = TextFrame(
+        content="test",
+        metadata={"chat_id": 123}
+    )
+
+    # Initial error count should be 0
+    assert transport._error_count == 0
+
+    # Process the frame - should raise TransportError
+    with pytest.raises(TransportError, match="Process error"):
+        await transport.process_frame(frame)
+
+    # Error count should be incremented
+    assert transport._error_count == 1
+
+@pytest.mark.asyncio
+async def test_frame_processor_chaining_without_app():
+    """Test frame processor chaining without initialized app."""
+    loop = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    
+    # Create processors that modify content and metadata
+    async def processor1(frame):
+        frame.content = frame.content.upper()
+        return frame
+        
+    async def processor2(frame):
+        frame.content = f"[{frame.content}]"
+        return frame
+    
+    # Chain processors
+    async def chain_processor(frame):
+        frame = await processor1(frame)
+        frame = await processor2(frame)
+        return frame
+    
+    transport.frame_processor = chain_processor
+    
+    # Create a text frame
+    frame = TextFrame(
+        content="test",
+        metadata={"chat_id": 123}
+    )
+    
+    # Process the frame - should work without initialized app
+    processed = await transport.process_frame(frame)
+    assert processed.content == "[TEST]"
+
+@pytest.mark.asyncio
+async def test_frame_processor_metadata_manipulation():
+    """Test frame processor metadata manipulation without app."""
+    loop = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    
+    # Create a processor that modifies metadata
+    async def processor(frame):
+        frame.metadata["processed"] = True
+        frame.metadata["timestamp"] = "test_time"
+        return frame
+    
+    transport.frame_processor = processor
+    
+    # Create a text frame
+    frame = TextFrame(
+        content="test",
+        metadata={"chat_id": 123}
+    )
+    
+    # Process the frame
+    processed = await transport.process_frame(frame)
+    
+    # Verify metadata was modified
+    assert processed.metadata["processed"] is True
+    assert processed.metadata["timestamp"] == "test_time"
+    assert processed.metadata["chat_id"] == 123  # Original metadata preserved
+
+@pytest.mark.asyncio
+async def test_frame_validation_without_metadata(mock_telegram_bot):
+    """Test frame validation when metadata is None."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+
+    frame = TextFrame(content="test")
+    frame.metadata = None
+
+    with pytest.raises(ValueError, match="chat_id is required"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_frame_validation_empty_metadata(mock_telegram_bot):
+    """Test frame validation with empty metadata."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+
+    frame = TextFrame(content="test", metadata={})
+
+    with pytest.raises(ValueError, match="chat_id is required"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_frame_type_validation(mock_telegram_bot):
+    """Test validation of frame types."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+
+    # Create an invalid frame type
+    class InvalidFrame(Frame):
+        def __init__(self):
+            super().__init__()
+            self.content = "test"
+            self.metadata = {"chat_id": 123}
+
+    frame = InvalidFrame()
+
+    with pytest.raises(TransportError, match="Unsupported frame type"):
+        await transport.send(frame)
+
+@pytest.mark.asyncio
+async def test_error_count_tracking(mock_telegram_bot):
+    """Test error count tracking during message processing."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+    
+    # Create a processor that raises an error
+    async def processor(frame):
+        raise ValueError("Process error")
+    
+    transport.frame_processor = processor
+    
+    # Mock an incoming message
+    mock_update = Mock()
+    mock_update.message = Mock(
+        text="test message",
+        chat=Mock(id=123, title="Test Chat", type="private"),
+        from_user=Mock(id=456, username="testuser"),
+        message_id=789
+    )
+    
+    # Initial error count should be 0
+    assert transport._error_count == 0
+    
+    # Handle message - should increment error count
+    await transport._handle_message(TelegramBotUpdate(mock_update))
+    assert transport._error_count == 1
+    
+    # Handle another message - should increment again
+    await transport._handle_message(TelegramBotUpdate(mock_update))
+    assert transport._error_count == 2
+
+@pytest.mark.asyncio
+async def test_error_count_tracking_without_app(mock_telegram_bot):
+    """Test error count tracking without initialized app."""
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    await transport.authenticate()
+    await transport.start()
+
+    # Create a processor that raises an error
+    async def processor(frame):
+        transport._error_count += 1  # Increment error count before raising
+        raise TransportError("Process error")
+
+    transport.frame_processor = processor
+
+    # Create a text frame
+    frame = TextFrame(
+        content="test",
+        metadata={"chat_id": 123}
+    )
+
+    # Initial error count should be 0
+    assert transport._error_count == 0
+
+    # Process frame - should increment error count
+    with pytest.raises(TransportError, match="Process error"):
+        await transport.process_frame(frame)
+
+    # Error count should be incremented
+    assert transport._error_count == 1
+
+@pytest.mark.asyncio
+async def test_authenticate_build_error():
+    """Test error handling when ApplicationBuilder.build() fails with a generic error."""
+    loop = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    
+    # Mock ApplicationBuilder to raise an error during build
+    with patch('telegram.ext.ApplicationBuilder.build', side_effect=Exception("Build failed")):
+        with pytest.raises(TransportError, match="Failed to build application: Build failed"):
+            await transport.authenticate()
+    
+    assert not transport.is_running
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_authenticate_initialize_error():
+    """Test error handling when app.initialize() fails."""
+    loop = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    
+    # Create mock app with failing initialize
+    mock_app = AsyncMock()
+    mock_app.initialize = AsyncMock(side_effect=Exception("Initialize failed"))
+    mock_app.bot = AsyncMock()
+    
+    with patch('telegram.ext.ApplicationBuilder.build', return_value=mock_app):
+        with pytest.raises(TransportAuthenticationError, match="Failed to initialize bot: Initialize failed"):
+            await transport.authenticate()
+    
+    assert not transport.is_running
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_stop_without_initialization():
+    """Test stopping a transport that was never initialized."""
+    loop = asyncio.get_running_loop()
+    transport = TelegramBotTransport("test_token")
+    
+    # Should not raise any errors
+    await transport.stop()
+    
+    assert not transport.is_running
+    assert transport._app is None 

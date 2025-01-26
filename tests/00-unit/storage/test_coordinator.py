@@ -1,441 +1,207 @@
 """Tests for storage coordinator."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from datetime import datetime, timezone
 
 from chronicler.storage.coordinator import StorageCoordinator
-from chronicler.storage.interface import Topic, Message, Attachment, User
+from chronicler.storage.git import GitStorageAdapter
 
 @pytest.fixture
-def storage_path():
-    """Create a test storage path."""
+def base_path():
+    """Create a test base path."""
     return Path("/test/storage/path")
 
 @pytest.fixture
 def git_storage_mock():
     """Create a mock git storage adapter."""
-    mock = AsyncMock()
-    mock.init_storage = AsyncMock()
-    mock.create_topic = AsyncMock()
-    mock.save_message = AsyncMock()
-    mock.sync = AsyncMock()
-    mock.set_github_config = AsyncMock()
+    mock = MagicMock()
+    mock.init_storage = MagicMock()
+    mock.create_topic = MagicMock()
+    mock.save_message = MagicMock()
+    mock.save_attachment = MagicMock()
+    mock.sync = MagicMock()
+    mock.set_github_config = MagicMock()
+    mock.topic_exists = MagicMock(return_value=True)
     return mock
 
 @pytest.fixture
-def file_storage_mock():
-    """Create a mock file storage adapter."""
-    mock = AsyncMock()
-    mock.init_storage = AsyncMock()
-    mock.create_topic = AsyncMock()
-    mock.save_attachment = AsyncMock()
-    return mock
-
-@pytest.fixture
-def attachment_handler_mock():
-    """Create a mock attachment handler."""
-    mock = AsyncMock()
-    mock.process = AsyncMock(side_effect=lambda x: x)  # Return attachment unchanged
-    return mock
-
-@pytest.fixture
-def coordinator(storage_path, git_storage_mock, file_storage_mock, attachment_handler_mock):
+def coordinator(base_path, git_storage_mock):
     """Create a storage coordinator with mocked dependencies."""
-    with patch('chronicler.storage.coordinator.GitStorageAdapter') as git_mock, \
-         patch('chronicler.storage.coordinator.FileSystemStorage') as file_mock, \
-         patch('chronicler.storage.coordinator.TelegramAttachmentHandler') as handler_mock:
-        
+    with patch('chronicler.storage.coordinator.GitStorageAdapter') as git_mock:
         git_mock.return_value = git_storage_mock
-        file_mock.return_value = file_storage_mock
-        handler_mock.return_value = attachment_handler_mock
-        
-        coordinator = StorageCoordinator(storage_path)
+        coordinator = StorageCoordinator(base_path)
         return coordinator
 
-@pytest.mark.asyncio
-async def test_initialization(storage_path, git_storage_mock, file_storage_mock):
+def test_initialization(base_path, git_storage_mock):
     """Test storage coordinator initialization."""
-    with patch('chronicler.storage.coordinator.GitStorageAdapter') as git_mock, \
-         patch('chronicler.storage.coordinator.FileSystemStorage') as file_mock:
-        
+    with patch('chronicler.storage.coordinator.GitStorageAdapter') as git_mock:
         git_mock.return_value = git_storage_mock
-        file_mock.return_value = file_storage_mock
         
-        coordinator = StorageCoordinator(storage_path)
+        coordinator = StorageCoordinator(base_path)
         
-        # Verify storage adapters were initialized with correct path
-        git_mock.assert_called_once_with(storage_path)
-        file_mock.assert_called_once_with(storage_path)
+        # Verify storage adapter was initialized with correct path
+        git_mock.assert_called_once_with(base_path)
         
         # Verify attributes were set
-        assert coordinator.storage_path == storage_path
+        assert coordinator.base_path == base_path
         assert coordinator.git_storage == git_storage_mock
-        assert coordinator.file_storage == file_storage_mock
-        assert not coordinator.is_initialized()
 
-@pytest.mark.asyncio
-async def test_init_storage(coordinator, git_storage_mock, file_storage_mock):
+def test_init_storage(coordinator, git_storage_mock):
     """Test initializing storage."""
-    user = User(id="test_user", name="Test User")
+    user_id = 123
     
     # Execute
-    result = await coordinator.init_storage(user)
+    coordinator.init_storage(user_id)
     
     # Verify storage was initialized
-    git_storage_mock.init_storage.assert_called_once_with(user)
-    file_storage_mock.init_storage.assert_called_once_with(user)
-    
-    # Verify coordinator is initialized
-    assert coordinator.is_initialized()
-    assert result == coordinator
+    git_storage_mock.init_storage.assert_called_once_with(user_id)
 
-@pytest.mark.asyncio
-async def test_init_storage_error(coordinator, git_storage_mock):
+def test_init_storage_error(coordinator, git_storage_mock):
     """Test error handling when initializing storage."""
     git_storage_mock.init_storage.side_effect = RuntimeError("Test error")
     
-    user = User(id="test_user", name="Test User")
+    user_id = 123
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Test error"):
-        await coordinator.init_storage(user)
-    
-    # Verify coordinator is not initialized
-    assert not coordinator.is_initialized()
+        coordinator.init_storage(user_id)
 
-@pytest.mark.asyncio
-async def test_create_topic(coordinator, git_storage_mock, file_storage_mock):
+def test_create_topic(coordinator, git_storage_mock):
     """Test creating a topic."""
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"key": "value"}
-    )
+    user_id = 123
+    topic_name = "test_topic"
     
     # Execute
-    topic_id = await coordinator.create_topic(topic)
+    coordinator.create_topic(user_id, topic_name)
     
-    # Verify topic was created in both storages
-    git_storage_mock.create_topic.assert_called_once_with(topic, False)
-    file_storage_mock.create_topic.assert_called_once_with(topic, False)
-    
-    # Verify returned topic ID
-    assert topic_id == topic.id
+    # Verify topic was created
+    git_storage_mock.create_topic.assert_called_once_with(user_id, topic_name)
 
-@pytest.mark.asyncio
-async def test_create_topic_error(coordinator, git_storage_mock):
+def test_create_topic_error(coordinator, git_storage_mock):
     """Test error handling when creating a topic."""
     git_storage_mock.create_topic.side_effect = RuntimeError("Test error")
     
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"key": "value"}
-    )
+    user_id = 123
+    topic_name = "test_topic"
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Test error"):
-        await coordinator.create_topic(topic)
+        coordinator.create_topic(user_id, topic_name)
 
-@pytest.mark.asyncio
-async def test_create_topic_file_error(coordinator, git_storage_mock, file_storage_mock):
-    """Test error handling when file storage fails to create topic."""
-    file_storage_mock.create_topic.side_effect = RuntimeError("File storage error")
-    
-    topic = Topic(
-        id="test_topic",
-        name="Test Topic",
-        metadata={"key": "value"}
-    )
-    
-    # Verify error is propagated
-    with pytest.raises(RuntimeError, match="File storage error"):
-        await coordinator.create_topic(topic)
-    
-    # Verify git storage was called
-    git_storage_mock.create_topic.assert_called_once_with(topic, False)
-
-@pytest.mark.asyncio
-async def test_save_message_without_attachments(coordinator, git_storage_mock, file_storage_mock):
-    """Test saving a message without attachments."""
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"}
-    )
+def test_save_message(coordinator, git_storage_mock):
+    """Test saving a message."""
+    user_id = 123
+    topic_name = "test_topic"
+    message = {
+        "content": "Test message",
+        "source": "test",
+        "metadata": {"key": "value"}
+    }
     
     # Execute
-    await coordinator.save_message("test_topic", message)
+    coordinator.save_message(user_id, topic_name, message)
     
-    # Verify message was saved to git storage
-    git_storage_mock.save_message.assert_called_once_with("test_topic", message)
-    
-    # Verify no attachments were saved
-    file_storage_mock.save_attachment.assert_not_called()
+    # Verify message was saved
+    git_storage_mock.save_message.assert_called_once_with(user_id, topic_name, message)
 
-@pytest.mark.asyncio
-async def test_save_message_with_attachments(coordinator, git_storage_mock, file_storage_mock, attachment_handler_mock):
-    """Test saving a message with attachments."""
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
-    
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"},
-        attachments=[attachment]
-    )
-    
-    # Execute
-    await coordinator.save_message("test_topic", message)
-    
-    # Verify attachment was processed
-    attachment_handler_mock.process.assert_called_once_with(attachment)
-    
-    # Verify message was saved to git storage
-    git_storage_mock.save_message.assert_called_once_with("test_topic", message)
-    
-    # Verify attachment was saved to file storage
-    file_storage_mock.save_attachment.assert_called_once_with("test_topic", message.id, attachment)
-
-@pytest.mark.asyncio
-async def test_save_message_error(coordinator, git_storage_mock):
+def test_save_message_error(coordinator, git_storage_mock):
     """Test error handling when saving a message."""
     git_storage_mock.save_message.side_effect = RuntimeError("Test error")
     
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"}
-    )
+    user_id = 123
+    topic_name = "test_topic"
+    message = {
+        "content": "Test message",
+        "source": "test",
+        "metadata": {"key": "value"}
+    }
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Test error"):
-        await coordinator.save_message("test_topic", message)
+        coordinator.save_message(user_id, topic_name, message)
 
-@pytest.mark.asyncio
-async def test_save_message_attachment_error(coordinator, git_storage_mock, file_storage_mock):
-    """Test error handling when saving message attachments."""
-    file_storage_mock.save_attachment.side_effect = RuntimeError("File storage error")
-    
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
-    
-    message = Message(
-        content="Test message",
-        source="test",
-        metadata={"key": "value"},
-        attachments=[attachment]
-    )
-    
-    # Verify error is propagated
-    with pytest.raises(RuntimeError, match="File storage error"):
-        await coordinator.save_message("test_topic", message)
-    
-    # Verify message was not saved to git storage
-    git_storage_mock.save_message.assert_not_called()
-
-@pytest.mark.asyncio
-async def test_save_attachment(coordinator, file_storage_mock, attachment_handler_mock):
+def test_save_attachment(coordinator, git_storage_mock):
     """Test saving an attachment."""
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
+    user_id = 123
+    topic_name = "test_topic"
+    file_path = "/path/to/file.txt"
+    attachment_name = "file.txt"
     
     # Execute
-    await coordinator.save_attachment("test_topic", "test_message", attachment)
-    
-    # Verify attachment was processed
-    attachment_handler_mock.process.assert_called_once_with(attachment)
+    coordinator.save_attachment(user_id, topic_name, file_path, attachment_name)
     
     # Verify attachment was saved
-    file_storage_mock.save_attachment.assert_called_once_with("test_topic", "test_message", attachment)
+    git_storage_mock.save_attachment.assert_called_once_with(user_id, topic_name, file_path, attachment_name)
 
-@pytest.mark.asyncio
-async def test_save_attachment_error(coordinator, file_storage_mock):
+def test_save_attachment_error(coordinator, git_storage_mock):
     """Test error handling when saving an attachment."""
-    file_storage_mock.save_attachment.side_effect = RuntimeError("Test error")
+    git_storage_mock.save_attachment.side_effect = RuntimeError("Test error")
     
-    attachment = Attachment(
-        id="test_attachment",
-        type="text/plain",
-        filename="test.txt",
-        data=b"test data"
-    )
+    user_id = 123
+    topic_name = "test_topic"
+    file_path = "/path/to/file.txt"
+    attachment_name = "file.txt"
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Test error"):
-        await coordinator.save_attachment("test_topic", "test_message", attachment)
+        coordinator.save_attachment(user_id, topic_name, file_path, attachment_name)
 
-@pytest.mark.asyncio
-async def test_sync(coordinator, git_storage_mock):
+def test_sync(coordinator, git_storage_mock):
     """Test syncing with remote storage."""
+    user_id = 123
+    
     # Execute
-    await coordinator.sync()
+    coordinator.sync(user_id)
     
     # Verify sync was called
-    git_storage_mock.sync.assert_called_once()
+    git_storage_mock.sync.assert_called_once_with(user_id)
 
-@pytest.mark.asyncio
-async def test_sync_error(coordinator, git_storage_mock):
+def test_sync_error(coordinator, git_storage_mock):
     """Test error handling when syncing with remote storage."""
     git_storage_mock.sync.side_effect = RuntimeError("Sync error")
     
+    user_id = 123
+    
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Sync error"):
-        await coordinator.sync()
+        coordinator.sync(user_id)
 
-@pytest.mark.asyncio
-async def test_set_github_config(coordinator, git_storage_mock):
+def test_set_github_config(coordinator, git_storage_mock):
     """Test setting GitHub configuration."""
     # Execute
-    await coordinator.set_github_config("test_token", "test_repo")
+    coordinator.set_github_config("test_token", "test_repo")
     
     # Verify config was set
     git_storage_mock.set_github_config.assert_called_once_with("test_token", "test_repo")
 
-@pytest.mark.asyncio
-async def test_set_github_config_error(coordinator, git_storage_mock):
+def test_set_github_config_error(coordinator, git_storage_mock):
     """Test error handling when setting GitHub configuration."""
     git_storage_mock.set_github_config.side_effect = RuntimeError("Config error")
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Config error"):
-        await coordinator.set_github_config("test_token", "test_repo")
+        coordinator.set_github_config("test_token", "test_repo")
 
-@pytest.mark.asyncio
-async def test_save_message_with_multiple_attachments(coordinator, git_storage_mock, file_storage_mock, attachment_handler_mock):
-    """Test saving a message with multiple attachments."""
-    message = Message(
-        id="test_message",
-        content="Test content",
-        source="test",
-        timestamp=datetime.now(timezone.utc),
-        metadata={},
-        attachments=[
-            Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
-            Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
-            Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt")
-        ]
-    )
+def test_topic_exists(coordinator, git_storage_mock):
+    """Test checking if a topic exists."""
+    user_id = 123
+    topic_name = "test_topic"
     
     # Execute
-    await coordinator.save_message("test_topic", message)
+    result = coordinator.topic_exists(user_id, topic_name)
     
-    # Verify attachments were processed and saved
-    assert attachment_handler_mock.process.call_count == 3
-    assert file_storage_mock.save_attachment.call_count == 3
-    
-    # Verify message was saved after attachments
-    git_storage_mock.save_message.assert_called_once()
+    # Verify topic_exists was called
+    git_storage_mock.topic_exists.assert_called_once_with(user_id, topic_name)
+    assert result is True
 
-@pytest.mark.asyncio
-async def test_save_message_with_binary_content(coordinator, git_storage_mock):
-    """Test saving a message with binary content."""
-    message = Message(
-        id="test_message",
-        content=b"Binary \x80\x81 content",
-        source="test",
-        timestamp=datetime.now(timezone.utc),
-        metadata={}
-    )
+def test_topic_exists_error(coordinator, git_storage_mock):
+    """Test error handling when checking if a topic exists."""
+    git_storage_mock.topic_exists.side_effect = RuntimeError("Test error")
     
-    # Execute
-    await coordinator.save_message("test_topic", message)
-    
-    # Verify message was saved
-    git_storage_mock.save_message.assert_called_once()
-
-@pytest.mark.asyncio
-async def test_save_message_partial_attachment_failure(coordinator, git_storage_mock, file_storage_mock, attachment_handler_mock):
-    """Test handling of partial attachment failures."""
-    # Make second attachment save fail
-    file_storage_mock.save_attachment.side_effect = [None, RuntimeError("Test error"), None]
-    
-    message = Message(
-        id="test_message",
-        content="Test content",
-        source="test",
-        timestamp=datetime.now(timezone.utc),
-        metadata={},
-        attachments=[
-            Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
-            Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
-            Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt")
-        ]
-    )
+    user_id = 123
+    topic_name = "test_topic"
     
     # Verify error is propagated
     with pytest.raises(RuntimeError, match="Test error"):
-        await coordinator.save_message("test_topic", message)
-    
-    # Verify first attachment was saved
-    assert file_storage_mock.save_attachment.call_count == 2
-    
-    # Verify message was not saved due to attachment failure
-    git_storage_mock.save_message.assert_not_called()
-
-@pytest.mark.asyncio
-async def test_save_attachment_with_different_types(coordinator, file_storage_mock, attachment_handler_mock):
-    """Test saving attachments with different MIME types."""
-    attachments = [
-        Attachment(id="att1", type="image/jpeg", data=b"test1", filename="test1.jpg"),
-        Attachment(id="att2", type="application/pdf", data=b"test2", filename="test2.pdf"),
-        Attachment(id="att3", type="text/plain", data=b"test3", filename="test3.txt"),
-        Attachment(id="att4", type="image/png", data=b"test4", filename="test4.png")
-    ]
-    
-    # Save each attachment
-    for attachment in attachments:
-        await coordinator.save_attachment("test_topic", "test_message", attachment)
-    
-    # Verify each attachment was processed and saved
-    assert attachment_handler_mock.process.call_count == 4
-    assert file_storage_mock.save_attachment.call_count == 4
-
-@pytest.mark.asyncio
-async def test_save_attachment_processing_error(coordinator, attachment_handler_mock):
-    """Test error handling when attachment processing fails."""
-    attachment_handler_mock.process.side_effect = ValueError("Invalid attachment")
-    
-    attachment = Attachment(
-        id="test_att",
-        type="image/jpeg",
-        data=b"test",
-        filename="test.jpg"
-    )
-    
-    # Verify error is propagated
-    with pytest.raises(ValueError, match="Invalid attachment"):
-        await coordinator.save_attachment("test_topic", "test_message", attachment)
-
-@pytest.mark.asyncio
-async def test_save_attachment_concurrent(coordinator, file_storage_mock, attachment_handler_mock):
-    """Test saving multiple attachments concurrently."""
-    attachments = [
-        Attachment(id=f"att{i}", type="image/jpeg", data=b"test", filename=f"test{i}.jpg")
-        for i in range(5)
-    ]
-    
-    # Save attachments concurrently
-    import asyncio
-    await asyncio.gather(*[
-        coordinator.save_attachment("test_topic", "test_message", att)
-        for att in attachments
-    ])
-    
-    # Verify all attachments were processed and saved
-    assert attachment_handler_mock.process.call_count == 5
-    assert file_storage_mock.save_attachment.call_count == 5 
+        coordinator.topic_exists(user_id, topic_name) 

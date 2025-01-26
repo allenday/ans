@@ -1,5 +1,5 @@
 """Test crystalline logging configuration."""
-import logging
+from chronicler.logging import logging
 import json
 import pytest
 from datetime import datetime

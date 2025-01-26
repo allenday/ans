@@ -1,74 +1,96 @@
-"""Command processor implementation."""
-from chronicler.logging import get_logger, trace_operation
-from typing import Dict, Type, Optional
+"""Command processor for handling command frames."""
+from typing import Dict, Optional, Type
 
 from chronicler.frames.base import Frame
-from chronicler.processors.base import BaseProcessor
 from chronicler.frames.media import TextFrame
 from chronicler.frames.command import CommandFrame
-from .handlers import CommandHandler
+from chronicler.handlers.command import CommandHandler
+from chronicler.exceptions import (
+    CommandError,
+    CommandValidationError,
+    CommandStorageError,
+    CommandAuthorizationError
+)
+from chronicler.logging import get_logger
+from chronicler.processors.base import BaseProcessor
 
 logger = get_logger(__name__)
 
 class CommandProcessor(BaseProcessor):
-    """Processes command frames by routing them to appropriate handlers."""
+    """Processor for command frames."""
     
-    def __init__(self):
-        """Initialize the command processor."""
+    def __init__(self, coordinator=None):
+        """Initialize command processor.
+        
+        Args:
+            coordinator: Optional storage coordinator instance.
+        """
         super().__init__()
-        self.logger = get_logger(__name__)
-        self.logger.info("COMMAND - Initializing command processor")
         self._handlers: Dict[str, CommandHandler] = {}
-        self.logger.debug("COMMAND - No handlers registered")
+        self.coordinator = coordinator
+        logger.info("COMMAND - Initializing command processor")
+        logger.debug("COMMAND - No handlers registered")
         
-    @trace_operation('commands.processor')
-    async def process(self, frame: Frame) -> Optional[Frame]:
-        """Process a frame, routing commands to appropriate handlers."""
-        if not isinstance(frame, CommandFrame):
-            self.logger.debug(f"COMMAND - Ignoring non-command frame: {type(frame)}")
-            return None
-            
-        return await self.process_frame(frame)
+    @property
+    def handlers(self) -> Dict[str, CommandHandler]:
+        """Get registered handlers."""
+        return self._handlers.copy()
         
-    @trace_operation('commands.processor')
-    async def process_frame(self, frame: CommandFrame) -> Frame:
-        """Process a command frame."""
-        command = frame.command
-        args = frame.args
-        metadata = frame.metadata
-
-        self.logger.info(f"COMMAND - Processing command: {command} from user {metadata.get('sender_id', 'unknown')}")
-        self.logger.debug(f"COMMAND - Command args: {args}")
-        self.logger.debug(f"COMMAND - Command metadata: {metadata}")
-
-        if command not in self._handlers:
-            self.logger.error(f"COMMAND - No handler registered for command: {command}")
-            return TextFrame(content=f"Unknown command: {command}", metadata=metadata)
-
-        handler = self._handlers[command]
-        self.logger.debug(f"COMMAND - Using handler {handler.__class__.__name__} for {command}")
-
-        # Let exceptions propagate
-        result = await handler.handle(frame)
-        return result
+    def register_handler(self, handler: CommandHandler, command: str = None) -> None:
+        """Register a command handler.
+        
+        Args:
+            handler: The command handler to register.
+            command: Optional command to handle. If not provided, will use handler.command.
             
-    @trace_operation('commands.processor')
-    def register_handler(self, command: str, handler: CommandHandler) -> None:
-        """Register a handler for a command."""
-        if not command.startswith('/'):
-            logger.error(f"COMMAND - Invalid command format: {command} (must start with '/')")
-            raise ValueError("Command must start with '/'")
-            
+        Raises:
+            ValueError: If handler is not a CommandHandler instance or command is invalid.
+        """
         if handler is None:
-            logger.error("COMMAND - Attempted to register None as handler")
             raise ValueError("Handler cannot be None")
             
         if not isinstance(handler, CommandHandler):
-            logger.error(f"COMMAND - Invalid handler type: {type(handler)} (must be CommandHandler)")
-            raise ValueError("Handler must be an instance of CommandHandler")
+            raise ValueError(f"Handler must be an instance of CommandHandler (got {type(handler)})")
             
-        command = command.lower()
-        logger.info(f"COMMAND - Registering handler {handler.__class__.__name__} for command {command}")
-        if command in self._handlers:
-            logger.warning(f"COMMAND - Overwriting existing handler for {command}")
-        self._handlers[command] = handler 
+        # Get command from handler if not provided
+        cmd = command if command is not None else getattr(handler, 'command', None)
+        if not cmd:
+            raise ValueError("Command must be provided either as argument or as handler.command attribute")
+            
+        if not isinstance(cmd, str) or not cmd.startswith('/'):
+            raise ValueError("Invalid command format - must start with '/'")
+            
+        if cmd in self._handlers:
+            raise ValueError(f"Handler for command {cmd} already registered")
+            
+        self._handlers[cmd] = handler
+        logger.debug(f"COMMAND - Registered handler for {cmd}")
+        
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a frame.
+        
+        Args:
+            frame: The frame to process.
+            
+        Returns:
+            The processed frame or None if the frame was handled or is not a command.
+            
+        Raises:
+            ValueError: If no handler is registered for a command.
+        """
+        if not isinstance(frame, CommandFrame):
+            return None  # Pass through non-command frames
+
+        command = frame.command
+        if command not in self._handlers:
+            logger.error(f"COMMAND - No handler registered for command {command}")
+            raise ValueError(f"No handler registered for command {command}")
+
+        try:
+            handler = self._handlers[command]
+            result = await handler.handle(frame)
+            logger.info(f"COMMAND - Successfully handled command: {command}")
+            return result
+        except Exception as e:
+            logger.error(f"COMMAND - Error handling command {command}: {e}")
+            raise  # Re-raise the original exception 

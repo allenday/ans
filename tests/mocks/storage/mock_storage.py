@@ -1,48 +1,55 @@
 """Mock storage implementations for testing."""
 from pathlib import Path
-from chronicler.storage.interface import StorageAdapter, User, Topic, Message, Attachment
 
-class MockStorageCoordinator(StorageAdapter):
+class MockStorageCoordinator:
     """Mock storage coordinator for testing."""
     
-    def __init__(self, storage_path: Path):
+    def __init__(self, base_path: Path):
         """Initialize mock storage."""
-        self.storage_path = storage_path
+        self.base_path = base_path
         self.saved_messages = []
         self.saved_attachments = []
         self.topics = {}
-        self._initialized = False
         self.github_token = None
         self.github_repo = None
         
-    async def init_storage(self, user: User) -> 'StorageAdapter':
+    def init_storage(self, user_id: int) -> None:
         """Initialize storage for a user."""
-        self._initialized = True
-        return self
+        pass
         
-    async def create_topic(self, topic: Topic | str, ignore_exists: bool = False, **kwargs) -> None:
+    def create_topic(self, user_id: int, topic_name: str) -> None:
         """Create a new topic."""
-        if isinstance(topic, str):
-            topic = Topic(id=topic, name=topic, metadata=kwargs)
-        self.topics[topic.id] = topic
+        self.topics[(user_id, topic_name)] = {
+            'messages': [],
+            'attachments': []
+        }
         
-    async def save_message(self, topic_id: str, message: Message) -> None:
+    def save_message(self, user_id: int, topic_name: str, message: dict) -> None:
         """Save a message to a topic."""
-        self.saved_messages.append((topic_id, message))
+        if (user_id, topic_name) not in self.topics:
+            self.create_topic(user_id, topic_name)
+        self.saved_messages.append((user_id, topic_name, message))
+        self.topics[(user_id, topic_name)]['messages'].append(message)
         
-    async def save_attachment(self, topic_id: str, message_id: str, attachment: Attachment) -> None:
+    def save_attachment(self, user_id: int, topic_name: str, file_path: str | Path, attachment_name: str) -> None:
         """Save an attachment."""
-        self.saved_attachments.append((topic_id, message_id, attachment))
+        if (user_id, topic_name) not in self.topics:
+            self.create_topic(user_id, topic_name)
+        self.saved_attachments.append((user_id, topic_name, file_path, attachment_name))
+        self.topics[(user_id, topic_name)]['attachments'].append({
+            'path': str(file_path),
+            'name': attachment_name
+        })
         
-    async def sync(self) -> None:
+    def sync(self, user_id: int) -> None:
         """Synchronize with remote storage."""
         pass
         
-    async def set_github_config(self, token: str, repo: str) -> None:
+    def set_github_config(self, token: str, repo: str) -> None:
         """Set GitHub configuration."""
         self.github_token = token
         self.github_repo = repo
         
-    def is_initialized(self) -> bool:
-        """Check if storage is initialized."""
-        return self._initialized
+    def topic_exists(self, user_id: int, topic_name: str) -> bool:
+        """Check if a topic exists."""
+        return (user_id, topic_name) in self.topics

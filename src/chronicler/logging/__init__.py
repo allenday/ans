@@ -5,7 +5,8 @@ from .config import (
     CORRELATION_ID,
     COMPONENT_ID,
     OPERATION_ID,
-    get_logger
+    get_logger,
+    logging
 )
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     'CORRELATION_ID',
     'COMPONENT_ID',
     'OPERATION_ID',
-    'get_logger'
+    'get_logger',
+    'logging'
 ]
