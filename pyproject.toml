@@ -15,8 +15,7 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = [
-    "tests/00-unit",
-    "tests/01-live"
+    "tests/00-unit"
 ]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
