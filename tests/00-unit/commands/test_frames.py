@@ -1,6 +1,6 @@
 """Tests for command frame classes."""
 import pytest
-from chronicler.commands.frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 
 def test_command_frame_valid():
     """Test valid CommandFrame initialization."""
@@ -25,7 +25,7 @@ def test_command_frame_normalization():
 def test_command_frame_validation():
     """Test command validation."""
     # Test command without leading slash
-    with pytest.raises(ValueError, match="Invalid command format - must start with '/'"):
+    with pytest.raises(ValueError, match="Command must start with '/'"):
         CommandFrame(command="test")
 
     # Test None command

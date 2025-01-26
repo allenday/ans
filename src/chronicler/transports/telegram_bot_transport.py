@@ -1,9 +1,11 @@
 """Telegram bot transport implementation."""
 
 from typing import Optional, Dict, Any, Callable, Awaitable, Union
-from telegram import Update as TelegramUpdate
+from telegram import Update as TelegramUpdate, Message, Chat, User, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ApplicationBuilder
 from telegram.error import InvalidToken
+from datetime import datetime
+import asyncio
 
 from chronicler.frames.base import Frame
 from chronicler.frames.command import CommandFrame
@@ -12,27 +14,31 @@ from chronicler.transports.telegram_transport import TelegramTransportBase
 from chronicler.transports.telegram_bot_event import TelegramBotEvent
 from chronicler.transports.telegram_bot_update import TelegramBotUpdate
 from chronicler.logging import get_logger
-from chronicler.logging.config import trace_operation
+from chronicler.logging.config import trace_operation, CORRELATION_ID
 from chronicler.exceptions import TransportError, TransportAuthenticationError
 
 logger = get_logger(__name__)
 
 class TelegramBotTransport(TelegramTransportBase):
-    """Transport implementation for Telegram Bot API."""
+    """Telegram bot transport implementation."""
 
-    def __init__(self, token: str):
-        """Initialize bot transport.
+    def __init__(self, token: str, storage=None):
+        """Initialize transport.
         
         Args:
-            token: Bot token from BotFather.
+            token: Bot token from BotFather
+            storage: Storage instance for saving messages
         """
         super().__init__()
         self._token = token
-        self._initialized = False
         self._app = None
         self._bot = None
-        self._command_handlers: Dict[str, Callable[[TelegramBotEvent], Awaitable[None]]] = {}
+        self._initialized = False
+        self._error_count = 0
+        self._command_handlers = {}
         self.frame_processor = None
+        self.storage = storage
+        self.logger = get_logger(__name__)
 
     @property
     def is_running(self) -> bool:
@@ -200,7 +206,13 @@ class TelegramBotTransport(TelegramTransportBase):
             # Register command handler without slash prefix
             await self._app.add_handler(CommandHandler(
                 cmd_without_slash,
-                lambda update, context: self._handle_command(update, handler)
+                lambda update, context: asyncio.create_task(handler(
+                    CommandFrame(
+                        command=f"/{cmd_without_slash}",
+                        args=context.args if context.args else [],
+                        metadata=TelegramBotEvent(update=update).get_metadata()
+                    )
+                ))
             ))
         except Exception as e:
             self.logger.error(f"Failed to register command: {e}")
@@ -225,32 +237,50 @@ class TelegramBotTransport(TelegramTransportBase):
             logger.error(f"Failed to process message: {e}", exc_info=True)
             self._error_count += 1
 
-    async def _handle_command(self, update: Union[TelegramUpdate, CommandFrame], handler: Callable[[TelegramBotEvent], Awaitable[None]]):
-        """Handle incoming command."""
+    async def _handle_command(self, update: CommandFrame, handler: Callable) -> None:
+        """Handle a command frame.
+        
+        Args:
+            update: Command frame to handle
+            handler: Handler function to call
+        """
         try:
-            # If update is already a CommandFrame, use it directly
-            if isinstance(update, CommandFrame):
-                frame = update
-            else:
-                # Create command frame from the raw update
-                frame = CommandFrame(
-                    command=update.message.text.split()[0],  # First word is command
-                    args=update.message.text.split()[1:],  # Rest are args
-                    metadata={
-                        "chat_id": update.message.chat.id,
-                        "chat_title": update.message.chat.title,
-                        "sender_id": update.message.from_user.id,
-                        "sender_name": update.message.from_user.username,
-                        "message_id": update.message.message_id,
-                        "is_private": update.message.chat.type == "private",
-                        "is_group": update.message.chat.type in ["group", "supergroup"]
-                    }
-                )
-            # Process frame
-            processed_frame = await self.process_frame(frame)
-            # Execute handler
-            await handler(processed_frame)
+            # Set correlation ID from frame metadata if present
+            if update.metadata and 'correlation_id' in update.metadata:
+                CORRELATION_ID.set(update.metadata['correlation_id'])
+
+            # Create mock message for telegram update
+            message = Message(
+                message_id=update.metadata.get('message_id'),
+                date=datetime.now(),
+                chat=Chat(
+                    id=update.metadata.get('chat_id'),
+                    type='private',
+                    title=update.metadata.get('chat_title')
+                ),
+                from_user=User(
+                    id=update.metadata.get('sender_id'),
+                    first_name=update.metadata.get('sender_name'),
+                    is_bot=False
+                ),
+                text=update.command
+            )
+            telegram_update = Update(
+                update_id=update.metadata.get('message_id', 0),
+                message=message
+            )
+            bot_update = TelegramBotUpdate(telegram_update)
+            event = TelegramBotEvent(update=bot_update)
+
+            # Process the command
+            response = await handler(event)
+            if response:
+                await self.storage.save_message(response)
+                await self.send(response)
+
         except Exception as e:
-            self.logger.error(f"Failed to handle command: {e}")
-            raise TransportError(f"Failed to handle command: {e}")
+            self._error_count += 1
+            raise TransportError(f"Command handling failed: {str(e)}") from e
+        finally:
+            CORRELATION_ID.set(None)
 

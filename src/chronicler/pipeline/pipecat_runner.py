@@ -55,11 +55,12 @@ async def run_bot(token: str, storage_path: str):
         logger.info("Starting bot...")
         try:
             await transport.authenticate()  # Authenticate before starting
+            await transport.start()  # Start transport
+            logger.info("Bot started successfully")
         except Exception as e:
             logger.error(f"Authentication failed: {str(e)}")
             raise TransportAuthenticationError(str(e))
             
-        await transport.start()
         await stop.wait()  # Wait until stop signal
     finally:
         await transport.stop()

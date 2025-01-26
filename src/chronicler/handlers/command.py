@@ -39,7 +39,8 @@ class StartCommandHandler(CommandHandler):
         """Handle /start command."""
         try:
             logger.debug("HANDLER - Processing /start command")
-            chat_id = frame.metadata.get("chat_id")
+            metadata = frame.get_metadata() if hasattr(frame, 'get_metadata') else frame.metadata
+            chat_id = metadata.chat_id if hasattr(metadata, 'chat_id') else metadata.get('chat_id')
             
             # Check if already initialized
             if await self.coordinator.is_initialized():
@@ -61,7 +62,7 @@ class StartCommandHandler(CommandHandler):
             
             return TextFrame(
                 content="Storage initialized successfully! You can now configure your GitHub repository with /config.",
-                metadata=frame.metadata
+                metadata=metadata if isinstance(metadata, dict) else metadata.__dict__
             )
         except Exception as e:
             logger.error(f"HANDLER - Error handling /start command: {str(e)}")

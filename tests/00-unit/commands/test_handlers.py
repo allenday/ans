@@ -1,7 +1,7 @@
 """Test cases for command handlers."""
 import pytest
 from unittest.mock import Mock, AsyncMock
-from chronicler.commands.frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.exceptions import (
     CommandValidationError,

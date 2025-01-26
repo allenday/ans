@@ -372,6 +372,7 @@ async def test_handle_command_execution(mock_telegram_bot):
     
     # Create mock context
     mock_context = Mock()
+    mock_context.args = Mock()
     mock_context.args = ["arg1", "arg2"]
     
     # Execute command

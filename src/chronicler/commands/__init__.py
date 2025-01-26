@@ -1,5 +1,5 @@
 """Command handling infrastructure."""
-from .frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 from .processor import CommandProcessor
 from chronicler.handlers.command import (
     CommandHandler,
@@ -9,7 +9,6 @@ from chronicler.handlers.command import (
 )
 
 __all__ = [
-    'CommandFrame',
     'CommandProcessor',
     'CommandHandler',
     'StartCommandHandler',

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 import asyncio
 
-from chronicler.commands.frames import CommandFrame
+from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.commands.processor import CommandProcessor
 from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
@@ -40,8 +40,9 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         processor.register_handler(config_handler, "/config")
         processor.register_handler(status_handler, "/status")
 
-        # Create transport with mock app and bot
-        transport = TelegramBotTransport(token='test_token')
+        # Get transport from mock_telegram_bot fixture and set storage
+        transport = mock_telegram_bot['transport']
+        transport.storage = storage  # Set storage object
         transport.frame_processor = processor.process
         
         # Authenticate and initialize transport
@@ -59,7 +60,8 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
                 'sender_name': "testuser",
                 'message_id': 789,
                 'timestamp': datetime.now(timezone.utc).timestamp(),
-                'thread_id': 'default'
+                'thread_id': 'default',
+                'correlation_id': 'test-correlation-id'  # Add correlation ID to metadata
             }
         )
 
@@ -73,4 +75,5 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         storage.save_message.assert_awaited_once()
 
         # Verify logs contain correlation ID
-        assert any('correlation_id' in record.message for record in caplog.records)
+        captured = capsys.readouterr()
+        assert any('correlation_id' in line and 'test-correlation-id' in line for line in captured.out.splitlines())

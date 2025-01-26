@@ -256,6 +256,9 @@ class MockApplication:
         self.logger.debug("Adding handler to application")
         if group is None:
             group = 0
+        # Ensure we have enough groups
+        while len(self.handlers) <= group:
+            self.handlers.append([])
         self.handlers[group].append(handler)
         self.logger.debug("Handler added successfully")
 
