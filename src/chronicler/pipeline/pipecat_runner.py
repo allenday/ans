@@ -28,9 +28,9 @@ async def run_bot(token: str, storage_path: str):
     
     # Initialize command processor with handlers
     command_processor = CommandProcessor()
-    command_processor.register_handler(StartCommandHandler(storage), "/start")
-    command_processor.register_handler(ConfigCommandHandler(storage), "/config")
-    command_processor.register_handler(StatusCommandHandler(storage), "/status")
+    command_processor.register_command("/start", StartCommandHandler(storage).handle)
+    command_processor.register_command("/config", ConfigCommandHandler(storage).handle)
+    command_processor.register_command("/status", StatusCommandHandler(storage).handle)
     logger.debug("Registered command handlers")
     
     # Create pipeline with command processor
