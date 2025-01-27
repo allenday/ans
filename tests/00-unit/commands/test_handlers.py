@@ -26,12 +26,11 @@ TEST_METADATA = {
 @pytest.fixture
 def mock_storage():
     """Create a mock storage coordinator."""
-    storage = Mock()
+    storage = AsyncMock()
+    storage.is_initialized = AsyncMock(return_value=False)
     storage.init_storage = AsyncMock()
     storage.create_topic = AsyncMock()
-    storage.set_github_config = AsyncMock()
-    storage.sync = AsyncMock()
-    storage.is_initialized = AsyncMock(return_value=False)
+    storage.save_message = AsyncMock()
     return storage
 
 class TestStartCommandHandler:
@@ -42,16 +41,14 @@ class TestStartCommandHandler:
         """Test successful /start command handling."""
         handler = StartCommandHandler(coordinator=mock_storage)
         frame = CommandFrame(command="/start", metadata=TEST_METADATA)
-        
         response = await handler.handle(frame)
         
-        # Verify storage initialization
-        mock_storage.init_storage.assert_called_once_with(TEST_METADATA["chat_id"])
-        mock_storage.create_topic.assert_called_once_with(TEST_METADATA["chat_id"], "default")
-        
-        # Verify response
-        assert isinstance(response, TextFrame)
-        assert "Storage initialized" in response.content
+        assert response is not None
+        assert response.content == "Storage initialized successfully! You can now configure your GitHub repository with /config."
+        mock_storage.is_initialized.assert_awaited_once()
+        mock_storage.init_storage.assert_awaited_once()
+        mock_storage.create_topic.assert_awaited_once()
+        mock_storage.save_message.assert_awaited_once_with(frame)
     
     @pytest.mark.asyncio
     async def test_start_command_already_initialized(self, mock_storage):

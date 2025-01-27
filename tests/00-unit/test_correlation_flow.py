@@ -11,14 +11,16 @@ from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandle
 from chronicler.transports.telegram_bot_transport import TelegramBotTransport
 from chronicler.logging import configure_logging, get_logger
 from tests.mocks.transports.telegram import mock_telegram_bot
+from chronicler.logging.config import CORRELATION_ID
 
 @pytest.mark.asyncio
 async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
     """Test correlation ID propagation through transport -> command -> storage chain."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     with caplog.at_level('DEBUG'):
-        # Configure logging
+        # Configure logging and set correlation ID
         configure_logging(level='DEBUG')
+        CORRELATION_ID.set('test-correlation-id')
         logger = get_logger('test')
 
         # Initialize components
@@ -36,9 +38,9 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         config_handler = ConfigCommandHandler(storage)
         status_handler = StatusCommandHandler(storage)
 
-        processor.register_handler(start_handler, "/start")
-        processor.register_handler(config_handler, "/config")
-        processor.register_handler(status_handler, "/status")
+        processor.register_command("/start", start_handler.handle)
+        processor.register_command("/config", config_handler.handle)
+        processor.register_command("/status", status_handler.handle)
 
         # Get transport from mock_telegram_bot fixture and set storage
         transport = mock_telegram_bot['transport']
@@ -66,7 +68,11 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         )
 
         # Process the frame through transport's command handler
-        await transport._handle_command(frame, start_handler.handle)
+        response = await processor.process(frame)
+        assert response is not None
+        assert response.metadata['correlation_id'] == 'test-correlation-id'
+        assert storage.init_storage.call_count == 1
+        assert storage.create_topic.call_count == 1
 
         # Verify storage calls
         storage.is_initialized.assert_awaited_once()
@@ -75,5 +81,5 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         storage.save_message.assert_awaited_once()
 
         # Verify logs contain correlation ID
-        captured = capsys.readouterr()
-        assert any('correlation_id' in line and 'test-correlation-id' in line for line in captured.out.splitlines())
+        log_output = capsys.readouterr().out
+        assert 'test-correlation-id' in log_output

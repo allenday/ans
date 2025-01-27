@@ -68,29 +68,18 @@ async def test_bot_initialization_after_auth(mock_telegram_bot):
 
 @pytest.mark.asyncio
 async def test_command_registration_after_auth(mock_telegram_bot):
-    """Test that commands can be registered after authentication."""
+    """Test that command registration is no longer supported after authentication."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.authenticate()
     await transport.start()  # Start transport before registering commands
     
-    # Register a test command
+    # Attempt to register a test command
     async def test_command(frame):
         pass
     
-    await transport.register_command("test", test_command)
-    
-    # Verify command was registered with leading slash in internal handlers
-    assert "/test" in transport._command_handlers
-    assert transport._command_handlers["/test"] == test_command
-    
-    # Verify command was added to application handlers without leading slash
-    assert transport._app is not None
-    assert any(isinstance(h, CommandHandler) and h.commands == frozenset(["test"])
-              for h in transport._app.handlers[0])
-    
-    # Clean up
-    await transport.stop()
+    with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
+        await transport.register_command("test", test_command)
 
 @pytest.mark.asyncio
 async def test_start_without_auth(mock_telegram_bot):
@@ -214,7 +203,7 @@ async def test_send_error_handling(mock_telegram_bot):
 
 @pytest.mark.asyncio
 async def test_invalid_command_characters(mock_telegram_bot):
-    """Test registering commands with invalid characters."""
+    """Test that command registration with invalid characters is no longer supported."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.authenticate()
@@ -227,12 +216,12 @@ async def test_invalid_command_characters(mock_telegram_bot):
     invalid_commands = ["test@command", "test#1", "test!", "test space"]
     
     for cmd in invalid_commands:
-        with pytest.raises(TransportError, match=f"Failed to register command: Command `{cmd}` is not a valid bot command"):
+        with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
             await transport.register_command(cmd, test_command)
 
 @pytest.mark.asyncio
 async def test_duplicate_command_registration(mock_telegram_bot):
-    """Test registering the same command multiple times."""
+    """Test that duplicate command registration is no longer supported."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.authenticate()
@@ -246,14 +235,9 @@ async def test_duplicate_command_registration(mock_telegram_bot):
     async def command2(frame):
         command_executions.append("command2")
     
-    # Register first command
-    await transport.register_command("test", command1)
-    
-    # Register same command again
-    await transport.register_command("test", command2)
-    
-    # Verify only the second command is registered
-    assert transport._command_handlers["/test"] == command2 
+    # Attempt to register first command
+    with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
+        await transport.register_command("test", command1)
 
 @pytest.mark.asyncio
 async def test_process_frame_without_processor(mock_telegram_bot):
@@ -307,7 +291,7 @@ async def test_handle_message_error(mock_telegram_bot):
 
 @pytest.mark.asyncio
 async def test_bot_transport_command_not_found(mock_telegram_bot):
-    """Test handling of unregistered commands in TelegramBotTransport."""
+    """Test that command handling is no longer supported in TelegramBotTransport."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.authenticate()
@@ -315,28 +299,12 @@ async def test_bot_transport_command_not_found(mock_telegram_bot):
     
     # Register a command
     handler = AsyncMock()
-    await transport.register_command("test", handler)
-    
-    # Verify only the registered command has a handler
-    assert "/test" in transport._command_handlers
-    assert "/unknown" not in transport._command_handlers
-    
-    # Mock an incoming unregistered command
-    mock_update = Mock()
-    mock_update.message = Mock(
-        text="/unknown",
-        chat=Mock(id=456, title="Test Chat", type="private"),
-        from_user=Mock(id=789, username="testuser"),
-        message_id=123
-    )
-    
-    # Handle the message - should not call our test handler
-    await transport._handle_message(TelegramBotUpdate(mock_update))
-    handler.assert_not_called()
+    with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
+        await transport.register_command("test", handler)
 
 @pytest.mark.asyncio
 async def test_handle_command_execution(mock_telegram_bot):
-    """Test command execution through handler."""
+    """Test that command execution is no longer handled by transport."""
     mock_telegram_bot['loop'] = asyncio.get_running_loop()
     transport = TelegramBotTransport("test_token")
     await transport.authenticate()
@@ -352,33 +320,9 @@ async def test_handle_command_execution(mock_telegram_bot):
         assert frame.command == "/test"
         assert frame.args == ["arg1", "arg2"]
     
-    # Register command
-    await transport.register_command("test", test_command)
-    
-    # Create mock update for command
-    mock_update = Mock()
-    mock_update.message = Mock(
-        text="/test arg1 arg2",
-        chat=Mock(id=123, title="Test Chat", type="private"),
-        from_user=Mock(id=456, username="testuser"),
-        message_id=789
-    )
-    
-    # Find command handler
-    command_handler = next(
-        h for h in transport._app.handlers[0] 
-        if isinstance(h, CommandHandler) and "test" in h.commands
-    )
-    
-    # Create mock context
-    mock_context = Mock()
-    mock_context.args = Mock()
-    mock_context.args = ["arg1", "arg2"]
-    
-    # Execute command
-    await command_handler.callback(mock_update, mock_context)
-    
-    assert command_executed
+    # Attempt to register command
+    with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
+        await transport.register_command("test", test_command)
 
 @pytest.mark.asyncio
 async def test_authenticate_invalid_token(mock_telegram_bot):
@@ -814,4 +758,13 @@ async def test_stop_without_initialization():
     await transport.stop()
     
     assert not transport.is_running
-    assert transport._app is None 
+    assert transport._app is None
+
+@pytest.mark.asyncio
+async def test_command_registration_removed():
+    """Test that command registration is no longer supported."""
+    transport = TelegramBotTransport(token="test_token")
+    await transport.authenticate()
+    
+    with pytest.raises(NotImplementedError, match="Command registration is no longer supported in Transport"):
+        await transport.register_command("test", AsyncMock()) 

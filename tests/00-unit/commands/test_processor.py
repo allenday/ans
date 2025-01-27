@@ -17,11 +17,11 @@ from chronicler.exceptions import (
 TEST_METADATA = {"chat_id": 123}
 
 @pytest.fixture
-def mock_handler():
-    """Create a mock command handler."""
-    handler = Mock(spec=CommandHandler)
-    handler.command = "/test"
-    return handler
+def mock_handler_func():
+    """Create a mock async handler function."""
+    async def handler(frame):
+        return TextFrame(content="test response", metadata=frame.metadata)
+    return handler  # Return the function directly, not awaiting it
 
 class TestCommandProcessor:
     """Tests for command processor."""
@@ -32,42 +32,39 @@ class TestCommandProcessor:
         assert isinstance(processor.handlers, dict)
         assert len(processor.handlers) == 0
         
-    def test_register_handler_valid(self, mock_handler):
-        """Test valid handler registration."""
+    @pytest.mark.asyncio
+    async def test_register_command_valid(self, mock_handler_func):
+        """Test valid command registration with async function."""
         processor = CommandProcessor()
-        processor.register_handler(mock_handler)
-        assert "/test" in processor.handlers
-        assert processor.handlers["/test"] == mock_handler
+        processor.register_command("/start", mock_handler_func)
+        assert "/start" in processor._handlers
+        assert processor._handlers["/start"] == mock_handler_func
         
-    def test_register_handler_invalid_command(self, mock_handler):
-        """Test handler registration with invalid command."""
+        # Test the handler works
+        frame = CommandFrame(command="/start", metadata=TEST_METADATA)
+        response = await processor.process(frame)
+        assert isinstance(response, TextFrame)
+        assert response.content == "test response"
+        assert response.metadata == TEST_METADATA
+        
+    def test_register_command_invalid_command(self, mock_handler_func):
+        """Test command registration with invalid command name."""
         processor = CommandProcessor()
-        with pytest.raises(ValueError, match="Invalid command format"):
-            processor.register_handler(mock_handler, "test")
+        with pytest.raises(ValueError, match="Command must start with '/'"):
+            processor.register_command("start", mock_handler_func)
             
-    def test_register_handler_none(self):
-        """Test handler registration with None handler."""
+    def test_register_command_invalid_handler(self):
+        """Test command registration with invalid handler."""
         processor = CommandProcessor()
-        with pytest.raises(ValueError, match="Handler cannot be None"):
-            processor.register_handler(None)
+        with pytest.raises(ValueError, match="Handler must be a callable"):
+            processor.register_command("/start", None)
             
-    def test_register_handler_invalid_type(self):
-        """Test handler registration with invalid handler type."""
+    def test_register_command_duplicate(self, mock_handler_func):
+        """Test command registration with duplicate command."""
         processor = CommandProcessor()
-        invalid_handler = object()
-        with pytest.raises(ValueError, match="Handler must be an instance of CommandHandler"):
-            processor.register_handler(invalid_handler)
-            
-    def test_register_handler_duplicate(self, mock_handler):
-        """Test handler registration with duplicate command."""
-        processor = CommandProcessor()
-        handler1 = Mock(spec=CommandHandler)
-        handler1.command = "/test"
-        handler2 = Mock(spec=CommandHandler)
-        handler2.command = "/test"
-        processor.register_handler(handler1)
+        processor.register_command("/test", mock_handler_func)
         with pytest.raises(ValueError, match="Handler for command /test already registered"):
-            processor.register_handler(handler2)
+            processor.register_command("/test", mock_handler_func)
             
     @pytest.mark.asyncio
     async def test_process_non_command_frame(self):
@@ -86,13 +83,14 @@ class TestCommandProcessor:
             await processor.process(frame)
             
     @pytest.mark.asyncio
-    async def test_handler_error(self):
+    async def test_handler_error(self, mock_handler_func):
         """Test handler error."""
         processor = CommandProcessor()
-        handler = Mock(spec=CommandHandler)
-        handler.command = "/test"
-        handler.handle = AsyncMock(side_effect=RuntimeError("Test error"))
-        processor.register_handler(handler)
+        
+        async def failing_handler(frame):
+            raise RuntimeError("Test error")
+            
+        processor.register_command("/test", failing_handler)
         frame = CommandFrame(command="/test")
         with pytest.raises(RuntimeError, match="Test error"):
             await processor.process(frame) 

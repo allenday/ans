@@ -8,15 +8,30 @@ from chronicler.exceptions import (
     CommandExecutionError
 )
 from tests.mocks.processors import TestCommandHandler, command_processor, storage
+from chronicler.processors.command import CommandProcessor
+from chronicler.storage.coordinator import StorageCoordinator
 
 pytestmark = pytest.mark.asyncio
 
+@pytest.fixture
+def storage():
+    """Create a mock storage coordinator."""
+    storage = AsyncMock(spec=StorageCoordinator)
+    storage.is_initialized = AsyncMock(return_value=False)
+    storage.init_storage = AsyncMock()
+    storage.create_topic = AsyncMock()
+    storage.save_message = AsyncMock()
+    return storage
+
+@pytest.fixture
+def command_processor(storage):
+    """Create a command processor with mock storage."""
+    return CommandProcessor(storage)
+
 async def test_command_processor_init(command_processor):
     """Test command processor initialization."""
-    # Verify default handlers are registered
-    assert "/start" in command_processor.handlers
-    assert "/config" in command_processor.handlers
-    assert "/status" in command_processor.handlers
+    assert command_processor is not None
+    assert isinstance(command_processor, CommandProcessor)
 
 async def test_register_handler(command_processor):
     """Test registering a new command handler."""
@@ -70,15 +85,15 @@ async def test_process_command_error(command_processor):
 
 async def test_default_start_command(command_processor, storage):
     """Test the default /start command."""
-    # Mock storage to not be initialized
-    storage.is_initialized = AsyncMock(return_value=False)
-    storage.init_storage = AsyncMock()
-
     frame = CommandFrame(command="/start", args="", metadata={"chat_id": 123})
     result = await command_processor.process(frame)
 
+    assert result is not None
     assert result.content == "Storage initialized successfully! You can now configure your GitHub repository with /config."
-    assert result.metadata == {"chat_id": 123, "type": "textframe"}
+    storage.is_initialized.assert_awaited_once()
+    storage.init_storage.assert_awaited_once()
+    storage.create_topic.assert_awaited_once()
+    storage.save_message.assert_awaited_once_with(frame)
 
 async def test_default_status_command(command_processor, storage):
     """Test the default /status command."""

@@ -1,10 +1,9 @@
 """Command processor for handling command frames."""
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Callable, Awaitable
 
 from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame
 from chronicler.frames.command import CommandFrame
-from chronicler.handlers.command import CommandHandler
 from chronicler.exceptions import (
     CommandError,
     CommandValidationError,
@@ -26,46 +25,39 @@ class CommandProcessor(BaseProcessor):
             coordinator: Optional storage coordinator instance.
         """
         super().__init__()
-        self._handlers: Dict[str, CommandHandler] = {}
+        self._handlers: Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]] = {}
         self.coordinator = coordinator
         logger.info("COMMAND - Initializing command processor")
         logger.debug("COMMAND - No handlers registered")
         
     @property
-    def handlers(self) -> Dict[str, CommandHandler]:
+    def handlers(self) -> Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]]:
         """Get registered handlers."""
         return self._handlers.copy()
         
-    def register_handler(self, handler: CommandHandler, command: str = None) -> None:
-        """Register a command handler.
+    def register_command(self, command: str, handler: Callable[[Frame], Awaitable[Optional[Frame]]]) -> None:
+        """Register a command handler function.
         
         Args:
-            handler: The command handler to register.
-            command: Optional command to handle. If not provided, will use handler.command.
+            command: The command to handle (e.g. "start" for /start)
+            handler: Async function that takes a Frame and returns an Optional[Frame]
             
         Raises:
-            ValueError: If handler is not a CommandHandler instance or command is invalid.
+            ValueError: If command format is invalid or handler is not callable
         """
-        if handler is None:
-            raise ValueError("Handler cannot be None")
+        if not callable(handler):
+            raise ValueError("Handler must be a callable")
             
-        if not isinstance(handler, CommandHandler):
-            raise ValueError(f"Handler must be an instance of CommandHandler (got {type(handler)})")
+        # Validate command format
+        if not command.startswith('/'):
+            raise ValueError("Command must start with '/'")
             
-        # Get command from handler if not provided
-        cmd = command if command is not None else getattr(handler, 'command', None)
-        if not cmd:
-            raise ValueError("Command must be provided either as argument or as handler.command attribute")
+        if command in self._handlers:
+            raise ValueError(f"Handler for command {command} already registered")
             
-        if not isinstance(cmd, str) or not cmd.startswith('/'):
-            raise ValueError("Invalid command format - must start with '/'")
+        self._handlers[command] = handler
+        logger.debug(f"COMMAND - Registered handler for {command}")
             
-        if cmd in self._handlers:
-            raise ValueError(f"Handler for command {cmd} already registered")
-            
-        self._handlers[cmd] = handler
-        logger.debug(f"COMMAND - Registered handler for {cmd}")
-        
     async def process(self, frame: Frame) -> Optional[Frame]:
         """Process a frame.
         
@@ -88,7 +80,7 @@ class CommandProcessor(BaseProcessor):
 
         try:
             handler = self._handlers[command]
-            result = await handler.handle(frame)
+            result = await handler(frame)
             logger.info(f"COMMAND - Successfully handled command: {command}")
             return result
         except Exception as e:

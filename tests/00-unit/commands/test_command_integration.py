@@ -1,4 +1,4 @@
-"""Test cases for command integration."""
+"""Test command integration."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -29,42 +29,33 @@ async def test_command_flow(coordinator_mock, command_frame_factory):
     start_handler = StartCommandHandler(coordinator=coordinator_mock)
     config_handler = ConfigCommandHandler(coordinator=coordinator_mock)
     status_handler = StatusCommandHandler(coordinator=coordinator_mock)
-
-    processor.register_handler(command="/start", handler=start_handler)
-    processor.register_handler(command="/config", handler=config_handler)
-    processor.register_handler(command="/status", handler=status_handler)
-
-    # Mock coordinator behavior
-    coordinator_mock.is_initialized.side_effect = [False, True, True]
-    coordinator_mock.init_storage = AsyncMock()
-    coordinator_mock.create_topic = AsyncMock()
-    coordinator_mock.set_github_config = AsyncMock()
-    coordinator_mock.sync = AsyncMock()
-
+    
+    # Configure mock behavior
+    coordinator_mock.is_initialized.return_value = False  # Initially not initialized
+    coordinator_mock.initialize.return_value = None  # Initialize succeeds
+    coordinator_mock.create_default_topic.return_value = None  # Create topic succeeds
+    coordinator_mock.configure_github.return_value = None  # Configure GitHub succeeds
+    coordinator_mock.sync.return_value = None  # Sync succeeds
+    
+    # Register handlers
+    processor.register_command("/start", start_handler.handle)
+    processor.register_command("/config", config_handler.handle)
+    processor.register_command("/status", status_handler.handle)
+    
     # Test /start command
-    start_frame = command_frame_factory(command="/start")
-    result = await processor.process(start_frame)
-    assert isinstance(result, TextFrame)
-    assert "initialized" in result.content.lower()
-    coordinator_mock.init_storage.assert_awaited_once()
-    coordinator_mock.create_topic.assert_awaited_once()
-
+    start_frame = command_frame_factory("/start")
+    response = await processor.process(start_frame)
+    assert response.content == "Storage initialized successfully! You can now configure your GitHub repository with /config."
+    
+    # Update mock state after initialization
+    coordinator_mock.is_initialized.return_value = True  # Now initialized
+    
     # Test /config command
-    config_frame = command_frame_factory(
-        command="/config",
-        args=["user/repo", "ghp_token123"]
-    )
-    result = await processor.process(config_frame)
-    assert isinstance(result, TextFrame)
-    assert "configuration" in result.content.lower()
-    coordinator_mock.set_github_config.assert_awaited_once_with(
-        token="ghp_token123",
-        repo="user/repo"
-    )
-
+    config_frame = command_frame_factory("/config", args=["username/repo", "ghp_token"])
+    response = await processor.process(config_frame)
+    assert response.content == "GitHub configuration updated!\n\nI'll now archive your messages to:\nhttps://github.com/username/repo\n\nYou can check the current status with /status"
+    
     # Test /status command
-    status_frame = command_frame_factory(command="/status")
-    result = await processor.process(status_frame)
-    assert isinstance(result, TextFrame)
-    assert "status" in result.content.lower()
-    assert coordinator_mock.sync.await_count == 2  # Called by both config and status handlers 
+    status_frame = command_frame_factory("/status")
+    response = await processor.process(status_frame)
+    assert response.content == "Chronicler Status:\n- Storage: Initialized\n- GitHub: Connected\n- Last sync: Success" 

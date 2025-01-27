@@ -16,7 +16,6 @@ class BaseTransport(BaseProcessor, ABC):
         self.logger.debug("TRANSPORT - Initialized BaseTransport")
         self._start_time = None
         self._message_count = 0
-        self._command_count = 0
         self._error_count = 0
         self._initialized = False
     

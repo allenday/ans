@@ -35,7 +35,6 @@ class TelegramBotTransport(TelegramTransportBase):
         self._bot = None
         self._initialized = False
         self._error_count = 0
-        self._command_handlers = {}
         self.frame_processor = None
         self.storage = storage
         self.logger = get_logger(__name__)
@@ -193,32 +192,9 @@ class TelegramBotTransport(TelegramTransportBase):
             handler: Handler function
             
         Raises:
-            TransportError: If command registration fails
+            NotImplementedError: Command registration is no longer supported in Transport
         """
-        # Ensure command starts with slash
-        cmd_with_slash = f"/{command.lstrip('/')}"
-        cmd_without_slash = command.lstrip('/')
-        
-        # Store handler with slash prefix
-        self._command_handlers[cmd_with_slash] = handler
-        
-        try:
-            # Register command handler without slash prefix
-            await self._app.add_handler(CommandHandler(
-                cmd_without_slash,
-                lambda update, context: asyncio.create_task(handler(
-                    CommandFrame(
-                        command=f"/{cmd_without_slash}",
-                        args=context.args if context.args else [],
-                        metadata=TelegramBotEvent(update=update).get_metadata()
-                    )
-                ))
-            ))
-        except Exception as e:
-            self.logger.error(f"Failed to register command: {e}")
-            # Remove handler since registration failed
-            del self._command_handlers[cmd_with_slash]
-            raise TransportError(f"Failed to register command: {e}")
+        raise NotImplementedError("Command registration is no longer supported in Transport")
 
     async def _handle_message(self, update: TelegramBotUpdate):
         """Handle incoming text messages."""
@@ -236,51 +212,4 @@ class TelegramBotTransport(TelegramTransportBase):
         except Exception as e:
             logger.error(f"Failed to process message: {e}", exc_info=True)
             self._error_count += 1
-
-    async def _handle_command(self, update: CommandFrame, handler: Callable) -> None:
-        """Handle a command frame.
-        
-        Args:
-            update: Command frame to handle
-            handler: Handler function to call
-        """
-        try:
-            # Set correlation ID from frame metadata if present
-            if update.metadata and 'correlation_id' in update.metadata:
-                CORRELATION_ID.set(update.metadata['correlation_id'])
-
-            # Create mock message for telegram update
-            message = Message(
-                message_id=update.metadata.get('message_id'),
-                date=datetime.now(),
-                chat=Chat(
-                    id=update.metadata.get('chat_id'),
-                    type='private',
-                    title=update.metadata.get('chat_title')
-                ),
-                from_user=User(
-                    id=update.metadata.get('sender_id'),
-                    first_name=update.metadata.get('sender_name'),
-                    is_bot=False
-                ),
-                text=update.command
-            )
-            telegram_update = Update(
-                update_id=update.metadata.get('message_id', 0),
-                message=message
-            )
-            bot_update = TelegramBotUpdate(telegram_update)
-            event = TelegramBotEvent(update=bot_update)
-
-            # Process the command
-            response = await handler(event)
-            if response:
-                await self.storage.save_message(response)
-                await self.send(response)
-
-        except Exception as e:
-            self._error_count += 1
-            raise TransportError(f"Command handling failed: {str(e)}") from e
-        finally:
-            CORRELATION_ID.set(None)
 
