@@ -47,31 +47,31 @@ User -> Transport -> Pipeline -> CommandProcessor -> Handler -> Transport
 3. Minor changes to Transport interface (remove command methods)
 4. Minor changes to CommandProcessor interface (simplified registration)
 
-## Non-Goals
+## 5. Non-Goals
 1. No changes to storage layer
 2. No changes to frame types
 3. No changes to pipeline architecture
 4. No changes to handler business logic
 
-## Success Metrics
+## 6. Success Metrics
 1. Reduced code complexity
 2. Simpler debugging flow
 3. All existing tests pass
 4. Command handling works reliably
 
-## Implementation Phases
+## 7. Implementation Phases
 1. Remove command registration from Transport ✅
-2. Update CommandProcessor interface ✅
-3. Simplify response handling ✅
+2. Update CommandProcessor interface ⏳
+3. Simplify response handling ⏳
 4. Update tests ⏳
 5. Verify functionality ⏳
 
-## Migration
+## 8. Migration
 1. No migration needed for users
 2. Minor updates needed for test code
 3. Backward compatible changes
 
-## Testing
+## 9. Testing
 1. All existing tests should continue to pass
 2. Focus on command handling integration tests
 3. Verify command flow with live bot testing 
