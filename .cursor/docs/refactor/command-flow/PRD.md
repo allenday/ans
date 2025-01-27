@@ -62,9 +62,10 @@ User -> Transport -> Pipeline -> CommandProcessor -> Handler -> Transport
 ## 7. Implementation Phases
 1. Remove command registration from Transport ✅
 2. Update CommandProcessor interface ✅
-3. Simplify response handling ⏳
-4. Update tests ⏳
-5. Verify functionality ⏳
+3. Handle stateful commands ✅
+4. Simplify response handling ✅
+5. Update tests ⏳
+6. Verify functionality ⏳
 
 ## 8. Migration
 1. No migration needed for users

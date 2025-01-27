@@ -12,21 +12,24 @@ from chronicler.exceptions import (
 )
 from chronicler.logging import get_logger
 from chronicler.processors.base import BaseProcessor
+from chronicler.storage.coordinator import StorageCoordinator
 
 logger = get_logger(__name__)
 
 class CommandProcessor(BaseProcessor):
     """Processor for command frames."""
     
-    def __init__(self, coordinator=None):
+    def __init__(self, coordinator: StorageCoordinator):
         """Initialize command processor.
         
         Args:
-            coordinator: Optional storage coordinator instance.
+            coordinator: Storage coordinator.
         """
         super().__init__()
-        self._handlers: Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]] = {}
         self.coordinator = coordinator
+        self._handlers: Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]] = {}
+        self._active_commands: Dict[int, str] = {}  # chat_id -> active command
+        self._logger = logger
         logger.info("COMMAND - Initializing command processor")
         logger.debug("COMMAND - No handlers registered")
         
@@ -36,53 +39,70 @@ class CommandProcessor(BaseProcessor):
         return self._handlers.copy()
         
     def register_command(self, command: str, handler: Callable[[Frame], Awaitable[Optional[Frame]]]) -> None:
-        """Register a command handler function.
+        """Register a command handler.
         
         Args:
-            command: The command to handle (e.g. "start" for /start)
-            handler: Async function that takes a Frame and returns an Optional[Frame]
+            command: Command to register.
+            handler: Handler function.
             
         Raises:
-            ValueError: If command format is invalid or handler is not callable
+            ValueError: If command is invalid or already registered.
         """
-        if not callable(handler):
-            raise ValueError("Handler must be a callable")
-            
-        # Validate command format
-        if not command.startswith('/'):
+        if not command.startswith("/"):
             raise ValueError("Command must start with '/'")
-            
         if command in self._handlers:
             raise ValueError(f"Handler for command {command} already registered")
+        if not callable(handler):
+            raise ValueError("Handler must be a callable")
             
         self._handlers[command] = handler
         logger.debug(f"COMMAND - Registered handler for {command}")
             
-    async def process(self, frame: Frame) -> Optional[Frame]:
-        """Process a frame.
+    def get_active_command(self, chat_id: int) -> Optional[str]:
+        """Get active command for a chat.
         
         Args:
-            frame: The frame to process.
+            chat_id: Chat ID.
             
         Returns:
-            The processed frame or None if the frame was handled or is not a command.
-            
-        Raises:
-            ValueError: If no handler is registered for a command.
+            Active command or None if no command is active.
         """
+        return self._active_commands.get(chat_id)
+        
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a command frame."""
         if not isinstance(frame, CommandFrame):
-            return None  # Pass through non-command frames
+            # If there's an active command, treat text frames as input
+            chat_id = frame.metadata.get("chat_id")
+            if chat_id and chat_id in self._active_commands:
+                command = self._active_commands[chat_id]
+                handler = self._handlers.get(command)
+                if handler:
+                    try:
+                        response = await handler(frame)
+                        if response and not response.content.startswith("Please provide"):
+                            self._active_commands.pop(chat_id)
+                        return response
+                    except Exception as e:
+                        self._logger.error(f"COMMAND - Handler error for command {command}: {str(e)}")
+                        raise
+            return None
 
         command = frame.command
-        if command not in self._handlers:
-            logger.error(f"COMMAND - No handler registered for command {command}")
+        handler = self._handlers.get(command)
+        if not handler:
+            self._logger.error(f"COMMAND - No handler registered for command {command}")
             raise ValueError(f"No handler registered for command {command}")
 
+        chat_id = frame.metadata.get("chat_id")
+        if chat_id:
+            self._active_commands[chat_id] = command
+
         try:
-            handler = self._handlers[command]
-            result = await handler(frame)
-            logger.info(f"COMMAND - Successfully handled command: {command}")
-            return result
+            response = await handler(frame)
+            if response and not response.content.startswith("Please provide"):
+                self._active_commands.pop(chat_id, None)
+            return response
         except Exception as e:
-            logger.error(f"COMMAND - Error handling command {command}: {e}")
-            raise  # Re-raise the original exception 
+            self._logger.error(f"COMMAND - Handler error for command {command}: {str(e)}")
+            raise 

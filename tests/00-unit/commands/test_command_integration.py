@@ -25,7 +25,7 @@ def coordinator_mock():
 async def test_command_flow(coordinator_mock, command_frame_factory):
     """Test the complete command flow from start to status."""
     # Setup command processor with handlers
-    processor = CommandProcessor()
+    processor = CommandProcessor(coordinator=coordinator_mock)
     start_handler = StartCommandHandler(coordinator=coordinator_mock)
     config_handler = ConfigCommandHandler(coordinator=coordinator_mock)
     status_handler = StatusCommandHandler(coordinator=coordinator_mock)
@@ -48,7 +48,7 @@ async def test_command_flow(coordinator_mock, command_frame_factory):
     assert response.content == "Storage initialized successfully! You can now configure your GitHub repository with /config."
     
     # Update mock state after initialization
-    coordinator_mock.is_initialized.return_value = True  # Now initialized
+    coordinator_mock.is_initialized.return_value = True
     
     # Test /config command
     config_frame = command_frame_factory("/config", args=["username/repo", "ghp_token"])

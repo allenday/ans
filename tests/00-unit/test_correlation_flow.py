@@ -33,11 +33,12 @@ async def test_correlation_flow(mock_telegram_bot, tmp_path, caplog, capsys):
         storage.save_message = AsyncMock()
 
         # Create command processor and register handlers
-        processor = CommandProcessor()
-        start_handler = StartCommandHandler(storage)
-        config_handler = ConfigCommandHandler(storage)
-        status_handler = StatusCommandHandler(storage)
+        processor = CommandProcessor(coordinator=storage)
+        start_handler = StartCommandHandler(coordinator=storage)
+        config_handler = ConfigCommandHandler(coordinator=storage)
+        status_handler = StatusCommandHandler(coordinator=storage)
 
+        # Register handlers
         processor.register_command("/start", start_handler.handle)
         processor.register_command("/config", config_handler.handle)
         processor.register_command("/status", status_handler.handle)
