@@ -1,5 +1,6 @@
 """Command processor for handling command frames."""
 from typing import Dict, Optional, Callable, Awaitable
+import inspect
 
 from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame
@@ -38,15 +39,35 @@ class CommandProcessor(BaseProcessor):
         """Get registered handlers."""
         return self._handlers.copy()
         
-    def register_command(self, command: str, handler: Callable):
-        """Register a command handler."""
+    def register_command(self, command: str, handler: Callable[[Frame, StorageCoordinator], Awaitable[Optional[Frame]]]):
+        """Register a command handler.
+        
+        Args:
+            command: Command to handle (must start with '/')
+            handler: Async function that takes a Frame and optionally a StorageCoordinator and returns an Optional[Frame]
+            
+        Raises:
+            ValueError: If command is invalid or handler is already registered
+        """
         if not command.startswith("/"):
             raise ValueError("Command must start with '/'")
         if not callable(handler):
             raise ValueError("Handler must be a callable")
         if command in self._handlers:
             raise ValueError(f"Handler for command {command} already registered")
-        self._handlers[command] = handler
+            
+        # Check if handler takes coordinator parameter
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+        takes_coordinator = len(params) > 1
+            
+        # Wrap handler based on its signature
+        async def wrapped_handler(frame: Frame) -> Optional[Frame]:
+            if takes_coordinator:
+                return await handler(frame, self._coordinator)
+            return await handler(frame)
+            
+        self._handlers[command] = wrapped_handler
         self._logger.debug(f"COMMAND - Registered handler for {command}")
 
     def get_active_command(self, chat_id: int) -> Optional[str]:

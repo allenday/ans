@@ -13,8 +13,8 @@ This refactor aims to simplify and streamline how commands are handled in the Ch
 
 ### 1. Command Registration ✅
 1. Move all command registration to CommandProcessor ✅
-2. Remove command registration from TelegramBotTransport
-3. Simplify command handler interface
+2. Remove command registration from TelegramBotTransport ✅
+3. Simplify command handler interface ✅
 
 ```python
 # Before

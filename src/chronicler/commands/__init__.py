@@ -1,17 +1,12 @@
 """Command handling infrastructure."""
 from chronicler.frames.command import CommandFrame
 from .processor import CommandProcessor
-from chronicler.handlers.command import (
-    CommandHandler,
-    StartCommandHandler,
-    ConfigCommandHandler,
-    StatusCommandHandler
-)
+from .handlers import handle_start, handle_config, handle_status
 
 __all__ = [
     'CommandProcessor',
-    'CommandHandler',
-    'StartCommandHandler',
-    'ConfigCommandHandler',
-    'StatusCommandHandler'
+    'CommandFrame',
+    'handle_start',
+    'handle_config',
+    'handle_status'
 ] 

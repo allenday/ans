@@ -3,6 +3,7 @@ import pytest
 import pytest_asyncio
 from unittest.mock import Mock, AsyncMock, MagicMock
 from typing import Optional
+import asyncio
 
 from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame
@@ -58,7 +59,13 @@ class TestCommandProcessor:
             return TextFrame(content="test response", metadata=frame.metadata)
         processor.register_command("/test", handler)
         assert "/test" in processor.handlers
-        assert processor.handlers["/test"] == handler
+        # Create a test frame
+        test_frame = CommandFrame(command="/test", args=[], metadata={"chat_id": 123})
+        # Run the handler and check the response
+        response = asyncio.run(processor.handlers["/test"](test_frame))
+        assert isinstance(response, TextFrame)
+        assert response.content == "test response"
+        assert response.metadata == test_frame.metadata
         
     def test_register_handler_duplicate(self, coordinator_mock):
         """Test registering a duplicate handler."""
