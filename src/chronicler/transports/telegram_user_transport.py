@@ -6,7 +6,6 @@ from telethon.events import NewMessage
 from telethon.errors import ApiIdInvalidError
 
 from chronicler.frames.base import Frame
-from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.transports.telegram_transport import TelegramTransportBase
 from chronicler.transports.telegram_user_event import TelegramUserEvent
@@ -41,7 +40,6 @@ class TelegramUserTransport(TelegramTransportBase):
         self._session_name = str(session_name) if session_name else ":memory:"  # Use in-memory session by default
         self._client: Optional[TelegramClient] = None
         self._initialized = False
-        self._command_handlers: Dict[str, Callable[[TelegramUserEvent], Awaitable[None]]] = {}
         self.frame_processor = None
 
     async def start(self):
@@ -67,10 +65,7 @@ class TelegramUserTransport(TelegramTransportBase):
             # Register message handler
             async def message_handler(event):
                 """Handle incoming messages."""
-                if event.message.text and event.message.text.startswith('/'):
-                    await self._handle_command(TelegramUserUpdate(event))
-                else:
-                    await self._handle_message(TelegramUserUpdate(event))
+                await self._handle_message(TelegramUserUpdate(event))
                     
             self._client.add_event_handler(message_handler, NewMessage)
             
@@ -146,8 +141,11 @@ class TelegramUserTransport(TelegramTransportBase):
         Args:
             command: Command to handle
             handler: Handler function
+            
+        Raises:
+            NotImplementedError: Command registration is no longer supported in Transport
         """
-        self._command_handlers[command] = handler
+        raise NotImplementedError("Command registration is no longer supported in Transport")
 
     async def _handle_message(self, update: TelegramUserUpdate):
         """Handle incoming text messages."""
@@ -161,31 +159,6 @@ class TelegramUserTransport(TelegramTransportBase):
         processed_frame = await self.process_frame(frame)
         if processed_frame:
             await self.send(processed_frame)
-
-    async def _handle_command(self, update: TelegramUserUpdate):
-        """Handle command messages."""
-        event = TelegramUserEvent(update=update)
-        
-        command = update.message_text.split()[0]  # Keep leading '/'
-        if command in self._command_handlers:
-            # Create command frame
-            metadata = event.get_metadata()
-            frame = CommandFrame(
-                command=command,
-                args=event.get_command_args(),
-                metadata=metadata.__dict__
-            )
-            # Process command frame
-            processed_frame = await self.process_frame(frame)
-            if processed_frame:
-                # Update event with processed frame's arguments
-                event = TelegramUserEvent(
-                    update=update,
-                    metadata=processed_frame.metadata
-                )
-                # Update command args from processed frame
-                event.get_command_args = lambda: processed_frame.args
-                await self._command_handlers[command](event)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Clean up resources when exiting context."""

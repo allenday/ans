@@ -4,6 +4,8 @@ from unittest.mock import create_autospec, AsyncMock
 from chronicler.frames.media import TextFrame
 from chronicler.pipeline.pipeline import Pipeline
 from chronicler.processors.base import BaseProcessor
+from chronicler.commands.processor import CommandProcessor
+from chronicler.frames.command import CommandFrame
 
 @pytest.fixture
 def processor_mock():
@@ -13,6 +15,12 @@ def processor_mock():
         processor.process = AsyncMock(return_value=TextFrame(content="mock_processed", metadata={}))
         return processor
     return create_mock
+
+@pytest.fixture
+def coordinator_mock():
+    """Create a mock coordinator."""
+    coordinator = create_autospec(BaseProcessor)
+    return coordinator
 
 @pytest.mark.asyncio
 async def test_pipeline_creation():
@@ -151,4 +159,112 @@ async def test_processor_debug_logging(processor_mock, caplog):
     # Check debug logs for processor execution
     assert "PIPELINE - Running processor 1/1" in caplog.text
     assert "PIPELINE - Processor" in caplog.text
-    assert "transformed frame to TextFrame" in caplog.text 
+    assert "transformed frame to TextFrame" in caplog.text
+
+@pytest.mark.asyncio
+async def test_command_processor_pipeline_integration(coordinator_mock):
+    """Test integration between command processor and pipeline."""
+    # Create pipeline
+    pipeline = Pipeline()
+    
+    # Create command processor
+    processor = CommandProcessor(coordinator=coordinator_mock)
+    
+    # Create a test command handler
+    async def test_handler(frame):
+        return TextFrame(content="Test response", metadata=frame.metadata)
+    
+    processor.register_command("/test", test_handler)
+    
+    # Add processor to pipeline
+    pipeline.add_processor(processor)
+    
+    # Create and process a command frame
+    frame = CommandFrame(
+        command="/test",
+        args=[],
+        metadata={
+            "chat_id": 123,
+            "message_id": 1,
+            "timestamp": 1234567890
+        }
+    )
+    
+    # Process frame through pipeline
+    response = await pipeline.process(frame)
+    
+    # Verify response
+    assert response is not None
+    assert isinstance(response, TextFrame)
+    assert response.content == "Test response"
+    assert response.metadata["chat_id"] == 123
+    
+    # Test error handling
+    async def error_handler(frame):
+        raise RuntimeError("Test error")
+    
+    processor.register_command("/error", error_handler)
+    
+    error_frame = CommandFrame(
+        command="/error",
+        args=[],
+        metadata={
+            "chat_id": 123,
+            "message_id": 2,
+            "timestamp": 1234567890
+        }
+    )
+    
+    # Verify error propagation
+    with pytest.raises(RuntimeError, match="Test error"):
+        await pipeline.process(error_frame)
+
+@pytest.mark.asyncio
+async def test_pipeline_command_state_preservation(coordinator_mock):
+    """Test that pipeline preserves command state between processors."""
+    # Create pipeline
+    pipeline = Pipeline()
+
+    # Create command processor
+    processor = CommandProcessor(coordinator=coordinator_mock)
+
+    # Create a stateful command handler
+    async def config_handler(frame):
+        if isinstance(frame, CommandFrame):
+            return TextFrame(content="Enter config", metadata=frame.metadata)
+        processor.complete(frame.metadata["chat_id"])  # Complete command after processing config
+        return TextFrame(content=f"Config: {frame.content}", metadata=frame.metadata)
+
+    processor.register_command("/config", config_handler)
+
+    # Create a mock transport processor that just passes frames through
+    class MockTransport(BaseProcessor):
+        async def process(self, frame):
+            return frame
+
+    # Add processors to pipeline
+    pipeline.add_processor(MockTransport())
+    pipeline.add_processor(processor)
+
+    # Start config command
+    command_frame = CommandFrame(
+        command="/config",
+        args=[],
+        metadata={"chat_id": 123}
+    )
+
+    # Process command frame and wait for completion
+    response = await pipeline.process(command_frame)
+    assert response.content == "Enter config"
+    assert processor.get_active_command(123) == "/config"
+
+    # Send config data through pipeline
+    text_frame = TextFrame(
+        content="test config",
+        metadata={"chat_id": 123}
+    )
+
+    # Process text frame and wait for completion
+    response = await pipeline.process(text_frame)
+    assert response.content == "Config: test config"
+    assert processor.get_active_command(123) is None  # Command should be cleared after processing 

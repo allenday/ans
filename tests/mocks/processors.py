@@ -5,6 +5,7 @@ from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.handlers.command import CommandHandler
 from chronicler.storage.coordinator import StorageCoordinator
+from chronicler.commands.processor import CommandProcessor
 
 class TestCommandHandler(CommandHandler):
     """Test command handler implementation."""
@@ -40,7 +41,6 @@ def metadata():
 @pytest.fixture
 def command_processor(storage):
     """Create a command processor instance."""
-    from chronicler.processors.command import CommandProcessor
     return CommandProcessor(storage)
 
 @pytest.fixture

@@ -60,6 +60,13 @@ class StartCommandHandler(CommandHandler):
             except Exception as e:
                 raise CommandStorageError(f"Failed to create topic: {str(e)}")
             
+            # Save command message
+            try:
+                await self.coordinator.save_message(frame)
+                logger.info(f"HANDLER - Saved command message for user {chat_id}")
+            except Exception as e:
+                raise CommandStorageError(f"Failed to save message: {str(e)}")
+            
             return TextFrame(
                 content="Storage initialized successfully! You can now configure your GitHub repository with /config.",
                 metadata=metadata if isinstance(metadata, dict) else metadata.__dict__

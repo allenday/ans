@@ -1,10 +1,10 @@
 """Command processor for handling command frames."""
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Callable, Awaitable
+import inspect
 
 from chronicler.frames.base import Frame
 from chronicler.frames.media import TextFrame
 from chronicler.frames.command import CommandFrame
-from chronicler.handlers.command import CommandHandler
 from chronicler.exceptions import (
     CommandError,
     CommandValidationError,
@@ -13,84 +13,113 @@ from chronicler.exceptions import (
 )
 from chronicler.logging import get_logger
 from chronicler.processors.base import BaseProcessor
+from chronicler.storage.coordinator import StorageCoordinator
 
 logger = get_logger(__name__)
 
 class CommandProcessor(BaseProcessor):
     """Processor for command frames."""
     
-    def __init__(self, coordinator=None):
+    def __init__(self, coordinator: StorageCoordinator):
         """Initialize command processor.
         
         Args:
-            coordinator: Optional storage coordinator instance.
+            coordinator: Storage coordinator.
         """
         super().__init__()
-        self._handlers: Dict[str, CommandHandler] = {}
-        self.coordinator = coordinator
-        logger.info("COMMAND - Initializing command processor")
-        logger.debug("COMMAND - No handlers registered")
+        self._coordinator = coordinator
+        self._handlers: Dict[str, Callable] = {}
+        self._active_commands: Dict[int, str] = {}
+        self._logger = get_logger("chronicler.commands.processor")
+        self._logger.info("COMMAND - Initializing command processor")
+        self._logger.debug("COMMAND - No handlers registered")
         
     @property
-    def handlers(self) -> Dict[str, CommandHandler]:
+    def handlers(self) -> Dict[str, Callable]:
         """Get registered handlers."""
         return self._handlers.copy()
         
-    def register_handler(self, handler: CommandHandler, command: str = None) -> None:
+    def register_command(self, command: str, handler: Callable[[Frame, StorageCoordinator], Awaitable[Optional[Frame]]]):
         """Register a command handler.
         
         Args:
-            handler: The command handler to register.
-            command: Optional command to handle. If not provided, will use handler.command.
+            command: Command to handle (must start with '/')
+            handler: Async function that takes a Frame and optionally a StorageCoordinator and returns an Optional[Frame]
             
         Raises:
-            ValueError: If handler is not a CommandHandler instance or command is invalid.
+            ValueError: If command is invalid or handler is already registered
         """
-        if handler is None:
-            raise ValueError("Handler cannot be None")
+        if not command.startswith("/"):
+            raise ValueError("Command must start with '/'")
+        if not callable(handler):
+            raise ValueError("Handler must be a callable")
+        if command in self._handlers:
+            raise ValueError(f"Handler for command {command} already registered")
             
-        if not isinstance(handler, CommandHandler):
-            raise ValueError(f"Handler must be an instance of CommandHandler (got {type(handler)})")
+        # Check if handler takes coordinator parameter
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+        takes_coordinator = len(params) > 1
             
-        # Get command from handler if not provided
-        cmd = command if command is not None else getattr(handler, 'command', None)
-        if not cmd:
-            raise ValueError("Command must be provided either as argument or as handler.command attribute")
+        # Wrap handler based on its signature
+        async def wrapped_handler(frame: Frame) -> Optional[Frame]:
+            if takes_coordinator:
+                return await handler(frame, self._coordinator)
+            return await handler(frame)
             
-        if not isinstance(cmd, str) or not cmd.startswith('/'):
-            raise ValueError("Invalid command format - must start with '/'")
-            
-        if cmd in self._handlers:
-            raise ValueError(f"Handler for command {cmd} already registered")
-            
-        self._handlers[cmd] = handler
-        logger.debug(f"COMMAND - Registered handler for {cmd}")
+        self._handlers[command] = wrapped_handler
+        self._logger.debug(f"COMMAND - Registered handler for {command}")
+
+    def get_active_command(self, chat_id: int) -> Optional[str]:
+        """Get the active command for a chat."""
+        return self._active_commands.get(chat_id)
         
-    async def process(self, frame: Frame) -> Optional[Frame]:
-        """Process a frame.
+    def complete(self, chat_id: int) -> None:
+        """Complete and clear the active command for a chat.
         
         Args:
-            frame: The frame to process.
-            
-        Returns:
-            The processed frame or None if the frame was handled or is not a command.
-            
-        Raises:
-            ValueError: If no handler is registered for a command.
+            chat_id: The chat ID to complete the command for.
         """
-        if not isinstance(frame, CommandFrame):
-            return None  # Pass through non-command frames
-
-        command = frame.command
-        if command not in self._handlers:
-            logger.error(f"COMMAND - No handler registered for command {command}")
-            raise ValueError(f"No handler registered for command {command}")
-
-        try:
-            handler = self._handlers[command]
-            result = await handler.handle(frame)
-            logger.info(f"COMMAND - Successfully handled command: {command}")
-            return result
-        except Exception as e:
-            logger.error(f"COMMAND - Error handling command {command}: {e}")
-            raise  # Re-raise the original exception 
+        if chat_id in self._active_commands:
+            self._logger.debug(f"COMMAND - Completing command for chat {chat_id}")
+            self._active_commands.pop(chat_id, None)
+        
+    async def process(self, frame: Frame) -> Optional[Frame]:
+        """Process a frame through the command processor."""
+        chat_id = frame.metadata.get("chat_id")
+        
+        if isinstance(frame, CommandFrame):
+            # Clear any existing command context when starting a new command
+            if chat_id is not None:
+                self.complete(chat_id)
+                
+            # Handle unknown commands
+            if frame.command not in self._handlers:
+                raise ValueError(f"No handler registered for command {frame.command}")
+                
+            # Set new command context
+            if chat_id is not None:
+                self._active_commands[chat_id] = frame.command
+                
+            try:
+                # Execute command handler
+                response = await self._handlers[frame.command](frame)
+                return response
+            except Exception as e:
+                # Clear command context on error
+                if chat_id is not None:
+                    self.complete(chat_id)
+                raise  # Re-raise the exception
+                
+        elif chat_id is not None and chat_id in self._active_commands:
+            # Handle continuation of existing command
+            active_command = self._active_commands[chat_id]
+            try:
+                response = await self._handlers[active_command](frame)
+                return response
+            except Exception as e:
+                # Clear command context on error
+                self.complete(chat_id)
+                raise  # Re-raise the exception
+                
+        return None  # Return None for non-command frames with no active context 

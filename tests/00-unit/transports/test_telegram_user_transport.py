@@ -177,7 +177,7 @@ async def test_user_handle_text_message(mock_client):
 @pytest.mark.asyncio
 @patch('chronicler.transports.telegram_user_transport.TelegramClient')
 async def test_user_handle_command(mock_client):
-    """Test handling of user commands."""
+    """Test that command registration is no longer supported."""
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
@@ -185,56 +185,10 @@ async def test_user_handle_command(mock_client):
         session_name=":memory:"
     )
 
-    # Create mock update with proper structure
-    mock_chat = MagicMock()
-    mock_chat.id = 67890
-    mock_chat.title = "Test Chat"
-    mock_chat.type = "private"
-
-    mock_sender = MagicMock()
-    mock_sender.id = 11111
-    mock_sender.username = "testuser"
-
-    mock_message = MagicMock()
-    mock_message.text = "/start help"
-    mock_message.chat_id = 67890
-    mock_message.chat = mock_chat
-    mock_message.sender_id = 11111
-    mock_message.sender = mock_sender
-    mock_message.id = 12345
-    mock_message.reply_to_msg_id = 22222
-    mock_message.date = MagicMock()
-    mock_message.date.timestamp.return_value = datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp()
-
-    mock_event = MagicMock()
-    mock_event.message = mock_message
-
-    # Create TelegramUserUpdate wrapper
-    update = TelegramUserUpdate(mock_event)
-
-    # Track processed frames
-    processed_frames = []
-    transport.process_frame = AsyncMock(side_effect=lambda frame: processed_frames.append(frame) or frame)
-
-    # Register command handler
-    handler = AsyncMock()
-    await transport.register_command("/start", handler)
-
-    # Handle command
-    await transport._handle_command(update)
-
-    # Verify handler was called with correct args and metadata
-    assert len(processed_frames) == 1
-    frame = processed_frames[0]
-    assert frame.command == "/start"
-    assert frame.args == ["help"]
-    assert frame.metadata["chat_id"] == 67890
-    assert frame.metadata["chat_title"] == "Test Chat"
-    assert frame.metadata["sender_id"] == 11111
-    assert frame.metadata["sender_name"] == "testuser"
-    assert frame.metadata["message_id"] == 12345
-    assert frame.metadata["is_private"] == True
-    assert frame.metadata["is_group"] == False
+    # Verify that command registration raises NotImplementedError
+    with pytest.raises(NotImplementedError) as exc_info:
+        await transport.register_command("/start", AsyncMock())
+    assert str(exc_info.value) == "Command registration is no longer supported in Transport"
 
 @pytest.mark.asyncio
 @patch('chronicler.transports.telegram_user_transport.TelegramClient')
@@ -441,63 +395,14 @@ async def test_user_transport_message_processing(transport, mock_client):
 
 @pytest.mark.asyncio
 async def test_user_transport_command_processing(mock_client):
-    """Test command processing with frame processing."""
-    # Create mock command handler
-    command_handler = AsyncMock()
+    """Test that command registration is no longer supported."""
+    transport = TelegramUserTransport("123", "hash", "+1234567890")
+    transport._initialized = True  # Skip initialization since we're testing command registration
 
-    # Create mock update
-    mock_update = Mock()
-    mock_update.message = Mock()
-    mock_update.message.text = "/test arg1 arg2"
-    mock_update.message.chat = Mock()
-    mock_update.message.chat.id = 456
-    mock_update.message.chat.title = "Test Chat"
-    mock_update.message.chat.type = "private"  # Used for is_private property
-    mock_update.message.chat_id = 456
-    mock_update.message.sender = Mock()
-    mock_update.message.sender.id = 789
-    mock_update.message.sender.first_name = "Test"
-    mock_update.message.sender.username = "Test"
-    mock_update.message.sender_id = 789
-    mock_update.message.id = 123
-    mock_update.message.date = Mock()
-    mock_update.message.date.timestamp = Mock(return_value=1234567890)
-
-    # Create frame processor that converts args to uppercase
-    processed_frames = []
-    async def frame_processor(frame):
-        frame.args = [arg.upper() for arg in frame.args]
-        processed_frames.append(frame)
-        return frame
-
-    mock_client.connect = AsyncMock()
-    mock_client.is_connected = AsyncMock(return_value=True)
-    mock_client.is_user_authorized = AsyncMock(return_value=True)  # User is already authorized
-    mock_client.get_me = AsyncMock(return_value=Mock(id=123, first_name="Test User"))
-    mock_client.add_event_handler = AsyncMock()
-    mock_client.send_code_request = AsyncMock(return_value=Mock(phone_code_hash="test_hash"))
-    mock_client.sign_in = AsyncMock(return_value=Mock(id=123, first_name="Test User"))
-
-    with patch('telethon.TelegramClient', return_value=mock_client):
-        transport = TelegramUserTransport("123", "hash", "+1234567890")
-        transport.frame_processor = frame_processor
-        transport._initialized = True  # Skip initialization since we're testing command processing
-
-        await transport.register_command("/test", command_handler)
-        await transport._handle_command(TelegramUserUpdate(mock_update))
-
-        # Verify handler was called with correct args and metadata
-        assert len(processed_frames) == 1
-        frame = processed_frames[0]
-        assert frame.command == "/test"
-        assert frame.args == ["ARG1", "ARG2"]  # Args should be uppercase
-        assert frame.metadata["chat_id"] == 456
-        assert frame.metadata["chat_title"] == "Test Chat"
-        assert frame.metadata["sender_id"] == 789
-        assert frame.metadata["sender_name"] == "Test"
-        assert frame.metadata["message_id"] == 123
-        assert frame.metadata["is_private"] == True
-        assert frame.metadata["is_group"] == False
+    # Verify that command registration raises NotImplementedError
+    with pytest.raises(NotImplementedError) as exc_info:
+        await transport.register_command("/test", AsyncMock())
+    assert str(exc_info.value) == "Command registration is no longer supported in Transport"
 
 @pytest.mark.asyncio
 async def test_user_event_handling():
