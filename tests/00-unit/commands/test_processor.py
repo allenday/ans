@@ -89,12 +89,12 @@ class TestCommandProcessor:
     async def test_process_unknown_command(self, coordinator_mock):
         """Test processing unknown command."""
         processor = CommandProcessor(coordinator=coordinator_mock)
-        frame = CommandFrame(command="/unknown")
+        frame = CommandFrame(command="/unknown", metadata=TEST_METADATA)
         with pytest.raises(ValueError, match="No handler registered for command /unknown"):
             await processor.process(frame)
             
     @pytest.mark.asyncio
-    async def test_handler_error(self, mock_handler_func, coordinator_mock):
+    async def test_handler_error(self, coordinator_mock):
         """Test handler error."""
         processor = CommandProcessor(coordinator=coordinator_mock)
         
@@ -102,6 +102,40 @@ class TestCommandProcessor:
             raise RuntimeError("Test error")
             
         processor.register_command("/test", failing_handler)
-        frame = CommandFrame(command="/test")
+        frame = CommandFrame(command="/test", metadata=TEST_METADATA)
         with pytest.raises(RuntimeError, match="Test error"):
-            await processor.process(frame) 
+            await processor.process(frame)
+
+    @pytest.mark.asyncio
+    async def test_process_valid_command(self, coordinator_mock):
+        """Test processing a valid command."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        async def test_handler(frame):
+            return TextFrame(content="Test command executed", metadata=frame.metadata)
+        processor.register_command("/test", test_handler)
+        frame = CommandFrame(command="/test", args="", metadata={"chat_id": 123})
+        result = await processor.process(frame)
+        assert isinstance(result, TextFrame)
+        assert result.content == "Test command executed"
+
+    @pytest.mark.asyncio
+    async def test_default_start_command(self, coordinator_mock):
+        """Test the default /start command."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        async def start_handler(frame):
+            return TextFrame(content="Started", metadata=frame.metadata)
+        processor.register_command("/start", start_handler)
+        frame = CommandFrame(command="/start", args="", metadata={"chat_id": 123})
+        result = await processor.process(frame)
+        assert result.content == "Started"
+
+    @pytest.mark.asyncio
+    async def test_default_status_command(self, coordinator_mock):
+        """Test the default /status command."""
+        processor = CommandProcessor(coordinator=coordinator_mock)
+        async def status_handler(frame):
+            return TextFrame(content="Status OK", metadata=frame.metadata)
+        processor.register_command("/status", status_handler)
+        frame = CommandFrame(command="/status", args="", metadata={"chat_id": 123})
+        result = await processor.process(frame)
+        assert result.content == "Status OK" 

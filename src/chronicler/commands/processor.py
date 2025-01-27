@@ -26,83 +26,79 @@ class CommandProcessor(BaseProcessor):
             coordinator: Storage coordinator.
         """
         super().__init__()
-        self.coordinator = coordinator
-        self._handlers: Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]] = {}
-        self._active_commands: Dict[int, str] = {}  # chat_id -> active command
-        self._logger = logger
-        logger.info("COMMAND - Initializing command processor")
-        logger.debug("COMMAND - No handlers registered")
+        self._coordinator = coordinator
+        self._handlers: Dict[str, Callable] = {}
+        self._active_commands: Dict[int, str] = {}
+        self._logger = get_logger("chronicler.commands.processor")
+        self._logger.info("COMMAND - Initializing command processor")
+        self._logger.debug("COMMAND - No handlers registered")
         
     @property
-    def handlers(self) -> Dict[str, Callable[[Frame], Awaitable[Optional[Frame]]]]:
+    def handlers(self) -> Dict[str, Callable]:
         """Get registered handlers."""
         return self._handlers.copy()
         
-    def register_command(self, command: str, handler: Callable[[Frame], Awaitable[Optional[Frame]]]) -> None:
-        """Register a command handler.
-        
-        Args:
-            command: Command to register.
-            handler: Handler function.
-            
-        Raises:
-            ValueError: If command is invalid or already registered.
-        """
+    def register_command(self, command: str, handler: Callable):
+        """Register a command handler."""
         if not command.startswith("/"):
             raise ValueError("Command must start with '/'")
-        if command in self._handlers:
-            raise ValueError(f"Handler for command {command} already registered")
         if not callable(handler):
             raise ValueError("Handler must be a callable")
-            
+        if command in self._handlers:
+            raise ValueError(f"Handler for command {command} already registered")
         self._handlers[command] = handler
-        logger.debug(f"COMMAND - Registered handler for {command}")
-            
+        self._logger.debug(f"COMMAND - Registered handler for {command}")
+
     def get_active_command(self, chat_id: int) -> Optional[str]:
-        """Get active command for a chat.
-        
-        Args:
-            chat_id: Chat ID.
-            
-        Returns:
-            Active command or None if no command is active.
-        """
+        """Get the active command for a chat."""
         return self._active_commands.get(chat_id)
         
+    def complete(self, chat_id: int) -> None:
+        """Complete and clear the active command for a chat.
+        
+        Args:
+            chat_id: The chat ID to complete the command for.
+        """
+        if chat_id in self._active_commands:
+            self._logger.debug(f"COMMAND - Completing command for chat {chat_id}")
+            self._active_commands.pop(chat_id, None)
+        
     async def process(self, frame: Frame) -> Optional[Frame]:
-        """Process a command frame."""
-        if not isinstance(frame, CommandFrame):
-            # If there's an active command, treat text frames as input
-            chat_id = frame.metadata.get("chat_id")
-            if chat_id and chat_id in self._active_commands:
-                command = self._active_commands[chat_id]
-                handler = self._handlers.get(command)
-                if handler:
-                    try:
-                        response = await handler(frame)
-                        if response and not response.content.startswith("Please provide"):
-                            self._active_commands.pop(chat_id)
-                        return response
-                    except Exception as e:
-                        self._logger.error(f"COMMAND - Handler error for command {command}: {str(e)}")
-                        raise
-            return None
-
-        command = frame.command
-        handler = self._handlers.get(command)
-        if not handler:
-            self._logger.error(f"COMMAND - No handler registered for command {command}")
-            raise ValueError(f"No handler registered for command {command}")
-
+        """Process a frame through the command processor."""
         chat_id = frame.metadata.get("chat_id")
-        if chat_id:
-            self._active_commands[chat_id] = command
-
-        try:
-            response = await handler(frame)
-            if response and not response.content.startswith("Please provide"):
-                self._active_commands.pop(chat_id, None)
-            return response
-        except Exception as e:
-            self._logger.error(f"COMMAND - Handler error for command {command}: {str(e)}")
-            raise 
+        
+        if isinstance(frame, CommandFrame):
+            # Clear any existing command context when starting a new command
+            if chat_id is not None:
+                self.complete(chat_id)
+                
+            # Handle unknown commands
+            if frame.command not in self._handlers:
+                raise ValueError(f"No handler registered for command {frame.command}")
+                
+            # Set new command context
+            if chat_id is not None:
+                self._active_commands[chat_id] = frame.command
+                
+            try:
+                # Execute command handler
+                response = await self._handlers[frame.command](frame)
+                return response
+            except Exception as e:
+                # Clear command context on error
+                if chat_id is not None:
+                    self.complete(chat_id)
+                raise  # Re-raise the exception
+                
+        elif chat_id is not None and chat_id in self._active_commands:
+            # Handle continuation of existing command
+            active_command = self._active_commands[chat_id]
+            try:
+                response = await self._handlers[active_command](frame)
+                return response
+            except Exception as e:
+                # Clear command context on error
+                self.complete(chat_id)
+                raise  # Re-raise the exception
+                
+        return None  # Return None for non-command frames with no active context 

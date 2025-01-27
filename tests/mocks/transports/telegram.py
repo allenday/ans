@@ -13,6 +13,26 @@ from chronicler.logging import get_logger
 
 logger = get_logger(__name__)
 
+class MockUpdate:
+    """Mock Telegram Update object."""
+    
+    def __init__(self, message_text=None, chat_id=None, chat_title=None, 
+                 sender_id=None, sender_name=None, message_id=None, thread_id=None):
+        """Initialize mock update."""
+        self.message = Mock()
+        self.message.text = message_text
+        self.message.chat = Mock()
+        self.message.chat.id = chat_id or 123456789
+        self.message.chat.title = chat_title or "Test Chat"
+        self.message.chat.type = "private"
+        self.message.from_user = Mock()
+        self.message.from_user.id = sender_id or 987654321
+        self.message.from_user.username = sender_name or "test_user"
+        self.message.message_id = message_id or 1
+        self.message.message_thread_id = thread_id
+        self.message.date = Mock()
+        self.message.date.timestamp = Mock(return_value=time.time())
+
 class MockHTTPXRequest(BaseRequest):
     """Mock request handler for testing."""
 

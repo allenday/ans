@@ -58,4 +58,75 @@ async def test_command_flow(coordinator_mock, command_frame_factory):
     # Test /status command
     status_frame = command_frame_factory("/status")
     response = await processor.process(status_frame)
-    assert response.content == "Chronicler Status:\n- Storage: Initialized\n- GitHub: Connected\n- Last sync: Success" 
+    assert response.content == "Chronicler Status:\n- Storage: Initialized\n- GitHub: Connected\n- Last sync: Success"
+
+@pytest.mark.asyncio
+async def test_command_direct_response_flow(coordinator_mock, command_frame_factory):
+    """Test the direct response flow without queueing and command context management."""
+    # Setup command processor with handlers
+    processor = CommandProcessor(coordinator=coordinator_mock)
+    
+    # Create a stateful command that requires multiple steps
+    async def config_handler(frame):
+        chat_id = frame.metadata.get("chat_id")
+        if isinstance(frame, CommandFrame):
+            return TextFrame(content="Please provide repository name", metadata=frame.metadata)
+        else:
+            # Process the repository name
+            repo_name = frame.content
+            await coordinator_mock.set_github_config(repo_name, "dummy_token")
+            processor.complete(chat_id)  # Explicitly complete command
+            return TextFrame(content=f"Repository set to: {repo_name}", metadata=frame.metadata)
+    
+    processor.register_command("/config", config_handler)
+    
+    # Test initial command
+    config_frame = command_frame_factory("/config")
+    response = await processor.process(config_frame)
+    assert response.content == "Please provide repository name"
+    assert processor.get_active_command(123) == "/config"  # Command context is maintained
+    
+    # Test providing repository name
+    text_frame = TextFrame(content="test/repo", metadata={"chat_id": 123})
+    response = await processor.process(text_frame)
+    assert response.content == "Repository set to: test/repo"
+    assert processor.get_active_command(123) is None  # Command context is cleared
+    
+    # Verify coordinator was called
+    coordinator_mock.set_github_config.assert_awaited_once_with("test/repo", "dummy_token")
+
+@pytest.mark.asyncio
+async def test_command_interruption_flow(coordinator_mock, command_frame_factory):
+    """Test command interruption and context clearing in the pipeline."""
+    processor = CommandProcessor(coordinator=coordinator_mock)
+    
+    # Create two command handlers
+    async def config_handler(frame):
+        if isinstance(frame, CommandFrame):
+            return TextFrame(content="Please provide repository name", metadata=frame.metadata)
+        processor.complete(frame.metadata["chat_id"])  # Explicitly complete command
+        return TextFrame(content=f"Config received: {frame.content}", metadata=frame.metadata)
+        
+    async def status_handler(frame):
+        processor.complete(frame.metadata["chat_id"])  # Explicitly complete command
+        return TextFrame(content="Status: OK", metadata=frame.metadata)
+    
+    processor.register_command("/config", config_handler)
+    processor.register_command("/status", status_handler)
+    
+    # Start config command
+    config_frame = command_frame_factory("/config")
+    response = await processor.process(config_frame)
+    assert response.content == "Please provide repository name"
+    assert processor.get_active_command(123) == "/config"
+    
+    # Interrupt with status command
+    status_frame = command_frame_factory("/status")
+    response = await processor.process(status_frame)
+    assert response.content == "Status: OK"
+    assert processor.get_active_command(123) is None  # Previous command context is cleared
+    
+    # Verify original command context is cleared by trying to send input
+    text_frame = TextFrame(content="test/repo", metadata={"chat_id": 123})
+    response = await processor.process(text_frame)
+    assert response is None  # No active command to handle the input 

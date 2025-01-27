@@ -1,7 +1,7 @@
 """Tests for command processor."""
 import pytest
 import pytest_asyncio
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, MagicMock
 from typing import Optional
 
 from chronicler.frames.base import Frame
@@ -35,13 +35,13 @@ async def storage():
     storage.set_github_config = AsyncMock()
     return storage
 
-@pytest_asyncio.fixture
-async def command_processor(storage):
-    """Create a command processor for testing."""
-    processor = CommandProcessor(coordinator=storage)
-    # Clear any default handlers
-    processor._handlers.clear()
-    return processor
+@pytest.fixture
+def coordinator_mock():
+    return MagicMock()
+
+@pytest.fixture
+def command_processor(coordinator_mock):
+    return CommandProcessor(coordinator=coordinator_mock)
 
 class TestCommandProcessor:
     """Test command processor."""
@@ -120,11 +120,13 @@ async def test_stateful_command_flow(command_processor, storage):
                 return TextFrame(content="Please provide your GitHub repository and token in the format: username/repo ghp_token", metadata=frame.metadata)
             repo, token = frame.args
             await storage.set_github_config(repo, token)
+            command_processor.complete(frame.metadata["chat_id"])  # Complete command after successful config
             return TextFrame(content="GitHub configuration updated!", metadata=frame.metadata)
         else:
             # Handle text frame input
             repo, token = frame.content.split()
             await storage.set_github_config(repo, token)
+            command_processor.complete(frame.metadata["chat_id"])  # Complete command after successful config
             return TextFrame(content="GitHub configuration updated!", metadata=frame.metadata)
 
     command_processor.register_command("/config", config_handler)
@@ -142,7 +144,7 @@ async def test_stateful_command_flow(command_processor, storage):
     frame = TextFrame(content="username/repo ghp_token", metadata={"chat_id": 123})
     response = await command_processor.process(frame)
 
-    # Verify config updated
+    # Verify config updated and context cleared
     assert response is not None
     assert response.content == "GitHub configuration updated!"
     assert command_processor.get_active_command(123) is None
@@ -156,6 +158,7 @@ async def test_command_interruption(command_processor, storage):
         return TextFrame(content="Please provide your GitHub repository and token in the format: username/repo ghp_token", metadata=frame.metadata)
 
     async def status_handler(frame):
+        command_processor.complete(frame.metadata["chat_id"])  # Complete command after status check
         return TextFrame(content="Status: All systems operational", metadata=frame.metadata)
 
     command_processor.register_command("/config", config_handler)
@@ -183,33 +186,109 @@ async def test_command_interruption(command_processor, storage):
     storage.set_github_config.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_command_context_auto_closure(command_processor, storage):
-    """Test that command context is automatically closed when command completes."""
+async def test_command_context_auto_replacement(command_processor):
+    """Test that starting a new command automatically replaces any existing command context."""
+    # Register test commands
+    async def first_handler(frame):
+        return TextFrame(content="First command response", metadata=frame.metadata)
+        
+    async def second_handler(frame):
+        return TextFrame(content="Second command response", metadata=frame.metadata)
+        
+    command_processor.register_command("/first", first_handler)
+    command_processor.register_command("/second", second_handler)
+    
+    # Start first command
+    frame = CommandFrame(command="/first", args=[], metadata={"chat_id": 123})
+    response = await command_processor.process(frame)
+    
+    # Verify first context is open
+    assert response.content == "First command response"
+    assert command_processor.get_active_command(123) == "/first"
+    
+    # Start second command without explicitly closing first
+    frame = CommandFrame(command="/second", args=[], metadata={"chat_id": 123})
+    response = await command_processor.process(frame)
+    
+    # Verify second command replaced first context
+    assert response.content == "Second command response"
+    assert command_processor.get_active_command(123) == "/second"
+    
+    # Verify no other contexts are open
+    assert len(command_processor._active_commands) == 1
+
+@pytest.mark.asyncio
+async def test_command_explicit_context_closure(command_processor):
+    """Test that a command can explicitly close its context."""
+    # Register test command
+    async def config_handler(frame):
+        if isinstance(frame, CommandFrame):
+            return TextFrame(content="Enter config value", metadata=frame.metadata)
+        # Process input and explicitly close context
+        command_processor.complete(frame.metadata["chat_id"])
+        return TextFrame(content=f"Config set to: {frame.content}", metadata=frame.metadata)
+        
+    command_processor.register_command("/config", config_handler)
+    
+    # Start config command
+    frame = CommandFrame(command="/config", args=[], metadata={"chat_id": 123})
+    response = await command_processor.process(frame)
+    
+    # Verify context is open
+    assert response.content == "Enter config value"
+    assert command_processor.get_active_command(123) == "/config"
+    
+    # Send config value
+    frame = TextFrame(content="test_value", metadata={"chat_id": 123})
+    response = await command_processor.process(frame)
+    
+    # Verify context was closed by handler
+    assert response.content == "Config set to: test_value"
+    assert command_processor.get_active_command(123) is None
+    
+    # Verify no contexts are open
+    assert len(command_processor._active_commands) == 0
+
+@pytest.mark.asyncio
+async def test_command_context_isolation(command_processor):
+    """Test that command contexts are isolated between different chats."""
     # Register test command
     async def test_handler(frame):
-        if isinstance(frame, CommandFrame):
-            return TextFrame(content="Please provide data", metadata=frame.metadata)
-        else:
-            # Process the data and return completion response
-            return TextFrame(content="Command completed!", metadata=frame.metadata)
-
+        return TextFrame(content="Test response", metadata=frame.metadata)
+        
     command_processor.register_command("/test", test_handler)
-
-    # Start command
+    
+    # Start command in first chat
     frame = CommandFrame(command="/test", args=[], metadata={"chat_id": 123})
-    response = await command_processor.process(frame)
-
-    # Verify context is open
-    assert response.content == "Please provide data"
+    await command_processor.process(frame)
+    
+    # Start command in second chat
+    frame = CommandFrame(command="/test", args=[], metadata={"chat_id": 456})
+    await command_processor.process(frame)
+    
+    # Verify both contexts are maintained separately
     assert command_processor.get_active_command(123) == "/test"
+    assert command_processor.get_active_command(456) == "/test"
+    assert len(command_processor._active_commands) == 2
 
-    # Send data and complete command
-    data_frame = TextFrame(content="test data", metadata={"chat_id": 123})
-    response = await command_processor.process(data_frame)
-
-    # Verify context is automatically closed
-    assert response.content == "Command completed!"
+@pytest.mark.asyncio
+async def test_command_context_error_handling(command_processor):
+    """Test that command context is properly cleared on errors."""
+    # Register test command that raises an error
+    async def error_handler(frame):
+        raise RuntimeError("Test error")
+        
+    command_processor.register_command("/error", error_handler)
+    
+    # Start command that will error
+    frame = CommandFrame(command="/error", args=[], metadata={"chat_id": 123})
+    
+    # Verify error is raised and context is cleared
+    with pytest.raises(RuntimeError, match="Test error"):
+        await command_processor.process(frame)
+    
     assert command_processor.get_active_command(123) is None
+    assert len(command_processor._active_commands) == 0
 
 @pytest.mark.asyncio
 async def test_command_no_nesting(command_processor, storage):
@@ -219,6 +298,7 @@ async def test_command_no_nesting(command_processor, storage):
         return TextFrame(content="Please provide first data", metadata=frame.metadata)
 
     async def second_handler(frame):
+        command_processor.complete(frame.metadata["chat_id"])  # Explicitly complete command
         return TextFrame(content="Second command complete", metadata=frame.metadata)
 
     command_processor.register_command("/first", first_handler)
