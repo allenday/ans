@@ -146,7 +146,8 @@ from chronicler.exceptions import (
 )
 from chronicler.frames import CommandFrame
 from chronicler.transports.events import EventMetadata
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport, TelegramBotEvent
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
+from chronicler.transports.telegram_bot_event import TelegramBotEvent
 
 from telegram.error import InvalidToken
 from chronicler.exceptions import TransportError, TransportAuthenticationError
@@ -343,8 +344,8 @@ def mock_telegram_bot(monkeypatch):
     logger.debug("Setting up mock telegram bot")
     
     # Patch ApplicationBuilder and Application in the transport module
-    monkeypatch.setattr('chronicler.transports.telegram_bot_transport.ApplicationBuilder', MockApplicationBuilder)
-    monkeypatch.setattr('chronicler.transports.telegram_bot_transport.Application', MockApplication)
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.ApplicationBuilder', MockApplicationBuilder)
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.Application', MockApplication)
     
     stop_event = asyncio.Event()
     
@@ -366,35 +367,24 @@ def mock_telegram_bot(monkeypatch):
         'stop_event': stop_event,
     }
 
-def create_mock_telethon():
-    """Create a mock Telethon client for user transport testing."""
-    client = AsyncMock()
+@pytest_asyncio.fixture
+async def bot_transport(mock_telegram_bot, monkeypatch):
+    """Create a bot transport instance."""
+    # Patch the ApplicationBuilder and Application
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.ApplicationBuilder', MockApplicationBuilder)
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.Application', MockApplication)
     
-    # Mock basic client operations
-    client.connect = AsyncMock()
-    client.is_user_authorized = AsyncMock(return_value=True)
-    client.start = AsyncMock()
-    client.disconnect = AsyncMock()
-    client.send_message = AsyncMock()
-    client.send_file = AsyncMock()
+    # Use real event loop for this test
+    mock_telegram_bot['loop'] = asyncio.get_running_loop()
+    transport = TelegramBotTransport(token="test_token")
+    await transport.authenticate()  # This will initialize the bot properly
     
-    # Mock event registration
-    event_handler = None
-    def on_mock(event_type):
-        nonlocal event_handler
-        def register_handler(handler):
-            nonlocal event_handler
-            event_handler = handler
-            # Create a simple async mock that stores the handler
-            mock_handler = AsyncMock()
-            mock_handler.__real_handler__ = handler
-            return mock_handler
-        return register_handler
-    client.on = Mock(side_effect=on_mock)
+    # Set up message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock()
+    transport._message_sender = mock_sender
     
-    # Store event handler for testing
-    client._event_handler = event_handler
-    return client 
+    return transport
 
 @pytest.fixture
 def mock_http_request():

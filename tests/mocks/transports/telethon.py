@@ -1,3 +1,4 @@
+"""Mock implementations for Telethon client."""
 import pytest
 import pytest_asyncio
 import os
@@ -13,7 +14,9 @@ import asyncio
 from chronicler.exceptions import TransportError
 from chronicler.frames import CommandFrame
 from chronicler.transports.events import EventMetadata
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport, TelegramBotEvent
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
+from chronicler.transports.telegram_bot_event import TelegramBotEvent
+from chronicler.transports.telegram.transport.user import TelegramUserTransport
 
 from telethon import events
 
@@ -66,3 +69,29 @@ def mock_telethon(mock_session_path):
         
         mock.return_value = client
         yield mock
+
+@pytest_asyncio.fixture
+async def mock_telegram_user_client():
+    """Create a mock Telethon client for testing."""
+    return create_mock_telethon()
+
+@pytest_asyncio.fixture
+async def user_transport(mock_telegram_user_client, monkeypatch):
+    """Create a user transport instance."""
+    # Patch TelegramClient to return our mock
+    monkeypatch.setattr('chronicler.transports.telegram.transport.user.TelegramClient', Mock(return_value=mock_telegram_user_client))
+    
+    transport = TelegramUserTransport(
+        api_id=123456789,
+        api_hash="test_hash",
+        phone_number="+1234567890"
+    )
+    transport._client = mock_telegram_user_client
+    transport._initialized = True  # Since we're mocking, we can set this directly
+    
+    # Set up message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock()
+    transport._message_sender = mock_sender
+    
+    return transport

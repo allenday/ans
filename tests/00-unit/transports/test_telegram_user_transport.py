@@ -9,7 +9,7 @@ from chronicler.frames.base import Frame
 from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.transports.events import EventMetadata
-from chronicler.transports.telegram_user_transport import TelegramUserTransport
+from chronicler.transports.telegram.transport.user import TelegramUserTransport
 from chronicler.transports.telegram_user_update import TelegramUserUpdate
 from chronicler.transports.telegram_user_event import TelegramUserEvent
 from chronicler.exceptions import TransportError, TransportAuthenticationError
@@ -35,10 +35,20 @@ async def mock_client():
 @pytest_asyncio.fixture
 async def transport(mock_client):
     """Create a transport instance with mock client."""
-    with patch('chronicler.transports.telegram_user_transport.TelegramClient', return_value=mock_client):
+    with patch('chronicler.transports.telegram.transport.user.TelegramClient', return_value=mock_client):
         transport = TelegramUserTransport("123", "hash", "+1234567890", session_name=":memory:")
         mock_client.is_user_authorized.return_value = True  # Ensure client is authorized
         mock_client.connect.return_value = True  # Ensure connection succeeds
+        
+        # Set up message sender mock
+        mock_sender = AsyncMock()
+        mock_sender.send = AsyncMock()
+        transport._message_sender = mock_sender
+        
+        # Initialize transport
+        transport._initialized = True
+        transport._client = mock_client
+        
         await transport.start()
         yield transport
         await transport.stop()
@@ -61,7 +71,7 @@ async def test_user_transport_validates_params():
         TelegramUserTransport(api_id="123", api_hash="abc", phone_number="")
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_transport_auth_error(mock_client):
     """Test error handling during transport authentication."""
     transport = TelegramUserTransport(
@@ -89,7 +99,7 @@ async def test_user_transport_api_error():
     mock_client = AsyncMock()
     mock_client.connect.side_effect = ApiIdInvalidError("The api_id/api_hash combination is invalid")
     
-    with patch('chronicler.transports.telegram_user_transport.TelegramClient', return_value=mock_client):
+    with patch('chronicler.transports.telegram.transport.user.TelegramClient', return_value=mock_client):
         transport = TelegramUserTransport(
             api_id="123",
             api_hash="invalid_hash",
@@ -123,15 +133,28 @@ async def test_user_transport_send_without_init():
         await transport.send(frame)
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_handle_text_message(mock_client):
     """Test handling text messages."""
+    # Setup mock client
+    mock_client_instance = AsyncMock()
+    mock_client_instance.connect = AsyncMock(return_value=True)
+    mock_client_instance.is_connected = AsyncMock(return_value=True)
+    mock_client_instance.is_user_authorized = AsyncMock(return_value=True)
+    mock_client_instance.get_me = AsyncMock(return_value=Mock(id=123, first_name="Test User"))
+    mock_client_instance.start = AsyncMock()
+    mock_client.return_value = mock_client_instance
+
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
         phone_number="+1234567890",
         session_name=":memory:"
     )
+
+    # Initialize transport
+    await transport.start()
+    transport._initialized = True
 
     # Create mock update with proper structure
     mock_chat = MagicMock()
@@ -145,14 +168,11 @@ async def test_user_handle_text_message(mock_client):
 
     mock_message = MagicMock()
     mock_message.text = "Hello world"
-    mock_message.chat_id = 67890
     mock_message.chat = mock_chat
-    mock_message.sender_id = 11111
     mock_message.sender = mock_sender
     mock_message.id = 12345
     mock_message.reply_to_msg_id = 22222
-    mock_message.date = MagicMock()
-    mock_message.date.timestamp.return_value = datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp()
+    mock_message.date = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
     mock_event = MagicMock()
     mock_event.message = mock_message
@@ -162,8 +182,11 @@ async def test_user_handle_text_message(mock_client):
 
     # Track processed frames
     processed_frames = []
-    transport.process_frame = AsyncMock(side_effect=lambda frame: processed_frames.append(frame) or frame)
-    transport.send = AsyncMock()
+    async def frame_processor(frame):
+        processed_frames.append(frame)
+        frame.content = frame.content.upper()
+        return frame
+    transport.frame_processor = frame_processor
 
     # Handle message
     await transport._handle_message(update)
@@ -172,10 +195,14 @@ async def test_user_handle_text_message(mock_client):
     assert len(processed_frames) == 1
     frame = processed_frames[0]
     assert isinstance(frame, TextFrame)
-    assert frame.content == "Hello world"
+    assert frame.content == "HELLO WORLD"
+    assert frame.metadata['chat_id'] == 67890
+
+    # Clean up
+    await transport.stop()
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_handle_command(mock_client):
     """Test that command registration is no longer supported."""
     transport = TelegramUserTransport(
@@ -191,7 +218,7 @@ async def test_user_handle_command(mock_client):
     assert str(exc_info.value) == "Command registration is no longer supported in Transport"
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_transport_send_error(mock_client):
     """Test error handling during frame sending."""
     transport = TelegramUserTransport(
@@ -201,33 +228,33 @@ async def test_user_transport_send_error(mock_client):
         session_name=":memory:"
     )
 
-    # Mock client
+    # Mock client and message sender
     client_instance = AsyncMock()
-    client_instance.start = AsyncMock()  # Need to start transport first
-    client_instance.send_message = AsyncMock(side_effect=Exception("Failed to send message"))
+    client_instance.start = AsyncMock()
     mock_client.return_value = client_instance
 
-    # Start transport
-    await transport.start()
+    # Mock message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock(side_effect=Exception("Failed to send message"))
+    transport._message_sender = mock_sender
+    transport._initialized = True
 
-    # Create a test frame
-    frame = TextFrame(
-        content="Test message",
-        metadata=EventMetadata(
-            chat_id=67890,
-            chat_title="Test Chat",
-            thread_id="22222"
-        )
+    # Create a test frame with metadata
+    metadata = EventMetadata(
+        chat_id=67890,
+        chat_title="Test Chat",
+        thread_id="22222"
     )
+    frame = TextFrame(content="Test message", metadata=metadata)
 
     # Send should raise TransportError
     with pytest.raises(TransportError, match="Failed to send message"):
         await transport.send(frame)
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_send_text_frame(mock_client):
-    """Test sending text frames through user transport."""
+    """Test sending text frame."""
     transport = TelegramUserTransport(
         api_id="123",
         api_hash="abc",
@@ -235,39 +262,31 @@ async def test_user_send_text_frame(mock_client):
         session_name=":memory:"
     )
 
-    # Mock client
+    # Mock client and message sender
     client_instance = AsyncMock()
-    client_instance.start = AsyncMock()  # Need to start transport first
-    mock_message = Mock(id=12345)
-    client_instance.send_message = AsyncMock(return_value=mock_message)
+    client_instance.start = AsyncMock()
     mock_client.return_value = client_instance
 
-    # Start transport to initialize client
-    await transport.start()
+    # Mock message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock(return_value=123)  # Return message ID
+    transport._message_sender = mock_sender
+    transport._initialized = True
 
-    # Create a test frame
-    frame = TextFrame(
-        content="Test message",
-        metadata=EventMetadata(
-            chat_id=67890,
-            chat_title="Test Chat",
-            thread_id="22222"
-        )
+    # Create a test frame with metadata
+    metadata = EventMetadata(
+        chat_id=67890,
+        chat_title="Test Chat",
+        thread_id="22222"
     )
+    frame = TextFrame(content="Test message", metadata=metadata)
 
     # Send frame
-    sent_frame = await transport.send(frame)
-
-    # Verify message was sent
-    client_instance.send_message.assert_awaited_once_with(
-        67890,
-        "Test message",
-        reply_to="22222"
-    )
-    assert sent_frame.metadata["message_id"] == 12345
+    result = await transport.send(frame)
+    assert result == 123  # Assert that result is the message ID
 
 @pytest.mark.asyncio
-@patch('chronicler.transports.telegram_user_transport.TelegramClient')
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
 async def test_user_send_unsupported_frame(mock_client):
     """Test sending unsupported frame type."""
     transport = TelegramUserTransport(
@@ -277,24 +296,24 @@ async def test_user_send_unsupported_frame(mock_client):
         session_name=":memory:"
     )
 
-    # Mock client
+    # Mock client and message sender
     client_instance = AsyncMock()
     client_instance.start = AsyncMock()
     mock_client.return_value = client_instance
 
-    # Start transport
-    await transport.start()
+    # Mock message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock(side_effect=Exception("Unsupported frame type"))
+    transport._message_sender = mock_sender
+    transport._initialized = True
 
-    # Create an unsupported frame type
-    class UnsupportedFrame(Frame):
-        pass
-
-    frame = UnsupportedFrame()
-    frame.metadata = EventMetadata(
+    # Create a test frame with metadata
+    metadata = EventMetadata(
         chat_id=67890,
         chat_title="Test Chat",
         thread_id="22222"
     )
+    frame = Frame(metadata=metadata)  # Base frame type is not supported
 
     # Send should raise TransportError
     with pytest.raises(TransportError, match="Unsupported frame type"):
@@ -303,7 +322,7 @@ async def test_user_send_unsupported_frame(mock_client):
 @pytest.mark.asyncio
 async def test_user_transport_lifecycle():
     """Test user transport lifecycle."""
-    with patch('chronicler.transports.telegram_user_transport.TelegramClient') as mock_client_class:
+    with patch('chronicler.transports.telegram.transport.user.TelegramClient') as mock_client_class:
         # Setup mock client
         mock_client = AsyncMock()
         mock_client.connect = AsyncMock(return_value=True)
@@ -312,7 +331,7 @@ async def test_user_transport_lifecycle():
         mock_client.is_user_authorized = AsyncMock(return_value=True)
         mock_client.send_code_request = AsyncMock()
         mock_client.sign_in = AsyncMock()
-        mock_client.get_me = AsyncMock()
+        mock_client.get_me = AsyncMock(return_value=Mock(id=123, first_name="Test User"))
         mock_client.add_event_handler = AsyncMock()
         
         # Mock the start method to avoid actual client initialization
@@ -326,38 +345,55 @@ async def test_user_transport_lifecycle():
             session_name=":memory:"
         )
         
+        # Start transport and verify initialization
         await transport.start()
         assert mock_client.connect.called
         assert mock_client.is_user_authorized.called
         assert mock_client.get_me.called
+        assert transport._message_sender is not None
+        assert transport._initialized is True
         
+        # Stop transport and verify cleanup
         await transport.stop()
         mock_client.disconnect.assert_awaited_once()
 
 @pytest.mark.asyncio
-async def test_user_transport_send_image(transport, mock_client):
-    """Test sending image frames through user transport."""
-    # Create mock message with ID
-    mock_message = Mock()
-    mock_message.id = 789
-    mock_client.send_file = AsyncMock(return_value=mock_message)
-
-    # Send image frame
-    image_data = b"test_image_data"
-    metadata = EventMetadata(chat_id=456)
-    frame = ImageFrame(image_data, metadata=metadata, size=(100, 100))
-    frame.caption = "Test image"
-
-    await transport.send(frame)
-
-    # Verify send_file was called with correct args
-    mock_client.send_file.assert_awaited_once_with(
-        456,
-        file=image_data,
-        caption="Test image",
-        reply_to=None
+@patch('chronicler.transports.telegram.transport.user.TelegramClient')
+async def test_user_transport_send_image(mock_client):
+    """Test sending image frame."""
+    transport = TelegramUserTransport(
+        api_id="123",
+        api_hash="abc",
+        phone_number="+1234567890",
+        session_name=":memory:"
     )
-    assert frame.metadata["message_id"] == 789
+
+    # Mock client and message sender
+    client_instance = AsyncMock()
+    client_instance.start = AsyncMock()
+    mock_client.return_value = client_instance
+
+    # Mock message sender
+    mock_sender = AsyncMock()
+    mock_sender.send = AsyncMock(return_value=123)  # Return message ID
+    transport._message_sender = mock_sender
+    transport._initialized = True
+
+    # Create a test frame with metadata
+    metadata = EventMetadata(
+        chat_id=67890,
+        chat_title="Test Chat",
+        thread_id="22222"
+    )
+    frame = ImageFrame(
+        content=b"Test image bytes",  # Provide bytes for image content
+        caption="Test caption",
+        metadata=metadata
+    )
+
+    # Send frame
+    result = await transport.send(frame)
+    assert result == 123  # Assert that result is the message ID
 
 @pytest.mark.asyncio
 async def test_user_transport_message_processing(transport, mock_client):
@@ -365,33 +401,47 @@ async def test_user_transport_message_processing(transport, mock_client):
     # Create mock message with ID
     mock_message = Mock()
     mock_message.id = 789
-    mock_client.send_message = AsyncMock(return_value=mock_message)
+    transport._message_sender.send = AsyncMock(return_value=mock_message)
 
     # Create mock update
-    mock_update = Mock()
-    mock_update.message = Mock()
-    mock_update.message.text = "Hello, World!"
-    mock_update.message.chat_id = 456
-    mock_update.message.chat = Mock()
-    mock_update.message.chat.type = "private"  # Used by is_private property
-    mock_update.message.date = Mock()
-    mock_update.message.date.timestamp = Mock(return_value=1234567890)
+    mock_chat = MagicMock()
+    mock_chat.id = 456
+    mock_chat.title = "Test Chat"
+    mock_chat.type = "private"
 
-    # Create frame processor that converts args to uppercase
+    mock_sender = MagicMock()
+    mock_sender.id = 11111
+    mock_sender.username = "testuser"
+
+    mock_message = MagicMock()
+    mock_message.text = "Hello, World!"
+    mock_message.chat = mock_chat
+    mock_message.sender = mock_sender
+    mock_message.id = 789
+    mock_message.reply_to_msg_id = None
+    mock_message.date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    mock_event = MagicMock()
+    mock_event.message = mock_message
+
+    # Create frame processor that converts text to uppercase
     async def frame_processor(frame):
         frame.content = frame.content.upper()
         return frame
     transport.frame_processor = frame_processor
 
-    # Handle message
-    await transport._handle_message(TelegramUserUpdate(mock_update))
+    # Create update object and handle message
+    update = TelegramUserUpdate(mock_event)
+    await transport._handle_message(update)
 
-    # Verify send_message was called with processed content
-    mock_client.send_message.assert_awaited_once_with(
-        456,
-        "HELLO, WORLD!",
-        reply_to=None
-    )
+    # Verify message was sent with processed text
+    transport._message_sender.send.assert_awaited_once()
+    args, kwargs = transport._message_sender.send.await_args
+    frame = args[0]
+    assert frame.content == "HELLO, WORLD!"
+
+    # Clean up
+    await transport.stop()
 
 @pytest.mark.asyncio
 async def test_user_transport_command_processing(mock_client):

@@ -8,7 +8,7 @@ from chronicler.logging import get_logger
 from chronicler.frames.base import Frame
 from chronicler.commands.processor import CommandProcessor
 from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 from chronicler.processors.storage_processor import StorageProcessor
 from chronicler.exceptions import TransportAuthenticationError
 from .pipeline import Pipeline

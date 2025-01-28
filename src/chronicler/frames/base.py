@@ -4,8 +4,6 @@ from dataclasses import dataclass, field, KW_ONLY
 from typing import Optional, Dict, Any, Union
 from abc import ABC
 
-from chronicler.transports.events import EventMetadata
-
 logger = get_logger("chronicler.frames.base")
 
 @dataclass
@@ -13,10 +11,11 @@ class Frame(ABC):
     """Base frame class."""
     _: KW_ONLY
     content: Optional[str] = None
-    metadata: Union[Dict[str, Any], EventMetadata] = field(default_factory=dict)
+    metadata: Union[Dict[str, Any], 'EventMetadata'] = field(default_factory=dict)
     
     def __post_init__(self):
         """Convert metadata to dict if it's an EventMetadata object."""
+        from chronicler.transports.events import EventMetadata
         if isinstance(self.metadata, EventMetadata):
             # Convert EventMetadata to dict
             required_fields = ['chat_id', 'thread_id']

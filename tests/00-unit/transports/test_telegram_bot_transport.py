@@ -4,7 +4,7 @@ import asyncio
 from tests.mocks.transports.telegram import mock_telegram_bot
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from chronicler.exceptions import TransportError, TransportAuthenticationError
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.frames.command import CommandFrame
 from telegram.ext import CommandHandler

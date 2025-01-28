@@ -10,7 +10,7 @@ from telegram import Bot
 import asyncio
 
 from chronicler.exceptions import TransportError
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 
 # Create a custom builder that returns our mock
 class MockBuilder:
@@ -543,7 +543,7 @@ async def test_application_builder_transport_flow(monkeypatch):
     monkeypatch.setattr("telegram.ext.ExtBot", MockBot)
     monkeypatch.setattr("telegram.ext.ApplicationBuilder", MockApplicationBuilder)
     monkeypatch.setattr("telegram.request.HTTPXRequest", MockRequest)
-    monkeypatch.setattr("chronicler.transports.telegram_bot_transport.ApplicationBuilder", MockApplicationBuilder)
+    monkeypatch.setattr("chronicler.transports.telegram.transport.bot.ApplicationBuilder", MockApplicationBuilder)
 
     # Create transport with test token
     transport = TelegramBotTransport("test_token")
