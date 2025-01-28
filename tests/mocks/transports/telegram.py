@@ -146,7 +146,8 @@ from chronicler.exceptions import (
 )
 from chronicler.frames import CommandFrame
 from chronicler.transports.events import EventMetadata
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport, TelegramBotEvent
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
+from chronicler.transports.telegram_bot_event import TelegramBotEvent
 
 from telegram.error import InvalidToken
 from chronicler.exceptions import TransportError, TransportAuthenticationError
@@ -343,8 +344,8 @@ def mock_telegram_bot(monkeypatch):
     logger.debug("Setting up mock telegram bot")
     
     # Patch ApplicationBuilder and Application in the transport module
-    monkeypatch.setattr('chronicler.transports.telegram_bot_transport.ApplicationBuilder', MockApplicationBuilder)
-    monkeypatch.setattr('chronicler.transports.telegram_bot_transport.Application', MockApplication)
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.ApplicationBuilder', MockApplicationBuilder)
+    monkeypatch.setattr('chronicler.transports.telegram.transport.bot.Application', MockApplication)
     
     stop_event = asyncio.Event()
     

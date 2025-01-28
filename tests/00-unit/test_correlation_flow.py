@@ -8,7 +8,7 @@ from chronicler.frames.command import CommandFrame
 from chronicler.frames.media import TextFrame
 from chronicler.commands.processor import CommandProcessor
 from chronicler.handlers.command import StartCommandHandler, ConfigCommandHandler, StatusCommandHandler
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 from chronicler.logging import configure_logging, get_logger
 from tests.mocks.transports.telegram import mock_telegram_bot
 from chronicler.logging.config import CORRELATION_ID

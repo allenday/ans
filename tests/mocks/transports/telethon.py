@@ -13,7 +13,8 @@ import asyncio
 from chronicler.exceptions import TransportError
 from chronicler.frames import CommandFrame
 from chronicler.transports.events import EventMetadata
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport, TelegramBotEvent
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
+from chronicler.transports.telegram_bot_event import TelegramBotEvent
 
 from telethon import events
 

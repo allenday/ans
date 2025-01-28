@@ -9,7 +9,7 @@ from unittest.mock import patch
 from chronicler.frames.base import Frame
 from chronicler.commands.processor import CommandProcessor
 from chronicler.handlers.command import CommandHandler
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 from chronicler.processors.storage_processor import StorageProcessor
 from chronicler.pipeline.pipecat_runner import run_bot, main
 from chronicler.processors.base import BaseProcessor

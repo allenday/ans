@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from telegram import Bot, Message, Chat, User, Update, PhotoSize
 from telegram.ext import ApplicationBuilder
 from chronicler.frames import TextFrame
-from chronicler.transports.telegram_bot_transport import TelegramBotTransport
+from chronicler.transports.telegram.transport.bot import TelegramBotTransport
 from chronicler.transports.telegram_user_transport import TelegramUserTransport
 from chronicler.logging.config import trace_operation
 from tests.mocks.transports.telethon import create_mock_telethon
