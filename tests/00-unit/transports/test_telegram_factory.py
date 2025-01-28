@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from chronicler.transports.telegram.transport.bot import TelegramBotTransport
-from chronicler.transports.telegram_user_transport import TelegramUserTransport
+from chronicler.transports.telegram.transport.user import TelegramUserTransport
 from chronicler.transports.telegram_factory import TelegramTransportFactory
 
 def test_create_bot_transport():

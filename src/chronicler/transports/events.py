@@ -10,27 +10,33 @@ from telegram import Update
 
 @dataclass
 class EventMetadata:
-    """Normalized metadata from transport events.
-    
-    Note: This is a placeholder for future multi-platform support.
-    Currently only the Telegram-specific fields are used.
-    """
-    # Currently used (Telegram)
-    chat_id: int
+    """Event metadata for transport events."""
+    chat_id: Optional[int] = None
     chat_title: Optional[str] = None
     sender_id: Optional[int] = None
     sender_name: Optional[str] = None
     message_id: Optional[int] = None
-    
-    # Future platform support (not used yet)
-    platform: str = "telegram"  # 'telegram', 'twitter', 'discord'
+    platform: str = "telegram"
     timestamp: Optional[datetime] = None
-    reply_to: Optional[str] = None
+    reply_to: Optional[int] = None
     thread_id: Optional[str] = None
-    channel_id: Optional[str] = None  # Discord channel, Twitter thread
-    guild_id: Optional[str] = None    # Discord server
+    channel_id: Optional[str] = None
+    guild_id: Optional[str] = None
     is_private: bool = False
     is_group: bool = False
+
+    def __getitem__(self, key: str) -> Any:
+        """Get metadata field by key."""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set metadata field by key."""
+        setattr(self, key, value)
+
+    def update(self, other: Dict[str, Any]) -> None:
+        """Update metadata fields from dictionary."""
+        for key, value in other.items():
+            setattr(self, key, value)
 
 class EventBase(ABC):
     """Abstract base class for transport events."""

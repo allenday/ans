@@ -98,10 +98,10 @@ src/chronicler/transports/
     ├── sender
     │   ├── __init__.py
     │   ├── base.py (new file)
-    │   ├── bot.py (was telegram/transport/bot.py)
+    │   ├── bot.py
     │   └── user.py (was telegram/transport/user.py)
     └── transport
         ├── __init__.py
         ├── base.py
-        ├── bot.py
+        ├── bot.py (done)
         └── user.py

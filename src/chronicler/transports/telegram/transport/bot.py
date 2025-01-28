@@ -13,6 +13,7 @@ from chronicler.frames.media import TextFrame, ImageFrame
 from chronicler.transports.telegram_transport import TelegramTransportBase
 from chronicler.transports.telegram_bot_event import TelegramBotEvent
 from chronicler.transports.telegram_bot_update import TelegramBotUpdate
+from chronicler.transports.telegram.message_sender import TelegramMessageSender
 from chronicler.logging import get_logger
 from chronicler.logging.config import trace_operation, CORRELATION_ID
 from chronicler.exceptions import TransportError, TransportAuthenticationError
@@ -37,6 +38,7 @@ class TelegramBotTransport(TelegramTransportBase):
         self._error_count = 0
         self.frame_processor = None
         self.storage = storage
+        self._message_sender = None
         self.logger = get_logger(__name__)
 
     @property
@@ -89,6 +91,7 @@ class TelegramBotTransport(TelegramTransportBase):
             
             self._initialized = True
             self._bot = self._app.bot
+            self._message_sender = TelegramMessageSender(self._bot)
             self.logger.debug("Authentication successful")
         except InvalidToken as e:
             self.logger.error(f"Failed to initialize bot: {e}")
@@ -142,33 +145,10 @@ class TelegramBotTransport(TelegramTransportBase):
         if not self._initialized:
             raise RuntimeError("Transport not initialized")
 
-        if not frame.metadata or frame.metadata.get("chat_id") is None:
-            raise ValueError("chat_id is required")
+        if not self._message_sender:
+            raise RuntimeError("Message sender not initialized")
 
-        try:
-            if not isinstance(frame, (TextFrame, ImageFrame)):
-                raise TransportError(f"Unsupported frame type: {type(frame)}")
-
-            if isinstance(frame, TextFrame):
-                message = await self._bot.send_message(
-                    chat_id=frame.metadata["chat_id"],
-                    text=frame.content,
-                    reply_to_message_id=frame.metadata.get("thread_id")
-                )
-                frame.metadata["message_id"] = message.message_id
-            else:  # Must be ImageFrame
-                message = await self._bot.send_photo(
-                    chat_id=frame.metadata["chat_id"],
-                    photo=frame.content,
-                    caption=frame.metadata.get("caption"),
-                    reply_to_message_id=frame.metadata.get("thread_id")
-                )
-                frame.metadata["message_id"] = message.message_id
-
-            return frame
-        except Exception as e:
-            logger.error(f"Failed to send frame: {e}")
-            raise TransportError(str(e)) from e
+        return await self._message_sender.send(frame)
 
     @trace_operation('transport.telegram.bot')
     async def process_frame(self, frame: Frame) -> Frame:

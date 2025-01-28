@@ -25,7 +25,7 @@ class TelegramUserUpdate(Update):
     @property
     def chat_id(self) -> int:
         """Get chat ID."""
-        chat_id = self._event.message.chat_id
+        chat_id = self._event.message.chat.id
         # If it's a mock, get the value it's mocking
         if hasattr(chat_id, '_mock_return_value'):
             return chat_id._mock_return_value

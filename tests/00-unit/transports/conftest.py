@@ -1,6 +1,11 @@
 """Fixtures for transport tests."""
-import pytest
-from tests.mocks.transports.telegram import mock_telegram_bot
+from tests.mocks.transports.telegram import bot_transport, mock_telegram_bot
+from tests.mocks.transports.telethon import user_transport, mock_telegram_user_client
 
-# Re-export the fixture
-__all__ = ['mock_telegram_bot'] 
+# Re-export the fixtures
+__all__ = [
+    'bot_transport',
+    'mock_telegram_bot',
+    'user_transport',
+    'mock_telegram_user_client'
+] 
